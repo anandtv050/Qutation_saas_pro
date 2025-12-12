@@ -102,6 +102,9 @@ CREATE TABLE tbl_ai_response (
     json_ai_response JSONB NOT NULL,
     vchr_prompt_version VARCHAR(50),
     vchr_model_used VARCHAR(50),
+    int_tokens_input INTEGER DEFAULT 0,
+    int_tokens_output INTEGER DEFAULT 0,
+    dbl_cost_inr DECIMAL(10,6) DEFAULT 0.00,
     tim_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (fk_bint_raw_input_id) REFERENCES tbl_raw_input(pk_bint_raw_input_id) ON DELETE CASCADE,
