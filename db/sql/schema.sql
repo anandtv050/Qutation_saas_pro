@@ -19,7 +19,8 @@ DROP TABLE IF EXISTS tbl_user CASCADE;
 -- =====================================================
 CREATE TABLE tbl_user (
     pk_bint_user_id BIGSERIAL PRIMARY KEY,
-    vchr_username VARCHAR(100) UNIQUE NOT NULL,
+    vchr_email VARCHAR(255) UNIQUE NOT NULL,
+    vchr_username VARCHAR(100) NOT NULL,
     vchr_password_hash VARCHAR(255) NOT NULL,
     vchr_business_name VARCHAR(200),
     vchr_phone VARCHAR(20),
@@ -30,6 +31,7 @@ CREATE TABLE tbl_user (
     tim_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX idx_email ON tbl_user(vchr_email);
 CREATE INDEX idx_username ON tbl_user(vchr_username);
 
 -- Trigger for auto-updating tim_updated_at

@@ -1,0 +1,92 @@
+"""
+Quttaion Saas Pro - Backend API 
+Multi-tenant SaaS application for quotations and invoices
+"""
+__author__ = "Anand"
+
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
+import importlib
+
+from app.core.database import ClsDatabasepool
+from app.api.login.router import router as login_router
+
+
+# Router registry - Easy to see all APIs
+LST_ROUTERS = [
+    "app.api.login.router",
+    # "app.api.register.router",      # Add when ready
+    # "app.api.quotation.router",     # Add when ready
+    # "app.api.invoice.router",       # Add when ready
+    # "app.api.inventory.router",     # Add when ready
+]
+
+
+@asynccontextmanager
+async def lifespan(app:FastAPI):
+    """Application life span"""
+    insDb = ClsDatabasepool()
+    await insDb.fnConnectDb()  # Connect to database
+    #startup
+    print("Starting Qutation Saas Pro API...")
+    yield
+    await insDb.fnDisconnectPool()
+    #Shotdown
+    print("Shutting down Qutation Saas Pro API...")
+
+
+
+def fnCreateApp() -> FastAPI:
+    """Create FastAPI application with dynamic router loading"""
+    
+    app = FastAPI(
+        title="Quotation Saas Pro",
+        description="Multi-tenant SaaS for Quotations & Invoices",
+        version="1.0.0",
+        lifespan=lifespan,
+        debug=True,
+    )
+    
+    # CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Frontend URLs
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+# Register routers
+
+
+    @app.get("/")
+    async def root():
+        """Root endpoint"""
+        return {
+            "message": "Quotation SaaS Pro API",
+            "version": "1.0.0",
+            "docs": "/docs"
+        }
+        
+        # Dynamically load routers
+    for strModulePath in LST_ROUTERS:
+        try:
+            module = importlib.import_module(strModulePath)
+            router = getattr(module, 'router', None)
+            
+            if router is None:
+                print(f"⚠️  Warning: Router not found in {strModulePath}")
+                continue
+            
+            app.include_router(router)
+            print(f" Loaded router: {strModulePath}")
+            
+        except Exception as e:
+            print(f" Failed to load router {strModulePath}: {e}")
+            raise
+
+    return app
+
+
+# Create app instance
+app = fnCreateApp()
