@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import authService from "@/services/authServices";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -20,10 +21,21 @@ export default function Login() {
 
     setIsLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 1000));
-      console.log("Login:", { email, password });
       // TODO: API call
-    } catch {
+      const response = await authService.login(email,password);
+
+      // store token in localstorage
+      localStorage.setItem('access_token',response.strAccessToken)
+
+      // store user info 
+      localStorage.setItem('user_info',JSON.stringify(response.dctUserInfo));
+
+      // success redirect into dashboard
+      console.log("Login SUccess")
+      // TODO : navigarte into dashbord
+      alert(`Welcome ${response.dctUserInfo.strUserName}!`);
+
+    } catch(error) {
       setError("Invalid email or password");
     } finally {
       setIsLoading(false);

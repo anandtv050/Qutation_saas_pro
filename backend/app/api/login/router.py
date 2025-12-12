@@ -6,7 +6,7 @@ from app.api.login.service import ClsLoginService
 from app.core.database import ClsDatabasepool
 
 
-router = APIRouter(prefix="/Auth",tags=["Authentication"])
+router = APIRouter(prefix="/auth",tags=["Authentication"])
 @router.post("/login",response_model=MdlLoginResponse)
 async def fnLogin(mdlLoginRequest:MdlLoginRequest):
     try:
