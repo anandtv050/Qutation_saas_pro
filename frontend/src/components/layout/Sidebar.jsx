@@ -1,10 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, FilePlus, ReceiptText, BarChart3, User, LogOut } from "lucide-react";
+import { Home, FilePlus, Package, BarChart3, User, LogOut } from "lucide-react";
 
 const navItems = [
   { path: "/dashboard", label: "Home", icon: Home },
   { path: "/quotations/new", label: "New Quote", icon: FilePlus },
-  { path: "/invoices/new", label: "New Bill", icon: ReceiptText },
+  { path: "/inventory", label: "Inventory", icon: Package },
   { path: "/reports", label: "Reports", icon: BarChart3 },
 ];
 

@@ -1,12 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, FilePlus, ReceiptText, BarChart3, User } from "lucide-react";
+import { Home, FilePlus, Package, BarChart3 } from "lucide-react";
 
 const navItems = [
   { path: "/dashboard", label: "Home", icon: Home },
   { path: "/quotations/new", label: "Quote", icon: FilePlus },
-  { path: "/invoices/new", label: "Bill", icon: ReceiptText },
+  { path: "/inventory", label: "Inventory", icon: Package },
   { path: "/reports", label: "Reports", icon: BarChart3 },
-  { path: "/profile", label: "Profile", icon: User },
 ];
 
 export default function MobileNav() {
@@ -14,7 +13,8 @@ export default function MobileNav() {
 
   const isActive = (path) => {
     if (path === "/dashboard") return location.pathname === "/dashboard";
-    if (path === "/profile") return location.pathname === "/profile";
+    if (path === "/inventory") return location.pathname === "/inventory";
+    if (path === "/reports") return location.pathname === "/reports";
     return location.pathname.startsWith(path.replace("/new", ""));
   };
 

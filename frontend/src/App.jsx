@@ -3,6 +3,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import NewQuotation from "./pages/NewQuotation";
 import NewInvoice from "./pages/NewInvoice";
+import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
 import Profile from "./pages/Profile";
 import MainLayout from "./components/layout/MainLayout";
@@ -38,6 +39,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/quotations/new" element={<NewQuotation />} />
           <Route path="/invoices/new" element={<NewInvoice />} />
+          <Route path="/inventory" element={<Inventory />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/profile" element={<Profile />} />
         </Route>
