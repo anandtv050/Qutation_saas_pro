@@ -1,53 +1,121 @@
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import {
-  ArrowLeft,
-  MessageSquareText,
-  ListPlus,
-  Send,
-  Plus,
-  Trash2,
-  User,
-  Phone,
-  MapPin,
-  Loader2,
-  Sparkles
-} from "lucide-react";
+import { ArrowLeft, Plus, Minus, X, Loader2, ChevronRight, Search, Printer, FilePlus, Calendar, Check, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { searchInventory, inventoryItems } from "@/data/inventoryData";
+
+// Session storage key
+const STORAGE_KEY = "quotation_draft";
+
+// Load draft from session storage
+const loadDraft = () => {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+};
+
+// Save draft to session storage
+const saveDraft = (data) => {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // Ignore storage errors
+  }
+};
+
+// Clear draft from session storage
+const clearDraft = () => {
+  sessionStorage.removeItem(STORAGE_KEY);
+};
 
 export default function NewQuotation() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const mode = searchParams.get("mode") || "ai";
 
-  const [step, setStep] = useState(1); // 1: Input, 2: Review, 3: Customer Details
+  // Load saved draft on mount
+  const draft = loadDraft();
+
+  const [rawInput, setRawInput] = useState(draft?.rawInput || "");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showForm, setShowForm] = useState(draft?.showForm ?? mode === "manual");
 
-  // AI Mode State
-  const [rawInput, setRawInput] = useState("");
+  const [customerName, setCustomerName] = useState(draft?.customerName || "");
+  const [customerPhone, setCustomerPhone] = useState(draft?.customerPhone || "");
+  const [customerAddress, setCustomerAddress] = useState(draft?.customerAddress || "");
+  const [items, setItems] = useState(draft?.items || []);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Items State (shared between modes)
-  const [items, setItems] = useState([]);
+  // Success state after save
+  const [savedQuotation, setSavedQuotation] = useState(draft?.savedQuotation || null);
+  const [isUpdated, setIsUpdated] = useState(false); // Track if this was an update
 
-  // Customer State
-  const [customer, setCustomer] = useState({
-    name: "",
-    phone: "",
-    site_address: "",
+  // Inventory search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isCustomItem, setIsCustomItem] = useState(false);
+  const [customRate, setCustomRate] = useState("");
+  const searchRef = useRef(null);
+
+  // Current date
+  const today = new Date().toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 
-  // Tax
-  const [taxPercent, setTaxPercent] = useState(18);
-  const [discount, setDiscount] = useState(0);
+  const total = items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
 
-  // Calculate totals
-  const subtotal = items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
-  const taxAmount = (subtotal * taxPercent) / 100;
-  const total = subtotal + taxAmount - discount;
+  // Check for custom items with zero rate (needs attention)
+  const hasZeroRateItems = items.some(item => !item.fromInventory && item.rate === 0);
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = items.length > 0 || customerName.trim() || customerPhone.trim() || customerAddress.trim() || rawInput.trim();
+
+  // Save draft to session storage whenever data changes
+  useEffect(() => {
+    saveDraft({
+      customerName,
+      customerPhone,
+      customerAddress,
+      items,
+      rawInput,
+      showForm,
+      savedQuotation,
+    });
+  }, [customerName, customerPhone, customerAddress, items, rawInput, showForm, savedQuotation]);
+
+  // Warn before closing/refreshing browser tab with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges && !savedQuotation) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges, savedQuotation]);
+
+  // Custom navigation with confirmation
+  const navigateWithConfirm = (path) => {
+    if (hasUnsavedChanges && !savedQuotation) {
+      if (window.confirm("You have unsaved changes. Are you sure you want to leave?")) {
+        navigate(path);
+      }
+    } else {
+      navigate(path);
+    }
+  };
 
   const formatCurrency = (amount) => {
+    if (amount === 0) return "₹0";
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
@@ -55,439 +123,666 @@ export default function NewQuotation() {
     }).format(amount);
   };
 
-  // AI Processing (mock - will connect to backend later)
+  // Handle search input
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const results = searchInventory(searchQuery);
+      setSearchResults(results);
+      setShowDropdown(true);
+      setIsCustomItem(results.length === 0 || !results.some(r =>
+        r.name.toLowerCase() === searchQuery.toLowerCase()
+      ));
+    } else {
+      setSearchResults(inventoryItems.slice(0, 8));
+      setShowDropdown(false);
+      setIsCustomItem(false);
+    }
+  }, [searchQuery]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const processWithAI = async () => {
     if (!rawInput.trim()) return;
-
     setIsProcessing(true);
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Simulate AI processing delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const lines = rawInput.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
+    const parsed = lines.map((line, i) => {
+      const match = line.match(/^(\d+)\s*(.+)/i);
+      const qty = match ? parseInt(match[1]) : 1;
+      const itemText = match ? match[2].trim() : line;
 
-    // Mock AI response - parse basic patterns
-    const mockItems = parseRawInput(rawInput);
-    setItems(mockItems);
-    setIsProcessing(false);
-    setStep(2);
-  };
+      const lowerText = itemText.toLowerCase();
+      const inventoryMatch = inventoryItems.find(inv =>
+        inv.name.toLowerCase().includes(lowerText) ||
+        lowerText.includes(inv.name.toLowerCase().split(' ').slice(0, 2).join(' '))
+      );
 
-  // Simple parser for demo (will be replaced with AI)
-  const parseRawInput = (input) => {
-    const lines = input.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
-    return lines.map((line, index) => {
-      // Try to extract quantity and item name
-      const match = line.match(/^(\d+)\s*(?:bags?|pcs?|pieces?|kg|units?|boxes?|sets?)?\s*(.+)/i);
-      if (match) {
-        return {
-          id: Date.now() + index,
-          name: match[2].trim(),
-          qty: parseInt(match[1]),
-          rate: 0,
-        };
-      }
       return {
-        id: Date.now() + index,
-        name: line,
-        qty: 1,
-        rate: 0,
+        id: Date.now() + i,
+        name: inventoryMatch ? inventoryMatch.name : itemText,
+        qty: qty,
+        rate: inventoryMatch ? inventoryMatch.rate : 0,
+        fromInventory: !!inventoryMatch,
       };
     });
+
+    setItems(parsed);
+    setIsProcessing(false);
+    setShowForm(true);
   };
 
-  // Manual mode - add empty item
-  const addItem = () => {
-    setItems([...items, { id: Date.now(), name: "", qty: 1, rate: 0 }]);
+  const addItemFromInventory = (inventoryItem) => {
+    const existing = items.find(item => item.name === inventoryItem.name);
+    if (existing) {
+      setItems(items.map(item =>
+        item.name === inventoryItem.name ? { ...item, qty: item.qty + 1 } : item
+      ));
+    } else {
+      setItems([...items, {
+        id: Date.now(),
+        name: inventoryItem.name,
+        qty: 1,
+        rate: inventoryItem.rate,
+        fromInventory: true,
+      }]);
+    }
+    setSearchQuery("");
+    setShowDropdown(false);
   };
 
-  const updateItem = (id, field, value) => {
+  const addCustomItem = () => {
+    if (!searchQuery.trim() || !customRate) return;
+    setItems([...items, {
+      id: Date.now(),
+      name: searchQuery.trim(),
+      qty: 1,
+      rate: Number(customRate) || 0,
+      fromInventory: false,
+    }]);
+    setSearchQuery("");
+    setCustomRate("");
+    setShowDropdown(false);
+    setIsCustomItem(false);
+  };
+
+  const updateQty = (id, delta) => {
     setItems(items.map(item =>
-      item.id === id ? { ...item, [field]: field === "name" ? value : Number(value) || 0 } : item
+      item.id === id ? { ...item, qty: Math.max(1, item.qty + delta) } : item
     ));
   };
 
-  const removeItem = (id) => {
-    setItems(items.filter(item => item.id !== id));
+  const updateRate = (id, rate) => {
+    setItems(items.map(item =>
+      item.id === id ? { ...item, rate: Number(rate) || 0 } : item
+    ));
   };
 
-  // Initialize manual mode with one empty item
-  useEffect(() => {
-    if (mode === "manual" && items.length === 0) {
-      addItem();
-    }
-  }, [mode]);
+  const removeItem = (id) => setItems(items.filter(item => item.id !== id));
 
-  const handleSubmit = () => {
-    // For now, just log and navigate back
-    console.log("Quotation:", { customer, items, subtotal, taxAmount, discount, total });
-    alert("Quotation created! (Demo mode)");
-    navigate("/dashboard");
+  const resetForm = () => {
+    setCustomerName("");
+    setCustomerPhone("");
+    setCustomerAddress("");
+    setItems([]);
+    setRawInput("");
+    setSavedQuotation(null);
+    setIsUpdated(false);
+    setShowForm(mode === "manual");
+    clearDraft(); // Clear session storage
   };
 
-  // Step 1: AI Input or Manual Items
-  if (step === 1) {
+  const handleSave = async () => {
+    if (!customerName.trim()) return alert("Enter customer name");
+    if (items.length === 0) return alert("Add at least one item");
+
+    const wasAlreadySaved = !!savedQuotation;
+    setIsSaving(true);
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Generate quotation number only on first save (in real app, this comes from backend)
+    const quotationNumber = savedQuotation?.quotation_number || `QT-${Date.now().toString().slice(-6)}`;
+
+    const quotationData = {
+      quotation_number: quotationNumber,
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      customer_address: customerAddress,
+      items: items,
+      total: total,
+      date: savedQuotation?.date || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    console.log(wasAlreadySaved ? "Updated:" : "Saved:", quotationData);
+    setIsSaving(false);
+    setSavedQuotation(quotationData);
+    setIsUpdated(wasAlreadySaved); // Mark as updated if it was already saved before
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  // AI Input Screen
+  if (!showForm && mode === "ai") {
     return (
-      <div className="min-h-screen">
-        <div className="max-w-lg mx-auto px-5 py-6">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-8">
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-neutral-600" />
-            </button>
+      <div className="p-4 md:p-6 max-w-2xl mx-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <button onClick={() => navigateWithConfirm("/dashboard")} className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg">
+            <ArrowLeft className="w-5 h-5 text-neutral-600" />
+          </button>
+          <h1 className="text-lg font-semibold text-neutral-900">Quick Create</h1>
+        </div>
+
+        {/* Customer Details for AI Mode */}
+        <div className="bg-white border border-neutral-200 rounded-xl p-4 mb-4">
+          <h2 className="font-medium text-neutral-900 mb-3">Customer Details</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <h1 className="text-xl font-semibold text-neutral-900">
-                {mode === "ai" ? "Quick Create" : "Add Items"}
-              </h1>
-              <p className="text-sm text-neutral-500">
-                {mode === "ai" ? "Describe what you need" : "Add items to quotation"}
-              </p>
+              <label className="text-xs font-medium text-neutral-500 mb-1 block">Name *</label>
+              <Input
+                placeholder="Customer name"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="h-10 border-neutral-200 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-neutral-500 mb-1 block">Phone</label>
+              <Input
+                placeholder="Phone number"
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                className="h-10 border-neutral-200 rounded-lg"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium text-neutral-500 mb-1 block">Address</label>
+              <Input
+                placeholder="Site address"
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                className="h-10 border-neutral-200 rounded-lg"
+              />
             </div>
           </div>
+        </div>
 
-          {/* Mode Toggle */}
-          <div className="flex gap-2 p-1 bg-neutral-100 rounded-xl mb-6">
-            <button
-              onClick={() => navigate("/quotations/new?mode=ai")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                mode === "ai"
-                  ? "bg-white text-neutral-900 shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-700"
-              }`}
-            >
-              <MessageSquareText className="w-4 h-4" />
-              Quick
-            </button>
-            <button
-              onClick={() => navigate("/quotations/new?mode=manual")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                mode === "manual"
-                  ? "bg-white text-neutral-900 shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-700"
-              }`}
-            >
-              <ListPlus className="w-4 h-4" />
-              Manual
-            </button>
-          </div>
-
-          {mode === "ai" ? (
-            /* AI Mode Input */
-            <div className="space-y-4">
-              <div className="relative">
-                <Textarea
-                  placeholder="Type your requirements...
+        <Textarea
+          placeholder="Type your items here...
 
 Example:
-100 bags cement
-50 rods 12mm steel
-200 cubic ft sand"
-                  value={rawInput}
-                  onChange={(e) => setRawInput(e.target.value)}
-                  className="min-h-[200px] bg-white border-neutral-200 rounded-xl resize-none text-base p-4"
-                />
-                <div className="absolute bottom-3 right-3">
-                  <Sparkles className="w-4 h-4 text-neutral-300" />
-                </div>
-              </div>
-
-              <Button
-                onClick={processWithAI}
-                disabled={!rawInput.trim() || isProcessing}
-                className="w-full h-12 bg-neutral-900 hover:bg-black text-white rounded-xl font-medium"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Create List
-                  </>
-                )}
-              </Button>
-            </div>
-          ) : (
-            /* Manual Mode Items */
-            <div className="space-y-4">
-              {items.map((item, index) => (
-                <div key={item.id} className="bg-white rounded-xl border border-neutral-200 p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <span className="text-xs text-neutral-400">Item {index + 1}</span>
-                    {items.length > 1 && (
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        className="p-1 hover:bg-neutral-100 rounded transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4 text-neutral-400" />
-                      </button>
-                    )}
-                  </div>
-                  <Input
-                    placeholder="Item name"
-                    value={item.name}
-                    onChange={(e) => updateItem(item.id, "name", e.target.value)}
-                    className="mb-3 border-neutral-200"
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-neutral-500 mb-1 block">Qty</label>
-                      <Input
-                        type="number"
-                        value={item.qty}
-                        onChange={(e) => updateItem(item.id, "qty", e.target.value)}
-                        className="border-neutral-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-neutral-500 mb-1 block">Rate (₹)</label>
-                      <Input
-                        type="number"
-                        value={item.rate}
-                        onChange={(e) => updateItem(item.id, "rate", e.target.value)}
-                        className="border-neutral-200"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              <button
-                onClick={addItem}
-                className="w-full py-3 border-2 border-dashed border-neutral-200 rounded-xl text-neutral-500 hover:border-neutral-300 hover:text-neutral-600 transition-colors flex items-center justify-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Add Item
-              </button>
-
-              <Button
-                onClick={() => setStep(2)}
-                disabled={items.length === 0 || items.every(i => !i.name.trim())}
-                className="w-full h-12 bg-neutral-900 hover:bg-black text-white rounded-xl font-medium"
-              >
-                Continue
-              </Button>
-            </div>
-          )}
-        </div>
+4 Hikvision 2MP Dome Camera
+1 DVR 8 Channel
+1 Hard Disk 1TB
+100m Cat6 Cable
+1 SMPS 4 Channel
+4 Installation Charges"
+          value={rawInput}
+          onChange={(e) => setRawInput(e.target.value)}
+          className="min-h-[250px] border-neutral-200 rounded-xl text-base p-4 resize-none mb-4"
+          autoFocus
+        />
+        <Button
+          onClick={processWithAI}
+          disabled={!rawInput.trim() || !customerName.trim() || isProcessing}
+          className="w-full h-12 bg-neutral-900 hover:bg-neutral-800 disabled:bg-neutral-200 text-white rounded-xl font-medium"
+        >
+          {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Continue<ChevronRight className="w-4 h-4 ml-1" /></>}
+        </Button>
+        {!customerName.trim() && rawInput.trim() && (
+          <p className="text-center text-xs text-amber-600 mt-2">Please enter customer name to continue</p>
+        )}
       </div>
     );
   }
 
-  // Step 2: Review Items
-  if (step === 2) {
-    return (
-      <div className="min-h-screen">
-        <div className="max-w-lg mx-auto px-5 py-6">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-6">
-            <button
-              onClick={() => setStep(1)}
-              className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-neutral-600" />
-            </button>
-            <div>
-              <h1 className="text-xl font-semibold text-neutral-900">Review Items</h1>
-              <p className="text-sm text-neutral-500">{items.length} items</p>
-            </div>
-          </div>
-
-          {/* Items List */}
-          <div className="space-y-3 mb-6">
-            {items.map((item, index) => (
-              <div key={item.id} className="bg-white rounded-xl border border-neutral-200 p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <Input
-                    value={item.name}
-                    onChange={(e) => updateItem(item.id, "name", e.target.value)}
-                    className="border-0 p-0 h-auto text-base font-medium focus-visible:ring-0"
-                    placeholder="Item name"
-                  />
-                  <button
-                    onClick={() => removeItem(item.id)}
-                    className="p-1 hover:bg-neutral-100 rounded transition-colors ml-2"
-                  >
-                    <Trash2 className="w-4 h-4 text-neutral-400" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-xs text-neutral-400 mb-1 block">Qty</label>
-                    <Input
-                      type="number"
-                      value={item.qty}
-                      onChange={(e) => updateItem(item.id, "qty", e.target.value)}
-                      className="border-neutral-200 h-9"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-neutral-400 mb-1 block">Rate</label>
-                    <Input
-                      type="number"
-                      value={item.rate}
-                      onChange={(e) => updateItem(item.id, "rate", e.target.value)}
-                      className="border-neutral-200 h-9"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-neutral-400 mb-1 block">Amount</label>
-                    <div className="h-9 flex items-center text-sm font-medium text-neutral-700">
-                      {formatCurrency(item.qty * item.rate)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Add More */}
-          <button
-            onClick={addItem}
-            className="w-full py-3 mb-6 border-2 border-dashed border-neutral-200 rounded-xl text-neutral-500 hover:border-neutral-300 hover:text-neutral-600 transition-colors flex items-center justify-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Add Item
-          </button>
-
-          {/* Summary */}
-          <div className="bg-white rounded-xl border border-neutral-200 p-4 mb-6">
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between text-neutral-600">
-                <span>Subtotal</span>
-                <span>{formatCurrency(subtotal)}</span>
-              </div>
-              <div className="flex justify-between items-center text-neutral-600">
-                <span>GST</span>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    value={taxPercent}
-                    onChange={(e) => setTaxPercent(Number(e.target.value) || 0)}
-                    className="w-16 h-7 text-center text-xs border-neutral-200"
-                  />
-                  <span className="text-xs">%</span>
-                  <span className="w-20 text-right">{formatCurrency(taxAmount)}</span>
-                </div>
-              </div>
-              <div className="flex justify-between items-center text-neutral-600">
-                <span>Discount</span>
-                <Input
-                  type="number"
-                  value={discount}
-                  onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-                  className="w-24 h-7 text-right text-xs border-neutral-200"
-                />
-              </div>
-              <div className="border-t border-neutral-100 pt-2 mt-2">
-                <div className="flex justify-between font-semibold text-base">
-                  <span>Total</span>
-                  <span className="text-neutral-900">{formatCurrency(total)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <Button
-            onClick={() => setStep(3)}
-            disabled={items.length === 0 || subtotal === 0}
-            className="w-full h-12 bg-neutral-900 hover:bg-black text-white rounded-xl font-medium"
-          >
-            Add Customer Details
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Step 3: Customer Details
+  // Main Form
   return (
-    <div className="min-h-screen">
-      <div className="max-w-lg mx-auto px-5 py-6">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+    <div className="p-4 md:p-6 pb-36 lg:pb-6">
+      {/* Header */}
+      <div className="mb-6">
+        {/* Top Row: Back button only (New button removed - dangerous on edit page) */}
+        <div className="flex items-center mb-2">
           <button
-            onClick={() => setStep(2)}
-            className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg transition-colors"
+            onClick={() => mode === "ai" ? setShowForm(false) : navigateWithConfirm("/dashboard")}
+            className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg"
           >
             <ArrowLeft className="w-5 h-5 text-neutral-600" />
           </button>
-          <div>
-            <h1 className="text-xl font-semibold text-neutral-900">Customer Details</h1>
-            <p className="text-sm text-neutral-500">Final step</p>
-          </div>
         </div>
 
-        {/* Customer Form */}
-        <div className="space-y-4 mb-6">
-          <div className="bg-white rounded-xl border border-neutral-200 p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <User className="w-4 h-4 text-neutral-400" />
-              <span className="text-sm text-neutral-500">Customer Name</span>
+        {/* Quotation Info Bar */}
+        {savedQuotation ? (
+          <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                <Check className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-neutral-900">{savedQuotation.quotation_number}</h1>
+                <p className="text-xs text-green-600">
+                  {isUpdated ? "Quotation updated successfully" : "Quotation saved successfully"}
+                </p>
+              </div>
             </div>
-            <Input
-              placeholder="Enter customer name"
-              value={customer.name}
-              onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
-              className="border-neutral-200"
-            />
+            <div className="text-right">
+              <div className="flex items-center gap-1 text-sm text-neutral-600">
+                <Calendar className="w-4 h-4" />
+                {new Date(savedQuotation.date).toLocaleDateString("en-IN", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </div>
+              <p className="text-lg font-bold text-neutral-900">{formatCurrency(total)}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-semibold text-neutral-900">New Quotation</h1>
+            <div className="flex items-center gap-1 text-sm text-neutral-500">
+              <Calendar className="w-4 h-4" />
+              {today}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Two Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Customer (mobile only) + Items */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Customer Details - Mobile Only (at top) */}
+          <div className="lg:hidden bg-white border border-neutral-200 rounded-xl p-4">
+            <h2 className="font-semibold text-neutral-900 mb-3">Customer Details</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 sm:col-span-1">
+                <label className="text-xs font-medium text-neutral-500 mb-1 block">Name *</label>
+                <Input
+                  placeholder="Customer name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="h-10 border-neutral-200 rounded-lg"
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="text-xs font-medium text-neutral-500 mb-1 block">Phone</label>
+                <Input
+                  placeholder="Phone number"
+                  type="tel"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  className="h-10 border-neutral-200 rounded-lg"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-neutral-500 mb-1 block">Address</label>
+                <Input
+                  placeholder="Site address"
+                  value={customerAddress}
+                  onChange={(e) => setCustomerAddress(e.target.value)}
+                  className="h-10 border-neutral-200 rounded-lg"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-neutral-200 p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <Phone className="w-4 h-4 text-neutral-400" />
-              <span className="text-sm text-neutral-500">Phone Number</span>
+          {/* Inventory Search */}
+          <div ref={searchRef} className="relative">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+              <Input
+                placeholder="Search inventory... (e.g., camera, dvr, cable)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setShowDropdown(true)}
+                className="pl-10 h-11 border-neutral-200 rounded-lg"
+                autoFocus={mode === "manual"}
+              />
             </div>
-            <Input
-              placeholder="Enter phone number"
-              type="tel"
-              value={customer.phone}
-              onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
-              className="border-neutral-200"
-            />
+
+            {/* Search Dropdown */}
+            {showDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-neutral-200 rounded-xl shadow-lg max-h-80 overflow-y-auto">
+                {searchResults.length > 0 ? (
+                  <>
+                    {searchResults.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => addItemFromInventory(item)}
+                        className="w-full px-4 py-3 text-left hover:bg-neutral-50 flex items-center justify-between border-b border-neutral-100 last:border-0 transition-colors"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-neutral-900">{item.name}</p>
+                          <p className="text-xs text-neutral-500">{item.category}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-neutral-700">{formatCurrency(item.rate)}</span>
+                      </button>
+                    ))}
+                  </>
+                ) : null}
+
+                {/* Custom Item Option */}
+                {isCustomItem && searchQuery.trim() && (
+                  <div className="p-4 border-t border-neutral-200 bg-neutral-50">
+                    <p className="text-xs text-neutral-500 mb-2">Item not in inventory? Add as custom:</p>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Rate (₹)"
+                        value={customRate}
+                        onChange={(e) => setCustomRate(e.target.value)}
+                        className="w-28 h-9 text-sm border-neutral-200 rounded-lg"
+                      />
+                      <Button
+                        onClick={addCustomItem}
+                        disabled={!customRate}
+                        size="sm"
+                        className="h-9 bg-neutral-900 hover:bg-neutral-800 disabled:bg-neutral-200"
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add "{searchQuery}"
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="bg-white rounded-xl border border-neutral-200 p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <MapPin className="w-4 h-4 text-neutral-400" />
-              <span className="text-sm text-neutral-500">Site Address</span>
+          {/* Items List */}
+          {items.length === 0 ? (
+            <div className="border-2 border-dashed border-neutral-200 rounded-xl p-8 md:p-12 text-center">
+              <p className="text-neutral-400 mb-1">Search and add items from inventory</p>
+              <p className="text-xs text-neutral-300">Prices are automatically filled from inventory</p>
             </div>
-            <Textarea
-              placeholder="Enter site address"
-              value={customer.site_address}
-              onChange={(e) => setCustomer({ ...customer, site_address: e.target.value })}
-              className="border-neutral-200 resize-none"
-              rows={2}
-            />
-          </div>
+          ) : (
+            <div className="border border-neutral-200 rounded-xl overflow-hidden bg-white">
+              {/* Desktop Table Header - Hidden on mobile */}
+              <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-3 bg-neutral-100 text-xs font-semibold text-neutral-600 uppercase tracking-wide">
+                <div className="col-span-5">Item Name</div>
+                <div className="col-span-2 text-center">Qty</div>
+                <div className="col-span-2 text-center">Rate</div>
+                <div className="col-span-2 text-right">Amount</div>
+                <div className="col-span-1"></div>
+              </div>
+
+              {/* Items */}
+              <div className="divide-y divide-neutral-100">
+                {items.map((item) => (
+                  <div key={item.id} className="p-3 md:p-0 hover:bg-neutral-50 transition-colors">
+                    {/* Mobile Layout */}
+                    <div className="md:hidden">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <p className="text-sm font-medium text-neutral-900 truncate">{item.name}</p>
+                          {!item.fromInventory && (
+                            <span className={`text-xs ${item.rate === 0 ? "text-red-500 font-medium" : "text-amber-600"}`}>
+                              {item.rate === 0 ? "⚠ Enter rate" : "Custom item"}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          className="p-1 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <X className="w-4 h-4 text-neutral-400" />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="inline-flex items-center border border-neutral-200 rounded-lg bg-white">
+                            <button
+                              onClick={() => updateQty(item.id, -1)}
+                              className="w-8 h-8 flex items-center justify-center hover:bg-neutral-100 rounded-l-lg"
+                            >
+                              <Minus className="w-3 h-3 text-neutral-600" />
+                            </button>
+                            <span className="w-8 text-center text-sm font-semibold">{item.qty}</span>
+                            <button
+                              onClick={() => updateQty(item.id, 1)}
+                              className="w-8 h-8 flex items-center justify-center hover:bg-neutral-100 rounded-r-lg"
+                            >
+                              <Plus className="w-3 h-3 text-neutral-600" />
+                            </button>
+                          </div>
+                          <span className="text-xs text-neutral-500">× {formatCurrency(item.rate)}</span>
+                        </div>
+                        <p className="text-sm font-semibold text-neutral-900">{formatCurrency(item.qty * item.rate)}</p>
+                      </div>
+                    </div>
+
+                    {/* Desktop Layout */}
+                    <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-3 items-center">
+                      <div className="col-span-5">
+                        <p className="text-sm font-medium text-neutral-900">{item.name}</p>
+                        {!item.fromInventory && (
+                          <span className={`text-xs ${item.rate === 0 ? "text-red-500 font-medium" : "text-amber-600"}`}>
+                            {item.rate === 0 ? "⚠ Enter rate" : "Custom item"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="col-span-2 flex justify-center">
+                        <div className="inline-flex items-center border border-neutral-200 rounded-lg bg-white">
+                          <button
+                            onClick={() => updateQty(item.id, -1)}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-neutral-100 rounded-l-lg"
+                          >
+                            <Minus className="w-3 h-3 text-neutral-600" />
+                          </button>
+                          <span className="w-8 text-center text-sm font-semibold">{item.qty}</span>
+                          <button
+                            onClick={() => updateQty(item.id, 1)}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-neutral-100 rounded-r-lg"
+                          >
+                            <Plus className="w-3 h-3 text-neutral-600" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="col-span-2 flex justify-center">
+                        {item.fromInventory ? (
+                          <span className="text-sm font-medium text-neutral-700">{formatCurrency(item.rate)}</span>
+                        ) : (
+                          <Input
+                            type="number"
+                            placeholder="Rate"
+                            value={item.rate || ""}
+                            onChange={(e) => updateRate(item.id, e.target.value)}
+                            className={`w-20 h-8 text-sm text-center rounded-lg ${
+                              item.rate === 0 ? "border-red-300 bg-red-50" : "border-neutral-200"
+                            }`}
+                          />
+                        )}
+                      </div>
+                      <div className="col-span-2 text-right">
+                        <p className="text-sm font-semibold text-neutral-900">{formatCurrency(item.qty * item.rate)}</p>
+                      </div>
+                      <div className="col-span-1 flex justify-end">
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          className="p-1.5 hover:bg-red-50 rounded-lg transition-colors group"
+                        >
+                          <X className="w-4 h-4 text-neutral-400 group-hover:text-red-500" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Warning for zero rate items */}
+              {hasZeroRateItems && (
+                <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 text-amber-700 text-xs flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center font-bold text-[10px]">!</span>
+                  Custom item has no price. Please enter a rate.
+                </div>
+              )}
+
+              {/* Footer - Total (Desktop only, mobile has fixed bar) */}
+              <div className="hidden md:flex px-4 py-3 bg-neutral-50 border-t border-neutral-200 items-center justify-between">
+                <span className="text-sm font-medium text-neutral-600">Total ({items.length} items)</span>
+                <span className="text-lg font-bold text-neutral-900">{formatCurrency(total)}</span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Summary Card */}
-        <div className="bg-neutral-50 rounded-xl p-4 mb-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="text-sm text-neutral-500">{items.length} items</p>
-              <p className="text-lg font-semibold text-neutral-900">{formatCurrency(total)}</p>
+        {/* Right: Customer & Actions - Desktop Only */}
+        <div className="hidden lg:block lg:col-span-1">
+          <div className="bg-white border border-neutral-200 rounded-xl p-5 sticky top-4">
+            <h2 className="font-semibold text-neutral-900 mb-4">Customer Details</h2>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="text-sm font-medium text-neutral-700 mb-1.5 block">Name *</label>
+                <Input
+                  placeholder="Customer name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="h-10 border-neutral-200 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-neutral-700 mb-1.5 block">Phone</label>
+                <Input
+                  placeholder="Phone number"
+                  type="tel"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  className="h-10 border-neutral-200 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-neutral-700 mb-1.5 block">Address</label>
+                <Input
+                  placeholder="Site address"
+                  value={customerAddress}
+                  onChange={(e) => setCustomerAddress(e.target.value)}
+                  className="h-10 border-neutral-200 rounded-lg"
+                />
+              </div>
             </div>
-            <button
-              onClick={() => setStep(2)}
-              className="text-sm text-neutral-500 hover:text-neutral-700"
+
+            {/* Action Buttons - User flow: Edit → Save → Print → Invoice */}
+            <div className="space-y-2">
+              {/* Save/Update is always PRIMARY (main user action) */}
+              <Button
+                onClick={handleSave}
+                disabled={isSaving || !customerName.trim() || items.length === 0}
+                className="w-full h-11 bg-neutral-900 hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400 text-white rounded-lg font-medium"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : savedQuotation ? "Update Quotation" : "Save Quotation"}
+              </Button>
+              {/* Actions after save */}
+              {savedQuotation && (
+                <>
+                  {/* Print */}
+                  <Button
+                    onClick={handlePrint}
+                    variant="outline"
+                    className="w-full h-11 border-neutral-200 text-neutral-700 hover:bg-neutral-50 rounded-lg font-medium"
+                  >
+                    <Printer className="w-4 h-4 mr-2" />
+                    Print Quotation
+                  </Button>
+                  {/* Convert to Invoice - Important business action */}
+                  <Button
+                    onClick={() => navigate("/invoices/new", { state: { fromQuotation: savedQuotation } })}
+                    variant="outline"
+                    className="w-full h-11 border-blue-200 text-blue-700 hover:bg-blue-50 rounded-lg font-medium"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Convert to Invoice
+                  </Button>
+                  {/* New Quotation - TERTIARY (with subtle border for visibility) */}
+                  <Button
+                    onClick={resetForm}
+                    variant="outline"
+                    className="w-full h-10 border-dashed border-neutral-300 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50 hover:border-neutral-400 rounded-lg font-medium text-sm"
+                  >
+                    <FilePlus className="w-4 h-4 mr-2" />
+                    Create New Quotation
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Fixed Bottom Bar - User flow: Edit → Save → Print → Invoice */}
+      <div className="lg:hidden fixed bottom-16 left-0 right-0 bg-white border-t border-neutral-200 p-3 z-40">
+        <div className="flex items-center gap-2">
+          {/* Left: New button (only after save - safe location) */}
+          {savedQuotation && (
+            <Button
+              onClick={resetForm}
+              variant="ghost"
+              size="sm"
+              className="h-11 px-2 text-neutral-500 shrink-0"
             >
-              Edit →
-            </button>
-          </div>
-        </div>
+              <FilePlus className="w-4 h-4" />
+            </Button>
+          )}
 
-        <Button
-          onClick={handleSubmit}
-          disabled={!customer.name.trim() || !customer.phone.trim()}
-          className="w-full h-12 bg-neutral-900 hover:bg-black text-white rounded-xl font-medium"
-        >
-          Create Quotation
-        </Button>
+          {/* Center: Total info */}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-neutral-500">{items.length} items</p>
+            <p className="text-lg font-bold text-neutral-900">{formatCurrency(total)}</p>
+          </div>
+
+          {/* Right: Action buttons (thumb zone) */}
+          {savedQuotation ? (
+            <>
+              {/* Print */}
+              <Button
+                onClick={handlePrint}
+                variant="outline"
+                className="h-11 px-3 border-neutral-200 shrink-0"
+              >
+                <Printer className="w-4 h-4" />
+              </Button>
+              {/* Convert to Invoice */}
+              <Button
+                onClick={() => navigate("/invoices/new", { state: { fromQuotation: savedQuotation } })}
+                className="h-11 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shrink-0"
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                Invoice
+              </Button>
+              {/* Update */}
+              <Button
+                onClick={handleSave}
+                disabled={isSaving}
+                variant="outline"
+                className="h-11 px-3 border-neutral-200 shrink-0"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
+              </Button>
+            </>
+          ) : (
+            /* Save is PRIMARY before first save */
+            <Button
+              onClick={handleSave}
+              disabled={isSaving || !customerName.trim() || items.length === 0}
+              className="h-11 px-5 bg-neutral-900 hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400 text-white rounded-lg font-medium shrink-0"
+            >
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
