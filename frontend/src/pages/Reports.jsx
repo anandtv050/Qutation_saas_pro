@@ -1,27 +1,13 @@
-import { useState } from "react";
-import { FileText, Receipt, TrendingUp, IndianRupee, Search, Phone, ChevronRight } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState, useMemo } from "react";
+import { Search, FileText, Receipt } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { dummyQuotations, dummyInvoices } from "@/data/dummyData";
 
-const quotationStatusColors = {
-  draft: "bg-neutral-100 text-neutral-600",
-  sent: "bg-amber-50 text-amber-600",
-  approved: "bg-green-50 text-green-600",
-  converted: "bg-blue-50 text-blue-600",
-  rejected: "bg-red-50 text-red-600",
-};
-
-const invoiceStatusColors = {
-  pending: "bg-amber-50 text-amber-600",
-  partial: "bg-blue-50 text-blue-600",
-  paid: "bg-green-50 text-green-600",
-  overdue: "bg-red-50 text-red-600",
-};
-
 export default function Reports() {
-  const [activeTab, setActiveTab] = useState("overview"); // overview, quotations, bills
+  const [activeTab, setActiveTab] = useState("quotations");
   const [searchQuery, setSearchQuery] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-IN", {
@@ -31,358 +17,244 @@ export default function Reports() {
     }).format(amount);
   };
 
-  // Calculate stats
-  const totalQuoted = dummyQuotations.reduce((sum, q) => sum + q.total_amount, 0);
-  const totalInvoiced = dummyInvoices.reduce((sum, i) => sum + i.total_amount, 0);
-  const totalCollected = dummyInvoices
-    .filter(i => i.payment_status === "paid")
-    .reduce((sum, i) => sum + i.total_amount, 0);
-  const pendingPayments = dummyInvoices
-    .filter(i => i.payment_status === "pending" || i.payment_status === "partial")
-    .reduce((sum, i) => sum + i.total_amount, 0);
+  // Filter quotations
+  const filteredQuotations = useMemo(() => {
+    return dummyQuotations.filter(q => {
+      const matchesSearch = !searchQuery.trim() ||
+        q.quotation_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        q.customer_name.toLowerCase().includes(searchQuery.toLowerCase());
+      const dateValue = q.created_at;
+      const matchesFromDate = !fromDate || dateValue >= fromDate;
+      const matchesToDate = !toDate || dateValue <= toDate;
+      return matchesSearch && matchesFromDate && matchesToDate;
+    });
+  }, [searchQuery, fromDate, toDate]);
 
-  // Filtered lists
-  const filteredQuotations = dummyQuotations.filter((q) =>
-    q.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    q.quotation_number.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter invoices
+  const filteredInvoices = useMemo(() => {
+    return dummyInvoices.filter(i => {
+      const matchesSearch = !searchQuery.trim() ||
+        i.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        i.customer_name.toLowerCase().includes(searchQuery.toLowerCase());
+      const dateValue = i.created_at;
+      const matchesFromDate = !fromDate || dateValue >= fromDate;
+      const matchesToDate = !toDate || dateValue <= toDate;
+      return matchesSearch && matchesFromDate && matchesToDate;
+    });
+  }, [searchQuery, fromDate, toDate]);
 
-  const filteredInvoices = dummyInvoices.filter((i) =>
-    i.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    i.invoice_number.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const statusColors = {
+    // Quotation statuses
+    draft: "bg-neutral-100 text-neutral-600",
+    sent: "bg-amber-50 text-amber-600",
+    approved: "bg-green-50 text-green-600",
+    converted: "bg-blue-50 text-blue-600",
+    rejected: "bg-red-50 text-red-600",
+    // Invoice statuses
+    pending: "bg-amber-50 text-amber-600",
+    partial: "bg-blue-50 text-blue-600",
+    paid: "bg-green-50 text-green-600",
+    overdue: "bg-red-50 text-red-600",
+  };
 
   return (
-    <div className="min-h-screen">
-      <div className="max-w-4xl mx-auto p-4 md:p-8">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-neutral-900">Reports</h1>
-          <p className="text-neutral-500 text-sm mt-1">Overview of your business</p>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-1 p-1 bg-neutral-100 rounded-xl mb-6">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              activeTab === "overview"
-                ? "bg-white text-neutral-900 shadow-sm"
-                : "text-neutral-500 hover:text-neutral-700"
-            }`}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => setActiveTab("quotations")}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              activeTab === "quotations"
-                ? "bg-white text-neutral-900 shadow-sm"
-                : "text-neutral-500 hover:text-neutral-700"
-            }`}
-          >
-            Quotations
-          </button>
-          <button
-            onClick={() => setActiveTab("bills")}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              activeTab === "bills"
-                ? "bg-white text-neutral-900 shadow-sm"
-                : "text-neutral-500 hover:text-neutral-700"
-            }`}
-          >
-            Bills
-          </button>
-        </div>
-
-        {/* Overview Tab */}
-        {activeTab === "overview" && (
-          <>
-            {/* Money Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-neutral-500 mb-2">
-                    <FileText className="w-4 h-4" />
-                    <span className="text-xs">Quoted</span>
-                  </div>
-                  <p className="text-lg font-semibold text-neutral-900">
-                    {formatCurrency(totalQuoted)}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-neutral-500 mb-2">
-                    <Receipt className="w-4 h-4" />
-                    <span className="text-xs">Billed</span>
-                  </div>
-                  <p className="text-lg font-semibold text-neutral-900">
-                    {formatCurrency(totalInvoiced)}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-emerald-600 mb-2">
-                    <TrendingUp className="w-4 h-4" />
-                    <span className="text-xs">Received</span>
-                  </div>
-                  <p className="text-lg font-semibold text-emerald-600">
-                    {formatCurrency(totalCollected)}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-amber-600 mb-2">
-                    <IndianRupee className="w-4 h-4" />
-                    <span className="text-xs">Pending</span>
-                  </div>
-                  <p className="text-lg font-semibold text-amber-600">
-                    {formatCurrency(pendingPayments)}
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Quotations Summary */}
-            <Card className="border-0 shadow-sm mb-4">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-semibold text-neutral-900 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-blue-600" />
-                    Quotations
-                  </h2>
-                  <button
-                    onClick={() => setActiveTab("quotations")}
-                    className="text-xs text-neutral-500 hover:text-neutral-700"
-                  >
-                    View all →
-                  </button>
-                </div>
-                <div className="grid grid-cols-4 gap-3">
-                  <div className="text-center p-2 bg-neutral-50 rounded-lg">
-                    <p className="text-xl font-bold text-neutral-600">
-                      {dummyQuotations.filter(q => q.status === "draft").length}
-                    </p>
-                    <p className="text-xs text-neutral-500">Draft</p>
-                  </div>
-                  <div className="text-center p-2 bg-amber-50 rounded-lg">
-                    <p className="text-xl font-bold text-amber-600">
-                      {dummyQuotations.filter(q => q.status === "sent").length}
-                    </p>
-                    <p className="text-xs text-neutral-500">Sent</p>
-                  </div>
-                  <div className="text-center p-2 bg-green-50 rounded-lg">
-                    <p className="text-xl font-bold text-green-600">
-                      {dummyQuotations.filter(q => q.status === "approved").length}
-                    </p>
-                    <p className="text-xs text-neutral-500">Approved</p>
-                  </div>
-                  <div className="text-center p-2 bg-blue-50 rounded-lg">
-                    <p className="text-xl font-bold text-blue-600">
-                      {dummyQuotations.filter(q => q.status === "converted").length}
-                    </p>
-                    <p className="text-xs text-neutral-500">Converted</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Invoices Summary */}
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-semibold text-neutral-900 flex items-center gap-2">
-                    <Receipt className="w-4 h-4 text-green-600" />
-                    Bills
-                  </h2>
-                  <button
-                    onClick={() => setActiveTab("bills")}
-                    className="text-xs text-neutral-500 hover:text-neutral-700"
-                  >
-                    View all →
-                  </button>
-                </div>
-                <div className="grid grid-cols-4 gap-3">
-                  <div className="text-center p-2 bg-amber-50 rounded-lg">
-                    <p className="text-xl font-bold text-amber-600">
-                      {dummyInvoices.filter(i => i.payment_status === "pending").length}
-                    </p>
-                    <p className="text-xs text-neutral-500">Pending</p>
-                  </div>
-                  <div className="text-center p-2 bg-blue-50 rounded-lg">
-                    <p className="text-xl font-bold text-blue-600">
-                      {dummyInvoices.filter(i => i.payment_status === "partial").length}
-                    </p>
-                    <p className="text-xs text-neutral-500">Partial</p>
-                  </div>
-                  <div className="text-center p-2 bg-green-50 rounded-lg">
-                    <p className="text-xl font-bold text-green-600">
-                      {dummyInvoices.filter(i => i.payment_status === "paid").length}
-                    </p>
-                    <p className="text-xs text-neutral-500">Paid</p>
-                  </div>
-                  <div className="text-center p-2 bg-red-50 rounded-lg">
-                    <p className="text-xl font-bold text-red-600">
-                      {dummyInvoices.filter(i => i.payment_status === "overdue").length}
-                    </p>
-                    <p className="text-xs text-neutral-500">Overdue</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-
-        {/* Quotations Tab */}
-        {activeTab === "quotations" && (
-          <>
-            {/* Search */}
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-              <Input
-                placeholder="Search quotations..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-white border-neutral-200"
-              />
-            </div>
-
-            {/* Quotation List */}
-            <div className="space-y-2">
-              {filteredQuotations.length === 0 ? (
-                <Card className="border-0 shadow-sm">
-                  <CardContent className="p-8 text-center">
-                    <FileText className="w-10 h-10 mx-auto text-neutral-300 mb-2" />
-                    <p className="text-neutral-500 text-sm">No quotations found</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                filteredQuotations.map((quotation) => (
-                  <Card
-                    key={quotation.id}
-                    className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs text-neutral-400">
-                              {quotation.quotation_number}
-                            </span>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                                quotationStatusColors[quotation.status]
-                              }`}
-                            >
-                              {quotation.status}
-                            </span>
-                          </div>
-                          <h3 className="font-medium text-neutral-900 mb-1">
-                            {quotation.customer_name}
-                          </h3>
-                          <div className="flex items-center gap-1 text-xs text-neutral-500">
-                            <Phone className="w-3 h-3" />
-                            {quotation.customer_phone}
-                          </div>
-                        </div>
-                        <div className="text-right flex items-center gap-2">
-                          <div>
-                            <p className="font-semibold text-neutral-900">
-                              {formatCurrency(quotation.total_amount)}
-                            </p>
-                            <p className="text-xs text-neutral-400">
-                              {quotation.created_at}
-                            </p>
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-neutral-300" />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
-          </>
-        )}
-
-        {/* Bills Tab */}
-        {activeTab === "bills" && (
-          <>
-            {/* Search */}
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-              <Input
-                placeholder="Search bills..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-white border-neutral-200"
-              />
-            </div>
-
-            {/* Invoice List */}
-            <div className="space-y-2">
-              {filteredInvoices.length === 0 ? (
-                <Card className="border-0 shadow-sm">
-                  <CardContent className="p-8 text-center">
-                    <Receipt className="w-10 h-10 mx-auto text-neutral-300 mb-2" />
-                    <p className="text-neutral-500 text-sm">No bills found</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                filteredInvoices.map((invoice) => (
-                  <Card
-                    key={invoice.id}
-                    className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs text-neutral-400">
-                              {invoice.invoice_number}
-                            </span>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                                invoiceStatusColors[invoice.payment_status]
-                              }`}
-                            >
-                              {invoice.payment_status}
-                            </span>
-                          </div>
-                          <h3 className="font-medium text-neutral-900 mb-1">
-                            {invoice.customer_name}
-                          </h3>
-                          <div className="flex items-center gap-1 text-xs text-neutral-500">
-                            <Phone className="w-3 h-3" />
-                            {invoice.customer_phone}
-                          </div>
-                        </div>
-                        <div className="text-right flex items-center gap-2">
-                          <div>
-                            <p className="font-semibold text-neutral-900">
-                              {formatCurrency(invoice.total_amount)}
-                            </p>
-                            <p className="text-xs text-neutral-400">
-                              Due: {invoice.due_date}
-                            </p>
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-neutral-300" />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
-          </>
-        )}
+    <div className="p-4 md:p-6 pb-24 lg:pb-6">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-neutral-900">Reports</h1>
+        <p className="text-sm text-neutral-500">View all quotations and invoices</p>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-neutral-100 rounded-lg mb-4">
+        <button
+          onClick={() => { setActiveTab("quotations"); setSearchQuery(""); setFromDate(""); setToDate(""); }}
+          className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
+            activeTab === "quotations"
+              ? "bg-white text-neutral-900 shadow-sm"
+              : "text-neutral-500 hover:text-neutral-700"
+          }`}
+        >
+          Quotations ({dummyQuotations.length})
+        </button>
+        <button
+          onClick={() => { setActiveTab("invoices"); setSearchQuery(""); setFromDate(""); setToDate(""); }}
+          className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
+            activeTab === "invoices"
+              ? "bg-white text-neutral-900 shadow-sm"
+              : "text-neutral-500 hover:text-neutral-700"
+          }`}
+        >
+          Invoices ({dummyInvoices.length})
+        </button>
+      </div>
+
+      {/* Search & Date Filters */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-neutral-500 hidden sm:inline">From</span>
+            <Input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="h-10 w-36 bg-white border-neutral-200"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-neutral-500 hidden sm:inline">To</span>
+            <Input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="h-10 w-36 bg-white border-neutral-200"
+            />
+          </div>
+        </div>
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+          <Input
+            placeholder={activeTab === "quotations" ? "Search by Q number..." : "Search by INV number..."}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 h-10 bg-white border-neutral-200"
+          />
+        </div>
+      </div>
+
+      {/* Quotations List */}
+      {activeTab === "quotations" && (
+        <>
+          {filteredQuotations.length === 0 ? (
+            <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
+              <FileText className="w-12 h-12 mx-auto text-neutral-300 mb-4" />
+              <h3 className="font-medium text-neutral-900 mb-1">No quotations found</h3>
+              <p className="text-sm text-neutral-500">Try a different search or date</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+              {/* Table Header - Desktop */}
+              <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-neutral-50 border-b border-neutral-200 text-xs font-medium text-neutral-500 uppercase">
+                <div className="col-span-2">Q. Number</div>
+                <div className="col-span-3">Customer</div>
+                <div className="col-span-2">Date</div>
+                <div className="col-span-2">Status</div>
+                <div className="col-span-3 text-right">Amount</div>
+              </div>
+
+              {/* Items */}
+              {filteredQuotations.map((q, index) => (
+                <div
+                  key={q.id}
+                  className={`grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-neutral-50 cursor-pointer ${
+                    index !== filteredQuotations.length - 1 ? "border-b border-neutral-100" : ""
+                  }`}
+                >
+                  {/* Mobile: Stacked */}
+                  <div className="col-span-8 md:col-span-2">
+                    <p className="font-medium text-neutral-900 text-sm">{q.quotation_number}</p>
+                    <p className="text-xs text-neutral-500 md:hidden">{q.customer_name}</p>
+                  </div>
+
+                  <div className="hidden md:block col-span-3 text-sm text-neutral-700">
+                    {q.customer_name}
+                  </div>
+
+                  <div className="hidden md:block col-span-2 text-sm text-neutral-500">
+                    {q.created_at}
+                  </div>
+
+                  <div className="hidden md:block col-span-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${statusColors[q.status]}`}>
+                      {q.status}
+                    </span>
+                  </div>
+
+                  <div className="col-span-4 md:col-span-3 text-right">
+                    <p className="font-semibold text-neutral-900">{formatCurrency(q.total_amount)}</p>
+                    <span className={`md:hidden px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[q.status]}`}>
+                      {q.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {filteredQuotations.length > 0 && (
+            <p className="text-sm text-neutral-500 mt-3">
+              Showing {filteredQuotations.length} quotation{filteredQuotations.length !== 1 ? "s" : ""}
+            </p>
+          )}
+        </>
+      )}
+
+      {/* Invoices List */}
+      {activeTab === "invoices" && (
+        <>
+          {filteredInvoices.length === 0 ? (
+            <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
+              <Receipt className="w-12 h-12 mx-auto text-neutral-300 mb-4" />
+              <h3 className="font-medium text-neutral-900 mb-1">No invoices found</h3>
+              <p className="text-sm text-neutral-500">Try a different search or date</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+              {/* Table Header - Desktop */}
+              <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-neutral-50 border-b border-neutral-200 text-xs font-medium text-neutral-500 uppercase">
+                <div className="col-span-2">INV. Number</div>
+                <div className="col-span-3">Customer</div>
+                <div className="col-span-2">Date</div>
+                <div className="col-span-2">Status</div>
+                <div className="col-span-3 text-right">Amount</div>
+              </div>
+
+              {/* Items */}
+              {filteredInvoices.map((i, index) => (
+                <div
+                  key={i.id}
+                  className={`grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-neutral-50 cursor-pointer ${
+                    index !== filteredInvoices.length - 1 ? "border-b border-neutral-100" : ""
+                  }`}
+                >
+                  {/* Mobile: Stacked */}
+                  <div className="col-span-8 md:col-span-2">
+                    <p className="font-medium text-neutral-900 text-sm">{i.invoice_number}</p>
+                    <p className="text-xs text-neutral-500 md:hidden">{i.customer_name}</p>
+                  </div>
+
+                  <div className="hidden md:block col-span-3 text-sm text-neutral-700">
+                    {i.customer_name}
+                  </div>
+
+                  <div className="hidden md:block col-span-2 text-sm text-neutral-500">
+                    {i.created_at}
+                  </div>
+
+                  <div className="hidden md:block col-span-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${statusColors[i.payment_status]}`}>
+                      {i.payment_status}
+                    </span>
+                  </div>
+
+                  <div className="col-span-4 md:col-span-3 text-right">
+                    <p className="font-semibold text-neutral-900">{formatCurrency(i.total_amount)}</p>
+                    <span className={`md:hidden px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[i.payment_status]}`}>
+                      {i.payment_status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {filteredInvoices.length > 0 && (
+            <p className="text-sm text-neutral-500 mt-3">
+              Showing {filteredInvoices.length} invoice{filteredInvoices.length !== 1 ? "s" : ""}
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

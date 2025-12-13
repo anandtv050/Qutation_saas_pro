@@ -27,12 +27,12 @@ const authService = {
     // Logout function
     logout: () => {
         localStorage.removeItem('access_token');
-        localStorage.removeItem('user_info');
+        localStorage.removeItem('user');
     },
 
     // Get Current User
     getCurrentUser: () => {
-        const UserInfo = localStorage.getItem('user_info');
+        const UserInfo = localStorage.getItem('user');
         return UserInfo ? JSON.parse(UserInfo) : null;
     },
 
