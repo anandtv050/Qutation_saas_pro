@@ -23,10 +23,10 @@ export default function Login() {
     try {
       const response = await authService.login(email, password);
 
-      localStorage.setItem('access_token', response.strAccessToken);
-      localStorage.setItem('user_info', JSON.stringify(response.dctUserInfo));
+      localStorage.setItem('token', response.strAccessToken);
+      localStorage.setItem('user', JSON.stringify(response.dctUserInfo));
 
-      // Success - will add proper navigation later
+      // Navigate to dashboard
       window.location.href = '/dashboard';
 
     } catch(error) {
