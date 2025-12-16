@@ -25,8 +25,9 @@ class ResponseStatus:
 
 
 # Base Request - All requests should inherit this
+# Note: intUserId is now optional - it comes from JWT/header via dependency injection
 class MdlBaseRequest(BaseModel):
-    intUserId: int
+    intUserId: Optional[int] = None
 
 
 # Base Response - All responses should inherit this

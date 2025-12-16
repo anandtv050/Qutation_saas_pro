@@ -4,11 +4,6 @@ from typing import Optional
 from app.core.baseSchema import MdlBaseRequest, MdlBaseResponse
 
 
-# Get Inventory List Request
-class MdlGetInventoryListRequest(MdlBaseRequest):
-    pass  # intUserId comes from MdlBaseRequest
-
-
 # Create inventory Request
 class MdlCreateInventoryRequest(MdlBaseRequest):
     strItemCode: str

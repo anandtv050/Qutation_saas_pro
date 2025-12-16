@@ -10,13 +10,12 @@ from app.core.baseSchema import ResponseStatus
 
 
 class ClsInventoryService:
-    def __init__(self, pool) -> None:
+    def __init__(self, pool, intUserId: int) -> None:
         self.insPool = pool
+        self.intUserId = intUserId
 
-    async def fnGetInventoryListService(self, mdlGetInventoryList):
+    async def fnGetInventoryListService(self):
         """Inventory listing"""
-
-        intUserId = mdlGetInventoryList.intUserId
 
         strQuery = """
                 SELECT
@@ -33,7 +32,7 @@ class ClsInventoryService:
                     fk_bint_user_id = $1
                 """
         async with self.insPool.acquire() as conn:
-            lstInventoryItems = await conn.fetch(strQuery, intUserId)
+            lstInventoryItems = await conn.fetch(strQuery, self.intUserId)
 
         # No data found
         if not lstInventoryItems:
@@ -78,7 +77,7 @@ class ClsInventoryService:
             rstExisting = await conn.fetchrow(
                 strCheckQuery,
                 mdlCreateInventoryRequest.strItemCode,
-                mdlCreateInventoryRequest.intUserId
+                self.intUserId
             )
 
         if rstExisting:
@@ -107,7 +106,7 @@ class ClsInventoryService:
         async with self.insPool.acquire() as conn:
             rstItems = await conn.fetchrow(
                 strQuery,
-                mdlCreateInventoryRequest.intUserId,
+                self.intUserId,
                 mdlCreateInventoryRequest.strItemCode,
                 mdlCreateInventoryRequest.strItemName,
                 mdlCreateInventoryRequest.strCategory,
@@ -153,7 +152,7 @@ class ClsInventoryService:
             rstExist = await conn.fetchrow(
                 strCheckQuery,
                 mdlUpdateInventoryRequest.intPkInventoryId,
-                mdlUpdateInventoryRequest.intUserId
+                self.intUserId
             )
 
         if not rstExist:
@@ -221,7 +220,7 @@ class ClsInventoryService:
 
         # Add WHERE params
         lstValues.append(mdlUpdateInventoryRequest.intPkInventoryId)
-        lstValues.append(mdlUpdateInventoryRequest.intUserId)
+        lstValues.append(self.intUserId)
 
         strQuery = f"""
             UPDATE tbl_inventory
@@ -250,7 +249,7 @@ class ClsInventoryService:
             data=mdlInventoryItem
         )
 
-    async def fnDeleteInventory(self, intUserId: int, intInventoryId: int):
+    async def fnDeleteInventory(self, intInventoryId: int):
         """Delete inventory item"""
 
         strQuery = """
@@ -259,7 +258,7 @@ class ClsInventoryService:
             RETURNING pk_bint_inventory_id
         """
         async with self.insPool.acquire() as conn:
-            rstDeleted = await conn.fetchrow(strQuery, intInventoryId, intUserId)
+            rstDeleted = await conn.fetchrow(strQuery, intInventoryId, self.intUserId)
 
         if not rstDeleted:
             return MdlDeleteInventoryResponse(
