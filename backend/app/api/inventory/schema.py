@@ -1,23 +1,28 @@
 from pydantic import BaseModel
 from typing import Optional
 
-class MdlGetInventoryListRequest(BaseModel):
-    intUserId: int
+from app.core.baseSchema import MdlBaseRequest, MdlBaseResponse
 
-# Create inventory Request 
-class MdlCreateInventoryRequest(BaseModel):
-    intUserId : int
+
+# Get Inventory List Request
+class MdlGetInventoryListRequest(MdlBaseRequest):
+    pass  # intUserId comes from MdlBaseRequest
+
+
+# Create inventory Request
+class MdlCreateInventoryRequest(MdlBaseRequest):
     strItemCode: str
     strItemName: str
     strCategory: str
-    strUnit: str ="piece"
+    strUnit: str = "piece"
     dblUnitPrice: float
     intStockQuantity: int
     strDescription: Optional[str] = None
 
+
 # Update Inventory Request
-class MdlUpdateInventoryRequest(BaseModel):
-    intPkInventoryId:int
+class MdlUpdateInventoryRequest(MdlBaseRequest):
+    intPkInventoryId: int
     strItemCode: Optional[str] = None
     strItemName: Optional[str] = None
     strCategory: Optional[str] = None
@@ -26,8 +31,14 @@ class MdlUpdateInventoryRequest(BaseModel):
     intStockQuantity: Optional[int] = None
     strDescription: Optional[str] = None
 
-# Response model for both create and update
-class MdlInventoryResponse(BaseModel):
+
+# Delete Inventory Request
+class MdlDeleteInventoryRequest(MdlBaseRequest):
+    intInventoryId: int
+
+
+# Inventory Item Data Model
+class MdlInventoryItem(BaseModel):
     intPkInventoryId: int
     strItemCode: str
     strItemName: str
@@ -35,10 +46,18 @@ class MdlInventoryResponse(BaseModel):
     strUnit: str
     dblUnitPrice: float
     intStockQuantity: int
-    # strDescription: Optional[str] = None
 
-# response for list inventory 
-class MdlInventoryListResponse(BaseModel):
-    lstItem: list[MdlInventoryResponse]
-    
-    
+
+# Response for single inventory (create/update)
+class MdlInventoryResponse(MdlBaseResponse):
+    data: Optional[MdlInventoryItem] = None
+
+
+# Response for list inventory
+class MdlInventoryListResponse(MdlBaseResponse):
+    lstItem: list[MdlInventoryItem] = []
+
+
+# Response for delete
+class MdlDeleteInventoryResponse(MdlBaseResponse):
+    intDeletedId: Optional[int] = None

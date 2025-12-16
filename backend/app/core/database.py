@@ -1,46 +1,51 @@
-import asyncpg 
+import asyncpg
 from typing import Optional
 
+
 class ClsDatabasepool:
-    def __init__(self) -> None:
-        self.pool:Optional[asyncpg.pool] =None
-        
+    """Singleton Database Pool - Only ONE instance created"""
+
+    _instance: Optional['ClsDatabasepool'] = None  # Singleton instance
+    _pool: Optional[asyncpg.Pool] = None           # Shared pool
+
+    def __new__(cls):
+        """Create only one instance (Singleton)"""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     async def fnConnectDb(self):
-        """Create Database pool"""
-        
+        """Create Database pool (only once)"""
+
+        if ClsDatabasepool._pool is not None:
+            return  # Pool already exists
+
         try:
-            self.pool = await asyncpg.create_pool(
-                # host=settings.DB_HOST,
-                # port=settings.DB_PORT,
-                # database=settings.DB_NAME,
-                # user=settings.DB_USER,
-                # password=settings.DB_PASSWORD,
-                # min_size=settings.DB_POOL_MIN_SIZE,
-                # max_size=settings.DB_POOL_MAX_SIZE,
+            ClsDatabasepool._pool = await asyncpg.create_pool(
                 host="localhost",
                 port=5432,
                 database="db_quotation_saas_pro_12_12_2025",
                 user="postgres",
                 password="Anand@123",
                 command_timeout=60,
+                min_size=2,
+                max_size=10,
             )
-            print("Database Pool Created")
+            print("Database Pool Created (Singleton)")
         except Exception as e:
-            print(f"pool creation failed '{e}'")
+            print(f"Pool creation failed: '{e}'")
             raise e
-    
+
     async def fnDisconnectPool(self):
-        """Close the databse pool"""
-        
-        if self.pool:
-            await self.pool.close()
-            print("DatabasePool Closed")
-    
-    async def fnGetPool(self)->asyncpg.pool:
-        """Get pool connection"""
-        if not self.pool:
+        """Close the database pool"""
+
+        if ClsDatabasepool._pool:
+            await ClsDatabasepool._pool.close()
+            ClsDatabasepool._pool = None
+            print("Database Pool Closed")
+
+    async def fnGetPool(self) -> asyncpg.Pool:
+        """Get pool connection (reuses same pool)"""
+        if ClsDatabasepool._pool is None:
             await self.fnConnectDb()
-        return self.pool
-            
-
-
+        return ClsDatabasepool._pool
