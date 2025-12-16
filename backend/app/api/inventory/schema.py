@@ -1,6 +1,9 @@
 from pydantic import BaseModel
 from typing import Optional
 
+class MdlGetInventoryListRequest(BaseModel):
+    intUserId: int
+
 # Create inventory Request 
 class MdlCreateInventoryRequest(BaseModel):
     strItemCode: str
@@ -31,7 +34,7 @@ class MdlInventoryResponse(BaseModel):
     strUnit: str
     dblUnitPrice: float
     intStockQuantity: int
-    strDescription: Optional[str] = None
+    # strDescription: Optional[str] = None
 
 # response for list inventory 
 class MdlInventoryListResponse(BaseModel):
