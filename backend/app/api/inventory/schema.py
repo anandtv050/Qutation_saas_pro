@@ -6,6 +6,7 @@ class MdlGetInventoryListRequest(BaseModel):
 
 # Create inventory Request 
 class MdlCreateInventoryRequest(BaseModel):
+    intUserId : int
     strItemCode: str
     strItemName: str
     strCategory: str

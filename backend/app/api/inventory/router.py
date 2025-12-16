@@ -5,7 +5,8 @@ from app.api.inventory.schema import (
     MdlCreateInventoryRequest,
     MdlUpdateInventoryRequest,
     MdlInventoryListResponse,
-    MdlGetInventoryListRequest
+    MdlGetInventoryListRequest,
+    MdlInventoryResponse
 )
 from app.api.inventory.service import ClsInventoryService
 from app.core.database import ClsDatabasepool
@@ -13,7 +14,7 @@ from app.core.database import ClsDatabasepool
 router = APIRouter(prefix="/inventory",tags=["Inventory"])
 
 #List - Get all inventory
-@router.post("/getinventorylist",response_model=MdlInventoryListResponse)
+@router.post("/list",response_model=MdlInventoryListResponse)
 async def fnGetInventoryList(mdlGetInventoryList:MdlGetInventoryListRequest):
     try:
         insPool = ClsDatabasepool()
@@ -32,26 +33,27 @@ async def fnGetInventoryList(mdlGetInventoryList:MdlGetInventoryListRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Database error: {str(e)}"
         )
-# # Add - Create new inventory
-# @router.post("/add",response_model=MdlInventoryResponse)
-# async def fnAddInventory(mdlCreateInventoryRequest:MdlCreateInventoryRequest):
-#     try:
-#         insPool = ClsDatabasepool()
-#         pool = await insPool.fnGetPool()
+
+# Add - Create new inventory
+@router.post("/add",response_model=MdlInventoryResponse)
+async def fnAddInventory(mdlCreateInventoryRequest:MdlCreateInventoryRequest):
+    try:
+        insPool = ClsDatabasepool()
+        pool = await insPool.fnGetPool()
         
-#         insInventoryService = ClsInventoryService(pool)
-#         mdlInventoryResponse = await insInventoryService.fnAddInventoryService(mdlCreateInventoryRequest)
-#         return mdlInventoryResponse
-#     except HTTPException:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"Unexpected Error"
-#         )
-#     except asyncpg.PostgresError as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"Database error: {str(e)}"
-#         )
+        insInventoryService = ClsInventoryService(pool)
+        mdlInventoryResponse = await insInventoryService.fnAddInventoryService(mdlCreateInventoryRequest)
+        return mdlInventoryResponse
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected Error"
+        )
+    except asyncpg.PostgresError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
 
 # Update - update Inventory
 # @router.post("")
