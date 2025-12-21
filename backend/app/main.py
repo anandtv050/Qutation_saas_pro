@@ -10,13 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import importlib
 
 from app.core.database import ClsDatabasepool
-from app.api.login.router import router as login_router
 
 
 # Router registry - Easy to see all APIs
 LST_ROUTERS = [
     "app.api.login.router",
-    "app.api.inventory.router"
+    "app.api.inventory.router",
+    "app.api.quotation.router"
     # "app.api.register.router",      # Add when ready
     # "app.api.quotation.router",     # Add when ready
     # "app.api.invoice.router",       # Add when ready
