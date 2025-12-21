@@ -11,7 +11,7 @@ import MainLayout from "./components/layout/MainLayout";
 function App() {
   // Check if user is logged in
   const isAuthenticated = () => {
-    return localStorage.getItem("token") !== null;
+    return localStorage.getItem("access_token") !== null;
   };
 
   // Protected Route wrapper

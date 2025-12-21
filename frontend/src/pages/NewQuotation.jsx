@@ -4,7 +4,7 @@ import { ArrowLeft, Plus, Minus, X, Loader2, ChevronRight, Search, Printer, File
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { searchInventory, inventoryItems } from "@/data/inventoryData";
+import inventoryService from "@/services/inventoryService";
 
 // Session storage key
 const STORAGE_KEY = "quotation_draft";
@@ -55,6 +55,10 @@ export default function NewQuotation() {
   const [savedQuotation, setSavedQuotation] = useState(draft?.savedQuotation || null);
   const [isUpdated, setIsUpdated] = useState(false); // Track if this was an update
 
+  // Inventory data from API
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [isLoadingInventory, setIsLoadingInventory] = useState(true);
+
   // Inventory search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -62,6 +66,37 @@ export default function NewQuotation() {
   const [isCustomItem, setIsCustomItem] = useState(false);
   const [customRate, setCustomRate] = useState("");
   const searchRef = useRef(null);
+
+  // Fetch inventory on mount
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        setIsLoadingInventory(true);
+        const response = await inventoryService.getList();
+        if (response.intStatus === 1 && response.lstItem) {
+          // Transform API data to match expected format
+          const items = response.lstItem.map(item => ({
+            id: item.intPkInventoryId,
+            name: item.strItemName,
+            code: item.strItemCode,
+            category: item.strCategory,
+            rate: item.dblUnitPrice,
+            unit: item.strUnit,
+            stock: item.intStockQuantity
+          }));
+          setInventoryItems(items);
+        } else {
+          setInventoryItems([]);
+        }
+      } catch (err) {
+        console.error("Failed to load inventory:", err);
+        setInventoryItems([]);
+      } finally {
+        setIsLoadingInventory(false);
+      }
+    };
+    fetchInventory();
+  }, []);
 
   // Current date
   const today = new Date().toLocaleDateString("en-IN", {
@@ -123,10 +158,15 @@ export default function NewQuotation() {
     }).format(amount);
   };
 
-  // Handle search input
+  // Handle search input - search local inventory data
   useEffect(() => {
     if (searchQuery.trim()) {
-      const results = searchInventory(searchQuery);
+      const query = searchQuery.toLowerCase();
+      const results = inventoryItems.filter(item =>
+        item.name.toLowerCase().includes(query) ||
+        item.code.toLowerCase().includes(query) ||
+        item.category.toLowerCase().includes(query)
+      ).slice(0, 10);
       setSearchResults(results);
       setShowDropdown(true);
       setIsCustomItem(results.length === 0 || !results.some(r =>
@@ -137,7 +177,7 @@ export default function NewQuotation() {
       setShowDropdown(false);
       setIsCustomItem(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, inventoryItems]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -162,9 +202,11 @@ export default function NewQuotation() {
       const itemText = match ? match[2].trim() : line;
 
       const lowerText = itemText.toLowerCase();
+      // Search in inventory items from API
       const inventoryMatch = inventoryItems.find(inv =>
         inv.name.toLowerCase().includes(lowerText) ||
-        lowerText.includes(inv.name.toLowerCase().split(' ').slice(0, 2).join(' '))
+        lowerText.includes(inv.name.toLowerCase().split(' ').slice(0, 2).join(' ')) ||
+        inv.code.toLowerCase().includes(lowerText)
       );
 
       return {
@@ -442,12 +484,17 @@ Example:
           {/* Inventory Search */}
           <div ref={searchRef} className="relative">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+              {isLoadingInventory ? (
+                <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 animate-spin" />
+              ) : (
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+              )}
               <Input
-                placeholder="Search inventory... (e.g., camera, dvr, cable)"
+                placeholder={isLoadingInventory ? "Loading inventory..." : "Search inventory... (e.g., camera, dvr, cable)"}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => setShowDropdown(true)}
+                onFocus={() => !isLoadingInventory && setShowDropdown(true)}
+                disabled={isLoadingInventory}
                 className="pl-10 h-11 border-neutral-200 rounded-lg"
                 autoFocus={mode === "manual"}
               />

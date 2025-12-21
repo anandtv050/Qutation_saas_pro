@@ -62,7 +62,7 @@ CREATE TABLE tbl_inventory (
     int_stock_qty INTEGER DEFAULT 0,
     txt_description TEXT,
     tim_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    tim_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    tim_updated_at TIMESTAMP DEFAULT NULL,
 
     FOREIGN KEY (fk_bint_user_id) REFERENCES tbl_user(pk_bint_user_id) ON DELETE CASCADE
 );
