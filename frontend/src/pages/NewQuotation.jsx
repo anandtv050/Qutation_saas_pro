@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Minus, X, Loader2, ChevronRight, Search, Printer, FilePlus, Calendar, Check, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import inventoryService from "@/services/inventoryService";
+import quotationService from "@/services/quotationService";
 
 // Session storage key
 const STORAGE_KEY = "quotation_draft";
@@ -36,14 +37,16 @@ const clearDraft = () => {
 export default function NewQuotation() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { id: editId } = useParams(); // Get ID from URL for edit mode
   const mode = searchParams.get("mode") || "ai";
+  const isEditMode = !!editId;
 
-  // Load saved draft on mount
-  const draft = loadDraft();
+  // Load saved draft on mount (only for new quotations)
+  const draft = isEditMode ? null : loadDraft();
 
   const [rawInput, setRawInput] = useState(draft?.rawInput || "");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showForm, setShowForm] = useState(draft?.showForm ?? mode === "manual");
+  const [showForm, setShowForm] = useState(draft?.showForm ?? mode === "manual" ?? isEditMode);
 
   const [customerName, setCustomerName] = useState(draft?.customerName || "");
   const [customerPhone, setCustomerPhone] = useState(draft?.customerPhone || "");
@@ -54,6 +57,9 @@ export default function NewQuotation() {
   // Success state after save
   const [savedQuotation, setSavedQuotation] = useState(draft?.savedQuotation || null);
   const [isUpdated, setIsUpdated] = useState(false); // Track if this was an update
+
+  // Loading state for edit mode
+  const [isLoadingQuotation, setIsLoadingQuotation] = useState(false);
 
   // Inventory data from API
   const [inventoryItems, setInventoryItems] = useState([]);
@@ -97,6 +103,63 @@ export default function NewQuotation() {
     };
     fetchInventory();
   }, []);
+
+  // Fetch quotation for edit mode
+  useEffect(() => {
+    if (!isEditMode || !editId) return;
+
+    const fetchQuotation = async () => {
+      setIsLoadingQuotation(true);
+      try {
+        const response = await quotationService.get(parseInt(editId));
+        if (response.intStatus === 1 && response.data) {
+          const q = response.data;
+          // Set form data
+          setCustomerName(q.strCustomerName || "");
+          setCustomerPhone(q.strCustomerPhone || "");
+          setCustomerAddress(q.strCustomerAddress || "");
+
+          // Transform items to UI format
+          const uiItems = (q.lstItems || []).map(item => ({
+            id: item.intPkQuotationItemId,
+            inventoryId: item.intInventoryId,
+            code: item.strItemCode,
+            name: item.strItemName,
+            unit: item.strUnit,
+            qty: item.dblQuantity,
+            rate: item.dblUnitPrice,
+            fromInventory: !!item.intInventoryId
+          }));
+          setItems(uiItems);
+
+          // Set saved quotation data
+          setSavedQuotation({
+            intPkQuotationId: q.intPkQuotationId,
+            quotation_number: q.strQuotationNumber,
+            customer_name: q.strCustomerName,
+            customer_phone: q.strCustomerPhone,
+            customer_address: q.strCustomerAddress,
+            total: q.dblTotalAmount,
+            date: q.datQuotationDate,
+            status: q.strStatus
+          });
+
+          setShowForm(true);
+        } else {
+          alert(response.strMessage || "Quotation not found");
+          navigate("/reports");
+        }
+      } catch (error) {
+        console.error("Failed to load quotation:", error);
+        alert("Failed to load quotation");
+        navigate("/reports");
+      } finally {
+        setIsLoadingQuotation(false);
+      }
+    };
+
+    fetchQuotation();
+  }, [isEditMode, editId, navigate]);
 
   // Current date
   const today = new Date().toLocaleDateString("en-IN", {
@@ -289,34 +352,86 @@ export default function NewQuotation() {
 
     const wasAlreadySaved = !!savedQuotation;
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Generate quotation number only on first save (in real app, this comes from backend)
-    const quotationNumber = savedQuotation?.quotation_number || `QT-${Date.now().toString().slice(-6)}`;
+    try {
+      // Transform items for API
+      const lstItems = items.map((item, index) => ({
+        intInventoryId: item.inventoryId || null,
+        strItemCode: item.code || null,
+        strItemName: item.name,
+        strUnit: item.unit || 'piece',
+        dblQuantity: item.qty,
+        dblUnitPrice: item.rate,
+        intSortOrder: index
+      }));
 
-    const quotationData = {
-      quotation_number: quotationNumber,
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      customer_address: customerAddress,
-      items: items,
-      total: total,
-      date: savedQuotation?.date || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+      let response;
 
-    console.log(wasAlreadySaved ? "Updated:" : "Saved:", quotationData);
-    setIsSaving(false);
-    setSavedQuotation(quotationData);
-    setIsUpdated(wasAlreadySaved); // Mark as updated if it was already saved before
+      if (wasAlreadySaved && savedQuotation.intPkQuotationId) {
+        // UPDATE existing quotation
+        response = await quotationService.update({
+          intPkQuotationId: savedQuotation.intPkQuotationId,
+          strCustomerName: customerName,
+          strCustomerPhone: customerPhone || null,
+          strCustomerAddress: customerAddress || null,
+          lstItems: lstItems
+        });
+      } else {
+        // CREATE new quotation
+        response = await quotationService.add({
+          strCustomerName: customerName,
+          strCustomerPhone: customerPhone || null,
+          strCustomerAddress: customerAddress || null,
+          strStatus: 'draft',
+          lstItems: lstItems
+        });
+      }
+
+      if (response.intStatus === 1 && response.data) {
+        // Transform response to match UI format
+        const savedData = {
+          intPkQuotationId: response.data.intPkQuotationId,
+          quotation_number: response.data.strQuotationNumber,
+          customer_name: response.data.strCustomerName,
+          customer_phone: response.data.strCustomerPhone,
+          customer_address: response.data.strCustomerAddress,
+          total: response.data.dblTotalAmount,
+          date: response.data.datQuotationDate,
+          status: response.data.strStatus,
+          items: response.data.lstItems
+        };
+        setSavedQuotation(savedData);
+        setIsUpdated(wasAlreadySaved);
+        clearDraft(); // Clear draft after successful save
+      } else {
+        alert(response.strMessage || "Failed to save quotation");
+      }
+    } catch (error) {
+      console.error("Save error:", error);
+      alert(error.message || "Failed to save quotation");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handlePrint = () => {
     window.print();
   };
 
+  // Loading screen for edit mode
+  if (isLoadingQuotation) {
+    return (
+      <div className="p-4 md:p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 mx-auto text-neutral-400 animate-spin mb-4" />
+          <p className="text-sm text-neutral-500">Loading quotation...</p>
+        </div>
+      </div>
+    );
+  }
+
   // AI Input Screen
-  if (!showForm && mode === "ai") {
+  if (!showForm && mode === "ai" && !isEditMode) {
     return (
       <div className="p-4 md:p-6 max-w-2xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
@@ -398,7 +513,7 @@ Example:
         {/* Top Row: Back button only (New button removed - dangerous on edit page) */}
         <div className="flex items-center mb-2">
           <button
-            onClick={() => mode === "ai" ? setShowForm(false) : navigateWithConfirm("/dashboard")}
+            onClick={() => mode === "ai" ? setShowForm(false) : navigateWithConfirm(isEditMode ? "/reports" : "/dashboard")}
             className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg"
           >
             <ArrowLeft className="w-5 h-5 text-neutral-600" />
@@ -433,7 +548,7 @@ Example:
           </div>
         ) : (
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-semibold text-neutral-900">New Quotation</h1>
+            <h1 className="text-xl font-semibold text-neutral-900">{isEditMode ? 'Edit Quotation' : 'New Quotation'}</h1>
             <div className="flex items-center gap-1 text-sm text-neutral-500">
               <Calendar className="w-4 h-4" />
               {today}

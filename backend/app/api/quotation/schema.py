@@ -322,7 +322,7 @@ class MdlQuotationResponse(MdlBaseResponse):
         "data": null
     }
     """
-    lstQutation: Optional[MdlQuotation] = None
+    data: Optional[MdlQuotation] = None
 
 
 class MdlQuotationListResponse(MdlBaseResponse):
