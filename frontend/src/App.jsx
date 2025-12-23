@@ -40,6 +40,7 @@ function App() {
           <Route path="/quotations/new" element={<NewQuotation />} />
           <Route path="/quotations/edit/:id" element={<NewQuotation />} />
           <Route path="/invoices/new" element={<NewInvoice />} />
+          <Route path="/invoices/view/:id" element={<NewInvoice />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/profile" element={<Profile />} />

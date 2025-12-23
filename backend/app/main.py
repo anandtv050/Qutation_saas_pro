@@ -16,11 +16,9 @@ from app.core.database import ClsDatabasepool
 LST_ROUTERS = [
     "app.api.login.router",
     "app.api.inventory.router",
-    "app.api.quotation.router"
+    "app.api.quotation.router",
+    "app.api.invoice.router"
     # "app.api.register.router",      # Add when ready
-    # "app.api.quotation.router",     # Add when ready
-    # "app.api.invoice.router",       # Add when ready
-    # "app.api.inventory.router",     # Add when ready
 ]
 
 

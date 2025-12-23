@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Printer, Calendar, Check, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import invoiceService from "@/services/invoiceService";
 // Commented for later - inventory search
 // import { searchInventory, inventoryItems } from "@/data/inventoryData";
 
@@ -32,12 +33,20 @@ const saveDraft = (data) => {
 export default function NewInvoice() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { id: invoiceId } = useParams();
 
   // Check if coming from quotation conversion
   const fromQuotation = location.state?.fromQuotation;
 
-  // Load saved draft on mount
-  const draft = loadDraft();
+  // Check if viewing/editing existing invoice
+  const isViewMode = !!invoiceId;
+
+  // Loading state for fetching invoice
+  const [isLoading, setIsLoading] = useState(isViewMode);
+  const [loadError, setLoadError] = useState(null);
+
+  // Load saved draft on mount (only if not in view mode)
+  const draft = isViewMode ? null : loadDraft();
 
   // Initialize from quotation if available, otherwise from draft
   const [customerName, setCustomerName] = useState(
@@ -53,9 +62,13 @@ export default function NewInvoice() {
     if (fromQuotation?.items) {
       return fromQuotation.items.map((item, i) => ({
         id: Date.now() + i,
-        name: item.name,
-        qty: item.qty,
-        rate: item.rate,
+        // Handle both API format (strItemName) and old format (name)
+        name: item.strItemName || item.name,
+        qty: item.dblQuantity || item.qty,
+        rate: item.dblUnitPrice || item.rate,
+        unit: item.strUnit || item.unit || 'piece',
+        code: item.strItemCode || item.code || null,
+        inventoryId: item.intInventoryId || item.inventoryId || null,
         fromInventory: true,
       }));
     }
@@ -77,8 +90,11 @@ export default function NewInvoice() {
   const [isUpdated, setIsUpdated] = useState(false);
 
   // Track if this is from quotation conversion
-  const [sourceQuotation] = useState(
+  const [sourceQuotation, setSourceQuotation] = useState(
     fromQuotation?.quotation_number || draft?.sourceQuotation || null
+  );
+  const [sourceQuotationId, setSourceQuotationId] = useState(
+    fromQuotation?.intPkQuotationId || draft?.sourceQuotationId || null
   );
 
   /* Inventory search state - Commented for later
@@ -120,8 +136,9 @@ export default function NewInvoice() {
       */
       savedInvoice,
       sourceQuotation,
+      sourceQuotationId,
     });
-  }, [customerName, customerPhone, customerAddress, items, dueDate, savedInvoice, sourceQuotation]);
+  }, [customerName, customerPhone, customerAddress, items, dueDate, savedInvoice, sourceQuotation, sourceQuotationId]);
 
   // Warn before closing/refreshing browser tab with unsaved changes
   useEffect(() => {
@@ -238,35 +255,57 @@ export default function NewInvoice() {
     if (!customerName.trim()) return alert("Enter customer name");
     if (items.length === 0) return alert("Add at least one item");
 
-    const wasAlreadySaved = !!savedInvoice;
+    // Invoice is not editable - only save once
+    if (savedInvoice) return;
+
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Generate invoice number only on first save
-    const invoiceNumber = savedInvoice?.invoice_number || `INV-${Date.now().toString().slice(-6)}`;
+    try {
+      // Transform items for API
+      const lstItems = items.map((item, index) => ({
+        intInventoryId: item.inventoryId || null,
+        strItemCode: item.code || null,
+        strItemName: item.name,
+        strUnit: item.unit || 'piece',
+        dblQuantity: item.qty,
+        dblUnitPrice: item.rate,
+        intSortOrder: index
+      }));
 
-    const invoiceData = {
-      invoice_number: invoiceNumber,
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      customer_address: customerAddress,
-      items: items,
-      total: subtotal,
-      due_date: dueDate,
-      source_quotation: sourceQuotation,
-      date: savedInvoice?.date || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      /* Payment tracking - Commented for later
-      payment_status: paymentStatus,
-      paid_amount: paidAmount,
-      balance: balance,
-      */
-    };
+      const response = await invoiceService.add({
+        intQuotationId: sourceQuotationId || null,
+        strCustomerName: customerName,
+        strCustomerPhone: customerPhone || null,
+        strCustomerAddress: customerAddress || null,
+        datDueDate: dueDate || null,
+        strPaymentStatus: 'pending',
+        lstItems: lstItems
+      });
 
-    console.log(wasAlreadySaved ? "Updated Invoice:" : "Saved Invoice:", invoiceData);
-    setIsSaving(false);
-    setSavedInvoice(invoiceData);
-    setIsUpdated(wasAlreadySaved);
+      if (response.intStatus === 1 && response.data) {
+        // Transform response to match UI format
+        const savedData = {
+          intPkInvoiceId: response.data.intPkInvoiceId,
+          invoice_number: response.data.strInvoiceNumber,
+          customer_name: response.data.strCustomerName,
+          customer_phone: response.data.strCustomerPhone,
+          customer_address: response.data.strCustomerAddress,
+          total: response.data.dblTotalAmount,
+          date: response.data.datInvoiceDate,
+          payment_status: response.data.strPaymentStatus,
+          items: response.data.lstItems
+        };
+        setSavedInvoice(savedData);
+        sessionStorage.removeItem(STORAGE_KEY); // Clear draft after save
+      } else {
+        alert(response.strMessage || "Failed to save invoice");
+      }
+    } catch (error) {
+      console.error("Save error:", error);
+      alert(error.message || "Failed to save invoice");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handlePrint = () => {
@@ -280,12 +319,121 @@ export default function NewInvoice() {
 
   // Set default due date to 15 days from now if not set
   useEffect(() => {
-    if (!dueDate && !fromQuotation && !draft?.dueDate) {
+    if (!dueDate && !fromQuotation && !draft?.dueDate && !isViewMode) {
       const defaultDue = new Date();
       defaultDue.setDate(defaultDue.getDate() + 15);
       setDueDate(defaultDue.toISOString().split('T')[0]);
     }
   }, []);
+
+  // Load invoice from API when in view mode
+  useEffect(() => {
+    if (!isViewMode || !invoiceId) return;
+
+    const loadInvoice = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const response = await invoiceService.get(parseInt(invoiceId));
+        if (response.intStatus === 1 && response.data) {
+          const inv = response.data;
+
+          // Set customer details
+          setCustomerName(inv.strCustomerName || "");
+          setCustomerPhone(inv.strCustomerPhone || "");
+          setCustomerAddress(inv.strCustomerAddress || "");
+          setDueDate(inv.datDueDate || "");
+
+          // Transform items from API format to UI format
+          const uiItems = (inv.lstItems || []).map((item, i) => ({
+            id: item.intPkInvoiceItemId || Date.now() + i,
+            name: item.strItemName,
+            qty: item.dblQuantity,
+            rate: item.dblUnitPrice,
+            unit: item.strUnit || 'piece',
+            code: item.strItemCode || null,
+            inventoryId: item.intInventoryId || null,
+            fromInventory: !!item.intInventoryId,
+          }));
+          setItems(uiItems);
+
+          // Set source quotation if linked
+          if (inv.strQuotationNumber) {
+            setSourceQuotation(inv.strQuotationNumber);
+            setSourceQuotationId(inv.intQuotationId);
+          }
+
+          // Set as already saved invoice (view mode)
+          setSavedInvoice({
+            intPkInvoiceId: inv.intPkInvoiceId,
+            invoice_number: inv.strInvoiceNumber,
+            customer_name: inv.strCustomerName,
+            customer_phone: inv.strCustomerPhone,
+            customer_address: inv.strCustomerAddress,
+            total: inv.dblTotalAmount,
+            date: inv.datInvoiceDate,
+            payment_status: inv.strPaymentStatus,
+            items: inv.lstItems
+          });
+        } else {
+          setLoadError(response.strMessage || "Invoice not found");
+        }
+      } catch (error) {
+        console.error("Failed to load invoice:", error);
+        setLoadError(error.message || "Failed to load invoice");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInvoice();
+  }, [invoiceId, isViewMode]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-6 pb-36 lg:pb-6">
+        <div className="flex items-center mb-6">
+          <button
+            onClick={() => navigate("/reports")}
+            className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg"
+          >
+            <ArrowLeft className="w-5 h-5 text-neutral-600" />
+          </button>
+        </div>
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 text-neutral-400 animate-spin mb-4" />
+          <p className="text-sm text-neutral-500">Loading invoice...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (loadError) {
+    return (
+      <div className="p-4 md:p-6 pb-36 lg:pb-6">
+        <div className="flex items-center mb-6">
+          <button
+            onClick={() => navigate("/reports")}
+            className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg"
+          >
+            <ArrowLeft className="w-5 h-5 text-neutral-600" />
+          </button>
+        </div>
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+            <span className="text-2xl">!</span>
+          </div>
+          <h3 className="text-lg font-medium text-neutral-900 mb-2">Failed to load invoice</h3>
+          <p className="text-sm text-neutral-500 mb-4">{loadError}</p>
+          <Button onClick={() => navigate("/reports")} variant="outline">
+            Back to Reports
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 pb-36 lg:pb-6">
@@ -294,7 +442,7 @@ export default function NewInvoice() {
         {/* Top Row: Back button */}
         <div className="flex items-center mb-2">
           <button
-            onClick={() => navigateWithConfirm("/dashboard")}
+            onClick={() => navigateWithConfirm(isViewMode ? "/reports" : "/dashboard")}
             className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg"
           >
             <ArrowLeft className="w-5 h-5 text-neutral-600" />

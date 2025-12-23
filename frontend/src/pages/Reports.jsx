@@ -4,7 +4,7 @@ import { Search, FileText, Receipt, Loader2, RefreshCw, Trash2 } from "lucide-re
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import quotationService from "@/services/quotationService";
-import { dummyInvoices } from "@/data/dummyData";
+import invoiceService from "@/services/invoiceService";
 
 export default function Reports() {
   const navigate = useNavigate();
@@ -18,8 +18,14 @@ export default function Reports() {
   const [isLoadingQuotations, setIsLoadingQuotations] = useState(true);
   const [quotationError, setQuotationError] = useState(null);
 
+  // Invoices state
+  const [invoices, setInvoices] = useState([]);
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(true);
+  const [invoiceError, setInvoiceError] = useState(null);
+
   // Delete confirmation state
   const [deleteId, setDeleteId] = useState(null);
+  const [deleteType, setDeleteType] = useState(null); // "quotation" or "invoice"
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch quotations from API
@@ -44,8 +50,31 @@ export default function Reports() {
     }
   };
 
+  // Fetch invoices from API
+  const fetchInvoices = async () => {
+    setIsLoadingInvoices(true);
+    setInvoiceError(null);
+    try {
+      const response = await invoiceService.getList();
+      if (response.intStatus === 1) {
+        setInvoices(response.lstInvoice || []);
+      } else if (response.intStatus === -1) {
+        // No data found
+        setInvoices([]);
+      } else {
+        setInvoiceError(response.strMessage || "Failed to load invoices");
+      }
+    } catch (error) {
+      console.error("Failed to fetch invoices:", error);
+      setInvoiceError(error.message || "Failed to load invoices");
+    } finally {
+      setIsLoadingInvoices(false);
+    }
+  };
+
   useEffect(() => {
     fetchQuotations();
+    fetchInvoices();
   }, []);
 
   const formatCurrency = (amount) => {
@@ -81,18 +110,20 @@ export default function Reports() {
     });
   }, [quotations, searchQuery, fromDate, toDate]);
 
-  // Filter invoices (still using dummy data for now)
+  // Filter invoices
   const filteredInvoices = useMemo(() => {
-    return dummyInvoices.filter(i => {
+    return invoices.filter(i => {
       const matchesSearch = !searchQuery.trim() ||
-        i.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        i.customer_name.toLowerCase().includes(searchQuery.toLowerCase());
-      const dateValue = i.created_at;
+        i.strInvoiceNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        i.strCustomerName?.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const dateValue = i.datInvoiceDate;
       const matchesFromDate = !fromDate || dateValue >= fromDate;
       const matchesToDate = !toDate || dateValue <= toDate;
+
       return matchesSearch && matchesFromDate && matchesToDate;
     });
-  }, [searchQuery, fromDate, toDate]);
+  }, [invoices, searchQuery, fromDate, toDate]);
 
   const statusColors = {
     // Quotation statuses
@@ -114,28 +145,52 @@ export default function Reports() {
     navigate(`/quotations/edit/${quotationId}`);
   };
 
+  // Handle invoice click - navigate to view/edit
+  const handleInvoiceClick = (invoiceId) => {
+    navigate(`/invoices/view/${invoiceId}`);
+  };
+
   // Handle delete quotation
   const handleDeleteQuotation = async (quotationId, e) => {
     e.stopPropagation(); // Prevent row click
     setDeleteId(quotationId);
+    setDeleteType("quotation");
+  };
+
+  // Handle delete invoice
+  const handleDeleteInvoice = async (invoiceId, e) => {
+    e.stopPropagation(); // Prevent row click
+    setDeleteId(invoiceId);
+    setDeleteType("invoice");
   };
 
   const confirmDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || !deleteType) return;
 
     setIsDeleting(true);
     try {
-      const response = await quotationService.delete(deleteId);
-      if (response.intStatus === 1) {
-        // Remove from local state
-        setQuotations(prev => prev.filter(q => q.intPkQuotationId !== deleteId));
-        setDeleteId(null);
-      } else {
-        alert(response.strMessage || "Failed to delete quotation");
+      if (deleteType === "quotation") {
+        const response = await quotationService.delete(deleteId);
+        if (response.intStatus === 1) {
+          setQuotations(prev => prev.filter(q => q.intPkQuotationId !== deleteId));
+          setDeleteId(null);
+          setDeleteType(null);
+        } else {
+          alert(response.strMessage || "Failed to delete quotation");
+        }
+      } else if (deleteType === "invoice") {
+        const response = await invoiceService.delete(deleteId);
+        if (response.intStatus === 1) {
+          setInvoices(prev => prev.filter(i => i.intPkInvoiceId !== deleteId));
+          setDeleteId(null);
+          setDeleteType(null);
+        } else {
+          alert(response.strMessage || "Failed to delete invoice");
+        }
       }
     } catch (error) {
       console.error("Delete error:", error);
-      alert(error.message || "Failed to delete quotation");
+      alert(error.message || `Failed to delete ${deleteType}`);
     } finally {
       setIsDeleting(false);
     }
@@ -147,14 +202,16 @@ export default function Reports() {
       {deleteId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-sm w-full">
-            <h3 className="text-lg font-semibold text-neutral-900 mb-2">Delete Quotation?</h3>
+            <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+              Delete {deleteType === "invoice" ? "Invoice" : "Quotation"}?
+            </h3>
             <p className="text-sm text-neutral-600 mb-6">
-              This action cannot be undone. The quotation and all its items will be permanently deleted.
+              This action cannot be undone. The {deleteType} and all its items will be permanently deleted.
             </p>
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                onClick={() => setDeleteId(null)}
+                onClick={() => { setDeleteId(null); setDeleteType(null); }}
                 className="flex-1"
                 disabled={isDeleting}
               >
@@ -198,7 +255,7 @@ export default function Reports() {
               : "text-neutral-500 hover:text-neutral-700"
           }`}
         >
-          Invoices ({dummyInvoices.length})
+          Invoices ({invoices.length})
         </button>
       </div>
 
@@ -242,6 +299,17 @@ export default function Reports() {
             className="h-10 w-10 shrink-0"
           >
             <RefreshCw className={`w-4 h-4 ${isLoadingQuotations ? "animate-spin" : ""}`} />
+          </Button>
+        )}
+        {activeTab === "invoices" && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={fetchInvoices}
+            disabled={isLoadingInvoices}
+            className="h-10 w-10 shrink-0"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoadingInvoices ? "animate-spin" : ""}`} />
           </Button>
         )}
       </div>
@@ -359,11 +427,28 @@ export default function Reports() {
       {/* Invoices List */}
       {activeTab === "invoices" && (
         <>
-          {filteredInvoices.length === 0 ? (
+          {isLoadingInvoices ? (
+            <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
+              <Loader2 className="w-8 h-8 mx-auto text-neutral-400 animate-spin mb-4" />
+              <p className="text-sm text-neutral-500">Loading invoices...</p>
+            </div>
+          ) : invoiceError ? (
+            <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
+              <Receipt className="w-12 h-12 mx-auto text-red-300 mb-4" />
+              <h3 className="font-medium text-neutral-900 mb-1">Error loading invoices</h3>
+              <p className="text-sm text-neutral-500 mb-4">{invoiceError}</p>
+              <Button variant="outline" onClick={fetchInvoices}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          ) : filteredInvoices.length === 0 ? (
             <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
               <Receipt className="w-12 h-12 mx-auto text-neutral-300 mb-4" />
               <h3 className="font-medium text-neutral-900 mb-1">No invoices found</h3>
-              <p className="text-sm text-neutral-500">Try a different search or date</p>
+              <p className="text-sm text-neutral-500 mb-4">
+                {invoices.length === 0 ? "Create your first invoice from a quotation" : "Try a different search or date"}
+              </p>
             </div>
           ) : (
             <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden">
@@ -372,43 +457,67 @@ export default function Reports() {
                 <div className="col-span-2">INV. Number</div>
                 <div className="col-span-3">Customer</div>
                 <div className="col-span-2">Date</div>
-                <div className="col-span-2">Status</div>
-                <div className="col-span-3 text-right">Amount</div>
+                <div className="col-span-1">Items</div>
+                <div className="col-span-1">Status</div>
+                <div className="col-span-2 text-right">Amount</div>
+                <div className="col-span-1 text-right">Actions</div>
               </div>
 
               {/* Items */}
-              {filteredInvoices.map((i, index) => (
+              {filteredInvoices.map((inv, index) => (
                 <div
-                  key={i.id}
-                  className={`grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-neutral-50 cursor-pointer ${
+                  key={inv.intPkInvoiceId}
+                  onClick={() => handleInvoiceClick(inv.intPkInvoiceId)}
+                  className={`grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-neutral-50 cursor-pointer transition-colors ${
                     index !== filteredInvoices.length - 1 ? "border-b border-neutral-100" : ""
                   }`}
                 >
                   {/* Mobile: Stacked */}
                   <div className="col-span-8 md:col-span-2">
-                    <p className="font-medium text-neutral-900 text-sm">{i.invoice_number}</p>
-                    <p className="text-xs text-neutral-500 md:hidden">{i.customer_name}</p>
+                    <p className="font-medium text-neutral-900 text-sm">{inv.strInvoiceNumber}</p>
+                    {inv.strQuotationNumber && (
+                      <p className="text-xs text-blue-600">From {inv.strQuotationNumber}</p>
+                    )}
+                    <p className="text-xs text-neutral-500 md:hidden">{inv.strCustomerName}</p>
                   </div>
 
-                  <div className="hidden md:block col-span-3 text-sm text-neutral-700">
-                    {i.customer_name}
+                  <div className="hidden md:block col-span-3 text-sm text-neutral-700 truncate">
+                    {inv.strCustomerName}
+                    {inv.strCustomerPhone && (
+                      <span className="text-neutral-400 ml-1">({inv.strCustomerPhone})</span>
+                    )}
                   </div>
 
                   <div className="hidden md:block col-span-2 text-sm text-neutral-500">
-                    {i.created_at}
+                    {formatDate(inv.datInvoiceDate)}
                   </div>
 
-                  <div className="hidden md:block col-span-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${statusColors[i.payment_status]}`}>
-                      {i.payment_status}
+                  <div className="hidden md:block col-span-1 text-sm text-neutral-500">
+                    {inv.intItemCount} items
+                  </div>
+
+                  <div className="hidden md:block col-span-1">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${statusColors[inv.strPaymentStatus] || statusColors.pending}`}>
+                      {inv.strPaymentStatus}
                     </span>
                   </div>
 
-                  <div className="col-span-4 md:col-span-3 text-right">
-                    <p className="font-semibold text-neutral-900">{formatCurrency(i.total_amount)}</p>
-                    <span className={`md:hidden px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[i.payment_status]}`}>
-                      {i.payment_status}
+                  <div className="col-span-3 md:col-span-2 text-right">
+                    <p className="font-semibold text-neutral-900">{formatCurrency(inv.dblTotalAmount)}</p>
+                    <span className={`md:hidden px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[inv.strPaymentStatus] || statusColors.pending}`}>
+                      {inv.strPaymentStatus}
                     </span>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="col-span-1 md:col-span-1 flex justify-end gap-1">
+                    <button
+                      onClick={(e) => handleDeleteInvoice(inv.intPkInvoiceId, e)}
+                      className="p-1.5 hover:bg-red-50 rounded-lg transition-colors group"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4 text-neutral-400 group-hover:text-red-500" />
+                    </button>
                   </div>
                 </div>
               ))}

@@ -132,7 +132,7 @@ export default function NewQuotation() {
           }));
           setItems(uiItems);
 
-          // Set saved quotation data
+          // Set saved quotation data (including items for Convert to Invoice)
           setSavedQuotation({
             intPkQuotationId: q.intPkQuotationId,
             quotation_number: q.strQuotationNumber,
@@ -141,7 +141,8 @@ export default function NewQuotation() {
             customer_address: q.strCustomerAddress,
             total: q.dblTotalAmount,
             date: q.datQuotationDate,
-            status: q.strStatus
+            status: q.strStatus,
+            items: uiItems
           });
 
           setShowForm(true);
