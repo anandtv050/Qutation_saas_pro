@@ -17,7 +17,9 @@ LST_ROUTERS = [
     "app.api.login.router",
     "app.api.inventory.router",
     "app.api.quotation.router",
-    "app.api.invoice.router"
+    "app.api.invoice.router",
+    "app.api.dashboard.router",
+    "app.api.pdf.router"
     # "app.api.register.router",      # Add when ready
 ]
 

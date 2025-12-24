@@ -250,6 +250,9 @@ class MdlQuotation(BaseModel):
     strStatus: str                                    # draft, sent, accepted, rejected
     datValidUntil: Optional[date] = None
     lstItems: List[MdlQuotationItem] = []
+    # Linked invoice info (if converted)
+    intLinkedInvoiceId: Optional[int] = None          # Invoice ID if converted
+    strLinkedInvoiceNumber: Optional[str] = None      # Invoice number if converted
 
 
 class MdlQuotationListItem(BaseModel):

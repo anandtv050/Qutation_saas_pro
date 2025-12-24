@@ -1,11 +1,21 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { MessageSquareText, ListPlus, ArrowRight } from "lucide-react";
-import { dummyInvoices } from "@/data/dummyData";
+import { MessageSquareText, ListPlus, ArrowRight, Loader2 } from "lucide-react";
+import dashboardService from "@/services/dashboardService";
 
 export default function Dashboard() {
   const [userName, setUserName] = useState("");
+  const [summary, setSummary] = useState({
+    dblTotalCollected: 0,
+    dblTotalPending: 0,
+    intTotalInvoices: 0,
+    intPaidInvoices: 0,
+    intPendingInvoices: 0,
+    intTotalQuotations: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Load user name from localStorage
   useEffect(() => {
     const user = localStorage.getItem("user");
     if (user) {
@@ -18,6 +28,23 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Fetch dashboard summary from API
+  useEffect(() => {
+    const fetchSummary = async () => {
+      try {
+        const response = await dashboardService.getSummary();
+        if (response.intStatus === 1 && response.data) {
+          setSummary(response.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard summary:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchSummary();
+  }, []);
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -25,14 +52,6 @@ export default function Dashboard() {
       maximumFractionDigits: 0,
     }).format(amount);
   };
-
-  const totalCollected = dummyInvoices
-    .filter(i => i.payment_status === "paid")
-    .reduce((sum, i) => sum + i.total_amount, 0);
-
-  const pendingAmount = dummyInvoices
-    .filter(i => i.payment_status !== "paid")
-    .reduce((sum, i) => sum + i.total_amount, 0);
 
   return (
     <div className="min-h-screen flex items-start justify-center">
@@ -47,16 +66,28 @@ export default function Dashboard() {
         {/* Money Stats - Simple */}
         <Link to="/reports" className="block mb-6">
           <div className="rounded-2xl bg-white border border-neutral-200 p-5">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-neutral-500 mb-1">Collected</p>
-                <p className="text-2xl font-bold text-emerald-600">{formatCurrency(totalCollected)}</p>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-6 h-6 text-neutral-400 animate-spin" />
               </div>
-              <div>
-                <p className="text-sm text-neutral-500 mb-1">Due</p>
-                <p className="text-2xl font-bold text-amber-500">{formatCurrency(pendingAmount)}</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-neutral-500 mb-1">Collected</p>
+                  <p className="text-2xl font-bold text-emerald-600">{formatCurrency(summary.dblTotalCollected)}</p>
+                  {summary.intPaidInvoices > 0 && (
+                    <p className="text-xs text-neutral-400">{summary.intPaidInvoices} invoices</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-neutral-500 mb-1">Due</p>
+                  <p className="text-2xl font-bold text-amber-500">{formatCurrency(summary.dblTotalPending)}</p>
+                  {summary.intPendingInvoices > 0 && (
+                    <p className="text-xs text-neutral-400">{summary.intPendingInvoices} invoices</p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </Link>
 

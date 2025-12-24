@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import inventoryService from "@/services/inventoryService";
 import quotationService from "@/services/quotationService";
+import pdfService from "@/services/pdfService";
 
 // Session storage key
 const STORAGE_KEY = "quotation_draft";
@@ -142,7 +143,10 @@ export default function NewQuotation() {
             total: q.dblTotalAmount,
             date: q.datQuotationDate,
             status: q.strStatus,
-            items: uiItems
+            items: uiItems,
+            // Linked invoice info (if already converted)
+            linkedInvoiceId: q.intLinkedInvoiceId,
+            linkedInvoiceNumber: q.strLinkedInvoiceNumber
           });
 
           setShowForm(true);
@@ -415,8 +419,31 @@ export default function NewQuotation() {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  const handlePrint = async () => {
+    if (!savedQuotation) {
+      alert("Please save the quotation first");
+      return;
+    }
+
+    setIsPrinting(true);
+    try {
+      // Generate PDF using saved quotation ID
+      const pdfBlob = await pdfService.generateQuotationPDF({
+        intQuotationId: savedQuotation.intPkQuotationId,
+        blnIncludeInfoPage: true
+      });
+
+      // Download PDF file
+      const filename = `Quotation_${savedQuotation.quotation_number || 'draft'}.pdf`;
+      pdfService.downloadPDF(pdfBlob, filename);
+    } catch (error) {
+      console.error("Print error:", error);
+      alert(error.message || "Failed to generate PDF");
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   // Loading screen for edit mode
@@ -530,9 +557,12 @@ Example:
               </div>
               <div>
                 <h1 className="text-lg font-bold text-neutral-900">{savedQuotation.quotation_number}</h1>
-                <p className="text-xs text-green-600">
-                  {isUpdated ? "Quotation updated successfully" : "Quotation saved successfully"}
-                </p>
+                {/* Only show success message after user action (save/update), not when just loading */}
+                {(!isEditMode || isUpdated) && (
+                  <p className="text-xs text-green-600">
+                    {isUpdated ? "Quotation updated successfully" : "Quotation saved successfully"}
+                  </p>
+                )}
               </div>
             </div>
             <div className="text-right">
@@ -854,21 +884,37 @@ Example:
                   {/* Print */}
                   <Button
                     onClick={handlePrint}
+                    disabled={isPrinting}
                     variant="outline"
                     className="w-full h-11 border-neutral-200 text-neutral-700 hover:bg-neutral-50 rounded-lg font-medium"
                   >
-                    <Printer className="w-4 h-4 mr-2" />
-                    Print Quotation
+                    {isPrinting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Printer className="w-4 h-4 mr-2" />
+                    )}
+                    {isPrinting ? "Generating PDF..." : "Print Quotation"}
                   </Button>
-                  {/* Convert to Invoice - Important business action */}
-                  <Button
-                    onClick={() => navigate("/invoices/new", { state: { fromQuotation: savedQuotation } })}
-                    variant="outline"
-                    className="w-full h-11 border-blue-200 text-blue-700 hover:bg-blue-50 rounded-lg font-medium"
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Convert to Invoice
-                  </Button>
+                  {/* Convert to Invoice OR View Invoice if already converted */}
+                  {savedQuotation.linkedInvoiceId ? (
+                    <Button
+                      onClick={() => navigate(`/invoices/view/${savedQuotation.linkedInvoiceId}`)}
+                      variant="outline"
+                      className="w-full h-11 border-green-200 text-green-700 hover:bg-green-50 rounded-lg font-medium"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      View Invoice ({savedQuotation.linkedInvoiceNumber})
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => navigate("/invoices/new", { state: { fromQuotation: savedQuotation } })}
+                      variant="outline"
+                      className="w-full h-11 border-blue-200 text-blue-700 hover:bg-blue-50 rounded-lg font-medium"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Convert to Invoice
+                    </Button>
+                  )}
                   {/* New Quotation - TERTIARY (with subtle border for visibility) */}
                   <Button
                     onClick={resetForm}
@@ -912,19 +958,34 @@ Example:
               {/* Print */}
               <Button
                 onClick={handlePrint}
+                disabled={isPrinting}
                 variant="outline"
                 className="h-11 px-3 border-neutral-200 shrink-0"
               >
-                <Printer className="w-4 h-4" />
+                {isPrinting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Printer className="w-4 h-4" />
+                )}
               </Button>
-              {/* Convert to Invoice */}
-              <Button
-                onClick={() => navigate("/invoices/new", { state: { fromQuotation: savedQuotation } })}
-                className="h-11 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shrink-0"
-              >
-                <FileText className="w-4 h-4 mr-1" />
-                Invoice
-              </Button>
+              {/* Convert to Invoice OR View Invoice */}
+              {savedQuotation.linkedInvoiceId ? (
+                <Button
+                  onClick={() => navigate(`/invoices/view/${savedQuotation.linkedInvoiceId}`)}
+                  className="h-11 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium shrink-0"
+                >
+                  <FileText className="w-4 h-4 mr-1" />
+                  View
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => navigate("/invoices/new", { state: { fromQuotation: savedQuotation } })}
+                  className="h-11 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shrink-0"
+                >
+                  <FileText className="w-4 h-4 mr-1" />
+                  Invoice
+                </Button>
+              )}
               {/* Update */}
               <Button
                 onClick={handleSave}

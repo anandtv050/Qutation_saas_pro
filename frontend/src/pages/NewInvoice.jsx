@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, Printer, Calendar, Check, Share2 } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import invoiceService from "@/services/invoiceService";
+import pdfService from "@/services/pdfService";
 // Commented for later - inventory search
 // import { searchInventory, inventoryItems } from "@/data/inventoryData";
 
@@ -86,15 +87,19 @@ export default function NewInvoice() {
   const [isSaving, setIsSaving] = useState(false);
 
   // Success state after save
-  const [savedInvoice, setSavedInvoice] = useState(draft?.savedInvoice || null);
+  // IMPORTANT: Don't load savedInvoice from draft when coming from quotation conversion
+  // This prevents showing "saved" state for a new invoice that hasn't been saved yet
+  const [savedInvoice, setSavedInvoice] = useState(
+    fromQuotation ? null : (draft?.savedInvoice || null)
+  );
   const [isUpdated, setIsUpdated] = useState(false);
 
   // Track if this is from quotation conversion
   const [sourceQuotation, setSourceQuotation] = useState(
-    fromQuotation?.quotation_number || draft?.sourceQuotation || null
+    fromQuotation?.quotation_number || null
   );
   const [sourceQuotationId, setSourceQuotationId] = useState(
-    fromQuotation?.intPkQuotationId || draft?.sourceQuotationId || null
+    fromQuotation?.intPkQuotationId || null
   );
 
   /* Inventory search state - Commented for later
@@ -105,6 +110,13 @@ export default function NewInvoice() {
   const [customRate, setCustomRate] = useState("");
   const searchRef = useRef(null);
   */
+
+  // Clear old draft when coming from quotation conversion (fresh start)
+  useEffect(() => {
+    if (fromQuotation) {
+      sessionStorage.removeItem(STORAGE_KEY);
+    }
+  }, []);
 
   // Current date
   const today = new Date().toLocaleDateString("en-IN", {
@@ -278,7 +290,7 @@ export default function NewInvoice() {
         strCustomerPhone: customerPhone || null,
         strCustomerAddress: customerAddress || null,
         datDueDate: dueDate || null,
-        strPaymentStatus: 'pending',
+        strPaymentStatus: 'paid',  // Default to paid since payment tracking is disabled
         lstItems: lstItems
       });
 
@@ -308,8 +320,35 @@ export default function NewInvoice() {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  const handlePrint = async () => {
+    // For view mode, use invoiceId from URL
+    // For saved invoice, use savedInvoice.intPkInvoiceId
+    const invoiceIdToUse = isViewMode ? parseInt(invoiceId) : savedInvoice?.intPkInvoiceId;
+
+    if (!invoiceIdToUse) {
+      alert("Please save the invoice first");
+      return;
+    }
+
+    setIsPrinting(true);
+    try {
+      const pdfBlob = await pdfService.generateInvoicePDF({
+        intInvoiceId: invoiceIdToUse,
+        blnIncludeInfoPage: false
+      });
+
+      // Download PDF file
+      const invoiceNum = savedInvoice?.invoice_number || invoiceId || 'draft';
+      const filename = `Invoice_${invoiceNum}.pdf`;
+      pdfService.downloadPDF(pdfBlob, filename);
+    } catch (error) {
+      console.error("Print error:", error);
+      alert(error.message || "Failed to generate PDF");
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const handleShare = () => {
@@ -459,9 +498,12 @@ export default function NewInvoice() {
               <div>
                 <h1 className="text-lg font-bold text-neutral-900">{savedInvoice.invoice_number}</h1>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs text-emerald-600">
-                    {isUpdated ? "Invoice updated successfully" : "Invoice saved successfully"}
-                  </p>
+                  {/* Only show success message if NOT in view mode (freshly saved/updated) */}
+                  {!isViewMode && (
+                    <p className="text-xs text-emerald-600">
+                      {isUpdated ? "Invoice updated successfully" : "Invoice saved successfully"}
+                    </p>
+                  )}
                   {sourceQuotation && (
                     <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
                       From {sourceQuotation}
@@ -848,17 +890,22 @@ export default function NewInvoice() {
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : savedInvoice ? "Update Invoice" : "Save Invoice"}
               </Button>
 
-              {/* Actions after save */}
-              {savedInvoice && (
+              {/* Actions after save or in view mode */}
+              {(savedInvoice || isViewMode) && (
                 <>
                   {/* Print */}
                   <Button
                     onClick={handlePrint}
+                    disabled={isPrinting}
                     variant="outline"
                     className="w-full h-11 border-neutral-200 text-neutral-700 hover:bg-neutral-50 rounded-lg font-medium"
                   >
-                    <Printer className="w-4 h-4 mr-2" />
-                    Print Invoice
+                    {isPrinting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Printer className="w-4 h-4 mr-2" />
+                    )}
+                    {isPrinting ? "Generating PDF..." : "Print Invoice"}
                   </Button>
                   {/* Share */}
                   <Button
@@ -899,15 +946,20 @@ export default function NewInvoice() {
           */}
 
           {/* Right: Action buttons */}
-          {savedInvoice ? (
+          {(savedInvoice || isViewMode) ? (
             <>
               {/* Print */}
               <Button
                 onClick={handlePrint}
+                disabled={isPrinting}
                 variant="outline"
                 className="h-11 px-3 border-neutral-200 shrink-0"
               >
-                <Printer className="w-4 h-4" />
+                {isPrinting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Printer className="w-4 h-4" />
+                )}
               </Button>
               {/* Share */}
               <Button

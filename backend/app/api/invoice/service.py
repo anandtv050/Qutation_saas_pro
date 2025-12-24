@@ -239,7 +239,7 @@ class ClsInvoiceService:
                     mdlRequest.dblDiscountAmount or 0,
                     dblTotalAmount,
                     mdlRequest.strNotes,
-                    mdlRequest.strPaymentStatus or "pending",
+                    mdlRequest.strPaymentStatus or "paid",
                     mdlRequest.datDueDate,
                     datetime.datetime.now()
                 )

@@ -88,26 +88,29 @@ class ClsQuotationService:
         )
 
     async def fnGetSingleQuotationDetails(self, intQuotationId: int):
-        """Get single quotation with items"""
-        
+        """Get single quotation with items and linked invoice info"""
+
         strQuery = """
-            SELECT 
-                pk_bint_quotation_id,
-                vchr_quotation_number,
-                dat_quotation_date,
-                vchr_customer_name,
-                vchr_customer_phone,
-                txt_customer_address,
-                dbl_subtotal,
-                dbl_tax_percent,
-                dbl_tax_amount,
-                dbl_discount_amount,
-                dbl_total_amount,
-                txt_notes,
-                vchr_status,
-                dat_valid_until
-            FROM tbl_quotation
-            WHERE pk_bint_quotation_id = $1 AND fk_bint_user_id = $2
+            SELECT
+                q.pk_bint_quotation_id,
+                q.vchr_quotation_number,
+                q.dat_quotation_date,
+                q.vchr_customer_name,
+                q.vchr_customer_phone,
+                q.txt_customer_address,
+                q.dbl_subtotal,
+                q.dbl_tax_percent,
+                q.dbl_tax_amount,
+                q.dbl_discount_amount,
+                q.dbl_total_amount,
+                q.txt_notes,
+                q.vchr_status,
+                q.dat_valid_until,
+                i.pk_bint_invoice_id as linked_invoice_id,
+                i.vchr_invoice_number as linked_invoice_number
+            FROM tbl_quotation q
+            LEFT JOIN tbl_invoice i ON i.fk_bint_quotation_id = q.pk_bint_quotation_id
+            WHERE q.pk_bint_quotation_id = $1 AND q.fk_bint_user_id = $2
         """
         async with self.insPool.acquire() as conn:
             rstQuotation = await conn.fetchrow(strQuery, intQuotationId, self.intUserId)
@@ -169,7 +172,9 @@ class ClsQuotationService:
             strNotes=rstQuotation['txt_notes'],
             strStatus=rstQuotation['vchr_status'],
             datValidUntil=rstQuotation['dat_valid_until'],
-            lstItems=lstQuotationItems
+            lstItems=lstQuotationItems,
+            intLinkedInvoiceId=rstQuotation['linked_invoice_id'],
+            strLinkedInvoiceNumber=rstQuotation['linked_invoice_number']
         )
         
         return MdlQuotationResponse(
