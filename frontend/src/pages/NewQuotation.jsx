@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import inventoryService from "@/services/inventoryService";
 import quotationService from "@/services/quotationService";
 import pdfService from "@/services/pdfService";
+import aiService from "@/services/aiService";
 
 // Session storage key
 const STORAGE_KEY = "quotation_draft";
@@ -261,8 +262,51 @@ export default function NewQuotation() {
   const processWithAI = async () => {
     if (!rawInput.trim()) return;
     setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
 
+    try {
+      // Call AI API to process raw text
+      const response = await aiService.processQuotation(rawInput);
+
+      if (response.intStatus === 1 && response.lstItems) {
+        // Transform AI response to UI format
+        const parsed = response.lstItems.map((item, i) => ({
+          id: Date.now() + i,
+          inventoryId: item.intInventoryId || null,
+          code: item.strItemCode || null,
+          name: item.strItemName,
+          unit: item.strUnit || 'piece',
+          qty: item.dblQuantity,
+          rate: item.dblUnitPrice,
+          fromInventory: !!item.intInventoryId,
+        }));
+
+        setItems(parsed);
+
+        // Set customer info if AI extracted it
+        if (response.strCustomerName && !customerName) {
+          setCustomerName(response.strCustomerName);
+        }
+        if (response.strCustomerPhone && !customerPhone) {
+          setCustomerPhone(response.strCustomerPhone);
+        }
+
+        setShowForm(true);
+      } else {
+        // Fallback to local parsing if AI fails
+        console.warn("AI processing failed, using local parsing:", response.strMessage);
+        fallbackLocalParsing();
+      }
+    } catch (error) {
+      console.error("AI processing error:", error);
+      // Fallback to local parsing
+      fallbackLocalParsing();
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Fallback local parsing if AI fails
+  const fallbackLocalParsing = () => {
     const lines = rawInput.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
     const parsed = lines.map((line, i) => {
       const match = line.match(/^(\d+)\s*(.+)/i);
@@ -270,7 +314,6 @@ export default function NewQuotation() {
       const itemText = match ? match[2].trim() : line;
 
       const lowerText = itemText.toLowerCase();
-      // Search in inventory items from API
       const inventoryMatch = inventoryItems.find(inv =>
         inv.name.toLowerCase().includes(lowerText) ||
         lowerText.includes(inv.name.toLowerCase().split(' ').slice(0, 2).join(' ')) ||
@@ -287,7 +330,6 @@ export default function NewQuotation() {
     });
 
     setItems(parsed);
-    setIsProcessing(false);
     setShowForm(true);
   };
 

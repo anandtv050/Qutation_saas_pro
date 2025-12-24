@@ -1,8 +1,12 @@
 """
-Quttaion Saas Pro - Backend API 
+Quttaion Saas Pro - Backend API
 Multi-tenant SaaS application for quotations and invoices
 """
 __author__ = "Anand"
+
+from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent / ".env")
 
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
@@ -19,7 +23,8 @@ LST_ROUTERS = [
     "app.api.quotation.router",
     "app.api.invoice.router",
     "app.api.dashboard.router",
-    "app.api.pdf.router"
+    "app.api.pdf.router",
+    "app.api.ai.router"
     # "app.api.register.router",      # Add when ready
 ]
 
