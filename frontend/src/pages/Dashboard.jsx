@@ -7,10 +7,10 @@ export default function Dashboard() {
   const [userName, setUserName] = useState("");
   const [summary, setSummary] = useState({
     dblTotalCollected: 0,
-    dblTotalPending: 0,
+    dblTodayEarnings: 0,
     intTotalInvoices: 0,
     intPaidInvoices: 0,
-    intPendingInvoices: 0,
+    intTodayInvoices: 0,
     intTotalQuotations: 0
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -75,15 +75,15 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm text-neutral-500 mb-1">Collected</p>
                   <p className="text-2xl font-bold text-emerald-600">{formatCurrency(summary.dblTotalCollected)}</p>
-                  {summary.intPaidInvoices > 0 && (
-                    <p className="text-xs text-neutral-400">{summary.intPaidInvoices} invoices</p>
+                  {summary.intTotalInvoices > 0 && (
+                    <p className="text-xs text-neutral-400">{summary.intTotalInvoices} invoices</p>
                   )}
                 </div>
                 <div>
-                  <p className="text-sm text-neutral-500 mb-1">Due</p>
-                  <p className="text-2xl font-bold text-amber-500">{formatCurrency(summary.dblTotalPending)}</p>
-                  {summary.intPendingInvoices > 0 && (
-                    <p className="text-xs text-neutral-400">{summary.intPendingInvoices} invoices</p>
+                  <p className="text-sm text-neutral-500 mb-1">Today</p>
+                  <p className="text-2xl font-bold text-blue-600">{formatCurrency(summary.dblTodayEarnings)}</p>
+                  {summary.intTodayInvoices > 0 && (
+                    <p className="text-xs text-neutral-400">{summary.intTodayInvoices} invoices</p>
                   )}
                 </div>
               </div>
