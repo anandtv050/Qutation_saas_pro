@@ -192,7 +192,26 @@ class ClsInvoiceService:
     
     async def fnAddInvoiceService(self, mdlRequest: MdlCreateInvoiceRequest):
         """Create new invoice"""
-        
+
+        # Check if quotation already has an invoice (prevent duplicate)
+        if mdlRequest.intQuotationId:
+            async with self.insPool.acquire() as conn:
+                strCheckQuery = """
+                    SELECT pk_bint_invoice_id, vchr_invoice_number
+                    FROM tbl_invoice
+                    WHERE fk_bint_quotation_id = $1 AND fk_bint_user_id = $2
+                """
+                rstExisting = await conn.fetchrow(strCheckQuery, mdlRequest.intQuotationId, self.intUserId)
+
+                if rstExisting:
+                    return MdlInvoiceResponse(
+                        intStatus=ResponseStatus.ERROR,
+                        strStatus=ResponseStatus.ERROR_STR,
+                        intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                        strMessage=f"This quotation is already converted to invoice: {rstExisting['vchr_invoice_number']}",
+                        data=None
+                    )
+
         strInvoiceNumber = await self.fnGenerateInvoiceNumber()
         
         dblSubtotal = sum(item.dblQuantity * item.dblUnitPrice for item in mdlRequest.lstItems)
