@@ -20,17 +20,18 @@ class ClsQuotationService:
     async def fnGenerateQuotationNumber(self) -> str:
         """Generate Qutation Number"""
         strYear = datetime.datetime.now().strftime("%Y")
-        
+
         strQuery = """
-            SELECT COUNT(*) as count FROM tbl_quotation
+            SELECT MAX(CAST(SUBSTRING(vchr_quotation_number FROM 9) AS INTEGER)) as max_num
+            FROM tbl_quotation
             WHERE fk_bint_user_id = $1
-            AND EXTRACT(YEAR FROM tim_created_at) =$2
+            AND vchr_quotation_number LIKE $2
         """
-        
+
         async with self.insPool.acquire() as conn:
-            rstCount = await conn.fetchrow(strQuery,self.intUserId,int(strYear))
-        
-        intNextNum = (rstCount['count'] or 0)+1
+            rstMax = await conn.fetchrow(strQuery, self.intUserId, f"QT-{strYear}-%")
+
+        intNextNum = (rstMax['max_num'] or 0) + 1
         return f"QT-{strYear}-{intNextNum:04d}"
 
     

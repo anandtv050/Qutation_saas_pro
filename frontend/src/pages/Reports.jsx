@@ -10,8 +10,21 @@ export default function Reports() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("quotations");
   const [searchQuery, setSearchQuery] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+
+  // Default: fromDate = 30 days ago, toDate = today
+  const getDefaultDates = () => {
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    return {
+      from: thirtyDaysAgo.toISOString().split('T')[0],
+      to: today.toISOString().split('T')[0]
+    };
+  };
+  const defaultDates = getDefaultDates();
+
+  const [fromDate, setFromDate] = useState(defaultDates.from);
+  const [toDate, setToDate] = useState(defaultDates.to);
 
   // Quotations state
   const [quotations, setQuotations] = useState([]);
@@ -238,7 +251,7 @@ export default function Reports() {
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-neutral-100 rounded-lg mb-4">
         <button
-          onClick={() => { setActiveTab("quotations"); setSearchQuery(""); setFromDate(""); setToDate(""); }}
+          onClick={() => { setActiveTab("quotations"); setSearchQuery(""); setFromDate(defaultDates.from); setToDate(defaultDates.to); }}
           className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
             activeTab === "quotations"
               ? "bg-white text-neutral-900 shadow-sm"
@@ -248,7 +261,7 @@ export default function Reports() {
           Quotations ({quotations.length})
         </button>
         <button
-          onClick={() => { setActiveTab("invoices"); setSearchQuery(""); setFromDate(""); setToDate(""); }}
+          onClick={() => { setActiveTab("invoices"); setSearchQuery(""); setFromDate(defaultDates.from); setToDate(defaultDates.to); }}
           className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
             activeTab === "invoices"
               ? "bg-white text-neutral-900 shadow-sm"

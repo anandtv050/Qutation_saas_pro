@@ -21,17 +21,17 @@ class ClsInvoiceService:
     async def fnGenerateInvoiceNumber(self):
         """Generate unique invoice number: INV-YYYY-NNNN"""
         strYear = str(datetime.date.today().year)
-        
+
         strQuery = """
-            SELECT COUNT(*) + 1 as next_num
+            SELECT MAX(CAST(SUBSTRING(vchr_invoice_number FROM 10) AS INTEGER)) as max_num
             FROM tbl_invoice
             WHERE fk_bint_user_id = $1
             AND vchr_invoice_number LIKE $2
         """
         async with self.insPool.acquire() as conn:
-            rstCount = await conn.fetchrow(strQuery, self.intUserId, f"INV-{strYear}-%")
-            intNextNum = rstCount['next_num']
-        
+            rstMax = await conn.fetchrow(strQuery, self.intUserId, f"INV-{strYear}-%")
+            intNextNum = (rstMax['max_num'] or 0) + 1
+
         return f"INV-{strYear}-{str(intNextNum).zfill(4)}"
     
     async def fnGetAllInvoiceList(self):
