@@ -5,22 +5,36 @@ import authService from "@/services/authServices";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Login() {
+  // ### STATE!!!
   const [email, setEmail] = useState("");
+  //     ↑        ↑              ↑
+ //   variable  function     initial value
+ //   (read)    (write)      (starting with "")
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-
+  // #### FUNCTION
+  //  Login submission function 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // ###########################################
+    // # in react they set variable as like state 
+    //   const [error, setError] = useState("");
+    //  when it default value is "" 
+    //  then we need to add value as " Enter Mail" 
+    //  use the function for setError("Enter Mail") , error ="Enter Mail"
+    // ##############################################
     setError("");
 
+    // eMail Validation
     if (!email.trim()) return setError("Enter your email");
     if (!EMAIL_REGEX.test(email)) return setError("Invalid email address");
     if (!password) return setError("Enter your password");
 
     setIsLoading(true);
     try {
+      // call login service 
       const response = await authService.login(email, password);
 
       localStorage.setItem('access_token', response.strAccessToken);

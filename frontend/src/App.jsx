@@ -22,7 +22,8 @@ function App() {
     }
     return children;
   };
-
+  //  when broser path change , then corresponding move to each page dynamically here
+  //  the path => taken from browser 
   return (
     <BrowserRouter>
       <Routes>
