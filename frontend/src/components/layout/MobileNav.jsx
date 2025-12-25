@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, FilePlus, Package, BarChart3 } from "lucide-react";
+import { Home, FilePlus, Package, BarChart3, Users } from "lucide-react";
 
 const navItems = [
   { path: "/dashboard", label: "Home", icon: Home },
@@ -11,12 +11,18 @@ const navItems = [
 export default function MobileNav() {
   const location = useLocation();
 
+  // Check if current user is admin (pk=1)
+  const userInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
+  const isAdmin = userInfo.intUserId === 1;
+
   const isActive = (path) => {
     if (path === "/dashboard") return location.pathname === "/dashboard";
     if (path === "/inventory") return location.pathname === "/inventory";
     if (path === "/reports") return location.pathname === "/reports";
     return location.pathname.startsWith(path.replace("/new", ""));
   };
+
+  const isUsersActive = location.pathname === "/users";
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 z-50">
@@ -42,6 +48,23 @@ export default function MobileNav() {
             </Link>
           );
         })}
+
+        {/* Admin-only Users link */}
+        {isAdmin && (
+          <Link
+            to="/users"
+            className={`flex flex-col items-center justify-center gap-1 py-2 px-3 rounded-lg transition-all duration-200 ${
+              isUsersActive
+                ? "text-purple-600"
+                : "text-purple-400 active:bg-purple-50"
+            }`}
+          >
+            <Users className={`w-5 h-5 ${isUsersActive ? "stroke-[2.5px]" : ""}`} />
+            <span className={`text-[10px] ${isUsersActive ? "font-semibold" : "font-medium"}`}>
+              Users
+            </span>
+          </Link>
+        )}
       </div>
     </nav>
   );

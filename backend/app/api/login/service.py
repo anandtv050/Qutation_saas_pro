@@ -1,17 +1,17 @@
 from fastapi  import HTTPException,status
 
 from app.api.login.schema import MdlLoginResponse
-from app.core.security import fnCreateAccesToken
+from app.core.security import fnCreateAccesToken, fnVerifyPassword
 
 
 class ClsLoginService:
     def __init__(self,insPool) -> None:
         self.insPool = insPool
-    
+
     async def fnLoginService(self,mdlLoginRequest) :
-        
-            # get user details using email 
-            strQuery = """ SELECT 
+
+            # get user details using email
+            strQuery = """ SELECT
                                 pk_bint_user_id,
                                 vchr_email,
                                 vchr_password_hash,
@@ -22,20 +22,19 @@ class ClsLoginService:
                             """
             async with self.insPool.acquire() as conn:
                 rstUser = await conn.fetchrow(strQuery,mdlLoginRequest.email)
-            
+
             if not rstUser:
                 raise HTTPException(
                     status_code  =status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid Email or password"
                 )
-            # verify the password currently no need bcz  no registration
-            ## TODO ::  passwrd verification
-            
-            # if not verify_password(request.password, user['vchr_password_hash']):
-            #     raise HTTPException(
-            #         status_code=status.HTTP_401_UNAUTHORIZED,
-            #         detail="Invalid email or password"
-            #     )
+
+            # Verify password using bcrypt
+            if not fnVerifyPassword(mdlLoginRequest.password, rstUser['vchr_password_hash']):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid email or password"
+                )
 
             ## Create JWT token
             strAccessToken = fnCreateAccesToken(
@@ -58,6 +57,3 @@ class ClsLoginService:
                 strTokentype="bearer",
                 dctUserInfo=dctUserInfo
             )
-            
-            
-            

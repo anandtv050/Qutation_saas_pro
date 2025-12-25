@@ -95,12 +95,21 @@ async def main():
         print("Failed to Create Database")
         sys.exit(1)
 
-    #excecute the schema
+    # Execute the schema
     schema_file = os.path.join('sql','schema.sql')
-
     if not await fnExecuteSchema(config,schema_file):
         print("Failed to execute schema")
         sys.exit(1)
+
+    # Execute admin setup (create default admin user)
+    admin_setup_file = os.path.join('sql','admin_setup.sql')
+    print("\nSetting up Admin User...")
+    if not await fnExecuteSchema(config, admin_setup_file):
+        print("Failed to execute admin setup")
+        sys.exit(1)
+    print("Admin user created successfully!")
+    # print("  Email: admin@quotely.com")
+    # print("  Password: letsGo#B25")
 
     print("=" * 60)
     print("BlankDb Setup Completed Successfully")

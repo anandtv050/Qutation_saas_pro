@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, FilePlus, Package, BarChart3, User, LogOut } from "lucide-react";
+import { Home, FilePlus, Package, BarChart3, User, LogOut, Users } from "lucide-react";
 
 const navItems = [
   { path: "/dashboard", label: "Home", icon: Home },
@@ -10,6 +10,10 @@ const navItems = [
 
 export default function Sidebar() {
   const location = useLocation();
+
+  // Check if current user is admin (pk=1)
+  const userInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
+  const isAdmin = userInfo.intUserId === 1;
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -62,6 +66,20 @@ export default function Sidebar() {
 
       {/* Bottom Section */}
       <div className="px-3 py-4 border-t border-neutral-100">
+        {/* User Management - Admin Only */}
+        {isAdmin && (
+          <Link
+            to="/users"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+              location.pathname === "/users"
+                ? "bg-purple-600 text-white"
+                : "text-purple-600 hover:bg-purple-50 hover:text-purple-700"
+            }`}
+          >
+            <Users className={`w-[18px] h-[18px] ${location.pathname === "/users" ? "text-white" : "text-purple-500"}`} />
+            <span>Users</span>
+          </Link>
+        )}
         <Link
           to="/profile"
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 ${

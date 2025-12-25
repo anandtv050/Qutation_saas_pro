@@ -2,11 +2,28 @@ from typing import Optional, Dict, Annotated
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from fastapi import Header, HTTPException, status, Depends
+from passlib.context import CryptContext
 
 # Hardcoded for now (later use config.py)
 JWT_SECRET_KEY = "QUTATION_SAAS_SECURE_VISION_25"
 JWT_ALGORITHM = "HS256"
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+# Admin user ID (always pk_bint_user_id = 1)
+ADMIN_USER_ID = 1
+
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def fnHashPassword(strPassword: str) -> str:
+    """Hash a password using bcrypt"""
+    return pwd_context.hash(strPassword)
+
+
+def fnVerifyPassword(strPlainPassword: str, strHashedPassword: str) -> bool:
+    """Verify a password against its hash"""
+    return pwd_context.verify(strPlainPassword, strHashedPassword)
 
 
 def fnCreateAccesToken(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -94,3 +111,35 @@ async def fnGetCurrentUser(
         detail="Authentication required",
         headers={"WWW-Authenticate": "Bearer"}
     )
+
+
+async def fnGetAdminUser(
+    intUserId: int = Depends(fnGetCurrentUser)
+) -> int:
+    """
+    Dependency to ensure current user is admin (user_id = 1).
+    Use this for admin-only endpoints like user creation.
+
+    Returns: intUserId (int) if admin
+    Raises: HTTPException 403 if not admin
+    """
+    if intUserId != ADMIN_USER_ID:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return intUserId
+
+
+# TODO: Future - Module permission check (commented for now)
+# async def fnCheckModulePermission(
+#     intUserId: int,
+#     strModuleName: str,
+#     insPool: Pool
+# ) -> bool:
+#     """
+#     Check if user has permission to access a specific module.
+#     Will be implemented later with tbl_user_permission table.
+#     """
+#     # For now, all authenticated users have access to all modules
+#     return True

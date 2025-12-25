@@ -6,6 +6,7 @@ import NewInvoice from "./pages/NewInvoice";
 import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
 import Profile from "./pages/Profile";
+import UserManagement from "./pages/UserManagement";
 import MainLayout from "./components/layout/MainLayout";
 
 function App() {
@@ -44,6 +45,7 @@ function App() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/users" element={<UserManagement />} />
         </Route>
 
         {/* Redirect unknown routes */}

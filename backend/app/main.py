@@ -24,8 +24,8 @@ LST_ROUTERS = [
     "app.api.invoice.router",
     "app.api.dashboard.router",
     "app.api.pdf.router",
-    "app.api.ai.router"
-    # "app.api.register.router",      # Add when ready
+    "app.api.ai.router",
+    "app.api.user.router",          # User management (Admin only)
 ]
 
 
