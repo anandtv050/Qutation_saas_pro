@@ -21,7 +21,10 @@ class MdlProcessQuotationRequest(MdlBaseRequest):
 
 class MdlProcessQuotationResponse(MdlBaseResponse):
     """Response with AI-generated quotation items"""
+    intAiResponseId: Optional[int] = None  # FK to link with quotation
     lstItems: List[MdlAIQuotationItem] = []
     strCustomerName: Optional[str] = None
     strCustomerPhone: Optional[str] = None
     strNotes: Optional[str] = None
+    intTokensInput: Optional[int] = None
+    intTokensOutput: Optional[int] = None

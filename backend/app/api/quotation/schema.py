@@ -109,6 +109,7 @@ class MdlCreateQuotationRequest(MdlBaseRequest):
         ]
     }
     """
+    intAiResponseId: Optional[int] = None              # Link to AI response (for AI-generated quotations)
     strCustomerName: str                              # Required
     strCustomerPhone: Optional[str] = None
     strCustomerAddress: Optional[str] = None
@@ -236,6 +237,7 @@ class MdlQuotation(BaseModel):
     }
     """
     intPkQuotationId: int
+    intAiResponseId: Optional[int] = None             # Link to AI response (NULL if manual)
     strQuotationNumber: str                           # Auto: QT-2024-0001
     datQuotationDate: date
     strCustomerName: str

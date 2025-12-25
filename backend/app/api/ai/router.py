@@ -13,16 +13,16 @@ from app.api.ai.schema import (
 router = APIRouter(prefix="/ai", tags=["AI Quotation"])
 
 
-async def get_pool() -> Pool:
-    db = ClsDatabasepool()
-    return await db.fnGetPool()
+async def fnGetPool() -> Pool:
+    insDb = ClsDatabasepool()
+    return await insDb.fnGetPool()
 
 
 @router.post("/process", response_model=MdlProcessQuotationResponse)
-async def process_quotation(
-    request: MdlProcessQuotationRequest,
-    pool: Pool = Depends(get_pool),
-    user_id: int = Depends(fnGetCurrentUser)
+async def fnProcessQuotation(
+    mdlRequest: MdlProcessQuotationRequest,
+    insPool: Pool = Depends(fnGetPool),
+    intUserId: int = Depends(fnGetCurrentUser)
 ):
     """
     Process raw text using AI to generate quotation items.
@@ -34,5 +34,5 @@ async def process_quotation(
 
     Returns AI-generated quotation items matched with inventory.
     """
-    service = ClsAIQuotationService(pool, user_id)
-    return await service.fnProcessQuotation(request.strRawText)
+    insService = ClsAIQuotationService(insPool, intUserId)
+    return await insService.fnProcessQuotation(mdlRequest.strRawText)

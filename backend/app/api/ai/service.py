@@ -1,6 +1,7 @@
 import os
 import json
 import httpx
+from typing import Optional
 from asyncpg import Pool
 from pathlib import Path
 
@@ -12,26 +13,28 @@ from app.core.baseSchema import ResponseStatus
 
 
 class ClsAIQuotationService:
-    def __init__(self, pool: Pool, intUserId: int):
-        self.pool = pool
+    def __init__(self, insPool: Pool, intUserId: int):
+        self.insPool = insPool
         self.intUserId = intUserId
-        self.groq_api_key = os.getenv("GROQ_API_KEY", "")
-        self.groq_url = "https://api.groq.com/openai/v1/chat/completions"
+        self.strGroqApiKey = os.getenv("GROQ_API_KEY", "")
+        self.strGroqUrl = "https://api.groq.com/openai/v1/chat/completions"
+        self.strModelName = "llama-3.3-70b-versatile"
+        self.strPromptVersion = "v1.0"
 
-    def _load_system_prompt(self) -> str:
+    def fnLoadSystemPrompt(self) -> str:
         """Load system prompt from file"""
-        prompt_path = Path(__file__).parent / "system_prompt.txt"
+        strPromptPath = Path(__file__).parent / "system_prompt.txt"
         try:
-            with open(prompt_path, "r", encoding="utf-8") as f:
+            with open(strPromptPath, "r", encoding="utf-8") as f:
                 return f.read()
         except Exception as e:
             print(f"Error loading system prompt: {e}")
             return "You are a helpful assistant for creating CCTV quotations."
 
-    async def _get_inventory_list(self) -> str:
+    async def fnGetInventoryList(self) -> str:
         """Fetch inventory items for AI context"""
-        async with self.pool.acquire() as conn:
-            query = """
+        async with self.insPool.acquire() as conn:
+            strQuery = """
                 SELECT
                     pk_bint_inventory_id,
                     vchr_item_code,
@@ -42,21 +45,83 @@ class ClsAIQuotationService:
                 WHERE fk_bint_user_id = $1
                 ORDER BY vchr_item_name
             """
-            rows = await conn.fetch(query, self.intUserId)
+            lstRows = await conn.fetch(strQuery, self.intUserId)
 
-            if not rows:
+            if not lstRows:
                 return "No inventory items available."
 
-            inventory_text = "AVAILABLE INVENTORY:\n"
-            for row in rows:
-                inventory_text += f"- ID:{row['pk_bint_inventory_id']} | Code:{row['vchr_item_code'] or 'N/A'} | {row['vchr_item_name']} | Unit:{row['vchr_unit']} | Price:{row['dbl_unit_price']}\n"
+            strInventoryText = "AVAILABLE INVENTORY:\n"
+            for dctRow in lstRows:
+                strInventoryText += f"- ID:{dctRow['pk_bint_inventory_id']} | Code:{dctRow['vchr_item_code'] or 'N/A'} | {dctRow['vchr_item_name']} | Unit:{dctRow['vchr_unit']} | Price:{dctRow['dbl_unit_price']}\n"
 
-            return inventory_text
+            return strInventoryText
+
+    async def fnSaveRawInput(self, strRawText: str, strCustomerName: Optional[str] = None, strCustomerPhone: Optional[str] = None) -> int:
+        """Save raw input to tbl_raw_input and return the ID"""
+        async with self.insPool.acquire() as conn:
+            strQuery = """
+                INSERT INTO tbl_raw_input (
+                    fk_bint_user_id,
+                    vchr_customer_name,
+                    vchr_customer_phone,
+                    txt_site_notes
+                ) VALUES ($1, $2, $3, $4)
+                RETURNING pk_bint_raw_input_id
+            """
+            dctResult = await conn.fetchrow(
+                strQuery,
+                self.intUserId,
+                strCustomerName,
+                strCustomerPhone,
+                strRawText
+            )
+            return dctResult['pk_bint_raw_input_id']
+
+    async def fnSaveAiResponse(
+        self,
+        intRawInputId: int,
+        dctJsonResponse: dict,
+        intTokensInput: int = 0,
+        intTokensOutput: int = 0
+    ) -> int:
+        """Save AI response to tbl_ai_response and return the ID"""
+        async with self.insPool.acquire() as conn:
+            strQuery = """
+                INSERT INTO tbl_ai_response (
+                    fk_bint_raw_input_id,
+                    fk_bint_user_id,
+                    json_ai_response,
+                    vchr_prompt_version,
+                    vchr_model_used,
+                    int_tokens_input,
+                    int_tokens_output,
+                    dbl_cost_inr
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                RETURNING pk_bint_ai_response_id
+            """
+            # Calculate cost (Groq is free, but track for future)
+            # Approximate: $0.05/1M input, $0.10/1M output tokens
+            dblCost = ((intTokensInput * 0.05) + (intTokensOutput * 0.10)) / 1000000
+            # Convert to INR (approx 83 INR per USD)
+            dblCostInr = dblCost * 83
+
+            dctResult = await conn.fetchrow(
+                strQuery,
+                intRawInputId,
+                self.intUserId,
+                json.dumps(dctJsonResponse),
+                self.strPromptVersion,
+                self.strModelName,
+                intTokensInput,
+                intTokensOutput,
+                dblCostInr
+            )
+            return dctResult['pk_bint_ai_response_id']
 
     async def fnProcessQuotation(self, strRawText: str) -> MdlProcessQuotationResponse:
         """Process raw text using Groq AI to generate quotation items"""
 
-        if not self.groq_api_key:
+        if not self.strGroqApiKey:
             return MdlProcessQuotationResponse(
                 intStatus=ResponseStatus.ERROR,
                 strStatus=ResponseStatus.ERROR_STR,
@@ -66,13 +131,16 @@ class ClsAIQuotationService:
             )
 
         try:
+            # Step 1: Save raw input to database
+            intRawInputId = await self.fnSaveRawInput(strRawText)
+
             # Load system prompt and inventory
-            system_prompt = self._load_system_prompt()
-            inventory_list = await self._get_inventory_list()
+            strSystemPrompt = self.fnLoadSystemPrompt()
+            strInventoryList = await self.fnGetInventoryList()
 
             # Build user message
-            user_message = f"""
-{inventory_list}
+            strUserMessage = f"""
+{strInventoryList}
 
 CUSTOMER REQUEST:
 {strRawText}
@@ -82,63 +150,77 @@ Return ONLY valid JSON, no markdown formatting.
 """
 
             # Call Groq API
-            headers = {
-                "Authorization": f"Bearer {self.groq_api_key}",
+            dctHeaders = {
+                "Authorization": f"Bearer {self.strGroqApiKey}",
                 "Content-Type": "application/json"
             }
 
-            payload = {
-                "model": "llama-3.3-70b-versatile",
+            dctPayload = {
+                "model": self.strModelName,
                 "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
+                    {"role": "system", "content": strSystemPrompt},
+                    {"role": "user", "content": strUserMessage}
                 ],
                 "temperature": 0.3,
                 "max_tokens": 2000
             }
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    self.groq_url,
-                    headers=headers,
-                    json=payload
+            async with httpx.AsyncClient(timeout=30.0) as insClient:
+                insResponse = await insClient.post(
+                    self.strGroqUrl,
+                    headers=dctHeaders,
+                    json=dctPayload
                 )
 
-                if response.status_code != 200:
+                if insResponse.status_code != 200:
                     return MdlProcessQuotationResponse(
                         intStatus=ResponseStatus.ERROR,
                         strStatus=ResponseStatus.ERROR_STR,
                         intStatusCode=ResponseStatus.HTTP_INTERNAL_ERROR,
-                        strMessage=f"Groq API error: {response.status_code}",
+                        strMessage=f"Groq API error: {insResponse.status_code}",
                         lstItems=[]
                     )
 
-                result = response.json()
-                ai_response = result["choices"][0]["message"]["content"]
+                dctResult = insResponse.json()
+
+                # Extract token usage
+                dctUsage = dctResult.get("usage", {})
+                intTokensInput = dctUsage.get("prompt_tokens", 0)
+                intTokensOutput = dctUsage.get("completion_tokens", 0)
+
+                strAiResponse = dctResult["choices"][0]["message"]["content"]
 
                 # Parse JSON from AI response
                 # Clean up response (remove markdown if present)
-                ai_response = ai_response.strip()
-                if ai_response.startswith("```json"):
-                    ai_response = ai_response[7:]
-                if ai_response.startswith("```"):
-                    ai_response = ai_response[3:]
-                if ai_response.endswith("```"):
-                    ai_response = ai_response[:-3]
-                ai_response = ai_response.strip()
+                strAiResponseClean = strAiResponse.strip()
+                if strAiResponseClean.startswith("```json"):
+                    strAiResponseClean = strAiResponseClean[7:]
+                if strAiResponseClean.startswith("```"):
+                    strAiResponseClean = strAiResponseClean[3:]
+                if strAiResponseClean.endswith("```"):
+                    strAiResponseClean = strAiResponseClean[:-3]
+                strAiResponseClean = strAiResponseClean.strip()
 
-                parsed = json.loads(ai_response)
+                dctParsed = json.loads(strAiResponseClean)
+
+                # Step 2: Save AI response to database and get ID
+                intAiResponseId = await self.fnSaveAiResponse(
+                    intRawInputId=intRawInputId,
+                    dctJsonResponse=dctParsed,
+                    intTokensInput=intTokensInput,
+                    intTokensOutput=intTokensOutput
+                )
 
                 # Convert to response model
-                items = []
-                for item in parsed.get("items", []):
-                    items.append(MdlAIQuotationItem(
-                        strItemName=item.get("item_name", "Unknown Item"),
-                        strItemCode=item.get("item_code"),
-                        intInventoryId=item.get("inventory_id"),
-                        dblQuantity=float(item.get("quantity", 1)),
-                        dblUnitPrice=float(item.get("unit_price", 0)),
-                        strUnit=item.get("unit", "piece")
+                lstItems = []
+                for dctItem in dctParsed.get("items", []):
+                    lstItems.append(MdlAIQuotationItem(
+                        strItemName=dctItem.get("item_name", "Unknown Item"),
+                        strItemCode=dctItem.get("item_code"),
+                        intInventoryId=dctItem.get("inventory_id"),
+                        dblQuantity=float(dctItem.get("quantity", 1)),
+                        dblUnitPrice=float(dctItem.get("unit_price", 0)),
+                        strUnit=dctItem.get("unit", "piece")
                     ))
 
                 return MdlProcessQuotationResponse(
@@ -146,10 +228,13 @@ Return ONLY valid JSON, no markdown formatting.
                     strStatus=ResponseStatus.SUCCESS_STR,
                     intStatusCode=ResponseStatus.HTTP_OK,
                     strMessage="Quotation generated successfully",
-                    lstItems=items,
-                    strCustomerName=parsed.get("customer_name"),
-                    strCustomerPhone=parsed.get("customer_phone"),
-                    strNotes=parsed.get("notes")
+                    intAiResponseId=intAiResponseId,
+                    lstItems=lstItems,
+                    strCustomerName=dctParsed.get("customer_name"),
+                    strCustomerPhone=dctParsed.get("customer_phone"),
+                    strNotes=dctParsed.get("notes"),
+                    intTokensInput=intTokensInput,
+                    intTokensOutput=intTokensOutput
                 )
 
         except json.JSONDecodeError as e:

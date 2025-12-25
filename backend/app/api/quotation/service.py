@@ -94,6 +94,7 @@ class ClsQuotationService:
         strQuery = """
             SELECT
                 q.pk_bint_quotation_id,
+                q.fk_bint_ai_response_id,
                 q.vchr_quotation_number,
                 q.dat_quotation_date,
                 q.vchr_customer_name,
@@ -160,6 +161,7 @@ class ClsQuotationService:
             
         mdlQuotation = MdlQuotation(
             intPkQuotationId=rstQuotation['pk_bint_quotation_id'],
+            intAiResponseId=rstQuotation['fk_bint_ai_response_id'],
             strQuotationNumber=rstQuotation['vchr_quotation_number'],
             datQuotationDate=rstQuotation['dat_quotation_date'],
             strCustomerName=rstQuotation['vchr_customer_name'],
@@ -202,6 +204,7 @@ class ClsQuotationService:
                 strInsertQuotation = """
                     INSERT INTO tbl_quotation (
                         fk_bint_user_id,
+                        fk_bint_ai_response_id,
                         vchr_quotation_number,
                         dat_quotation_date,
                         vchr_customer_name,
@@ -216,12 +219,13 @@ class ClsQuotationService:
                         vchr_status,
                         dat_valid_until,
                         tim_created_at
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                     RETURNING pk_bint_quotation_id
                 """
                 rstQuotation = await conn.fetchrow(
                     strInsertQuotation,
                     self.intUserId,
+                    mdlRequest.intAiResponseId,  # NULL for manual, ID for AI-generated
                     strQuotationNumber,
                     datQuotationDate,
                     mdlRequest.strCustomerName,
