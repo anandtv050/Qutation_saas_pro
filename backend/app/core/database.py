@@ -33,6 +33,15 @@ class ClsDatabasepool:
             db_user = os.getenv("DB_USER", "postgres")
             db_password = os.getenv("DB_PASSWORD", "")
 
+            # Debug: Print config (hide password)
+            print(f"=== DB Config ===")
+            print(f"DB_HOST: {db_host}")
+            print(f"DB_PORT: {db_port}")
+            print(f"DB_NAME: {db_name}")
+            print(f"DB_USER: {db_user}")
+            print(f"DB_PASSWORD: {'***SET***' if db_password else '***EMPTY***'}")
+            print(f"=================")
+
             # Supabase requires SSL
             ssl_mode = "require" if db_host != "localhost" else None
 
