@@ -27,14 +27,14 @@ const authService = {
     // Logout function
     logout: () => {
         localStorage.removeItem('access_token');
-        localStorage.removeItem('user');
-        localStorage.removeItem("userInfo")
+        localStorage.removeItem('userInfo');
+        localStorage.removeItem('user'); // Clean up legacy key
     },
 
     // Get Current User
     getCurrentUser: () => {
-        const UserInfo = localStorage.getItem('user');
-        return UserInfo ? JSON.parse(UserInfo) : null;
+        const userInfo = localStorage.getItem('userInfo');
+        return userInfo ? JSON.parse(userInfo) : null;
     },
 
     // check if user is logggedin
