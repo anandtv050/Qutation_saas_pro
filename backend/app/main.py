@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import importlib
+import os
 
 from app.core.database import ClsDatabasepool
 
@@ -54,10 +55,14 @@ def fnCreateApp() -> FastAPI:
         debug=True,
     )
     
-    # CORS middleware
+    # CORS middleware - Read from environment variable
+    cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
+    cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
+    print(f"CORS Origins: {cors_origins}")
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Frontend URLs
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
