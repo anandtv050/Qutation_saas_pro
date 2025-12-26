@@ -1,5 +1,10 @@
 import asyncpg
+import os
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 
 class ClsDatabasepool:
@@ -21,17 +26,28 @@ class ClsDatabasepool:
             return  # Pool already exists
 
         try:
+            # Read from environment variables
+            db_host = os.getenv("DB_HOST", "localhost")
+            db_port = int(os.getenv("DB_PORT", "5432"))
+            db_name = os.getenv("DB_NAME", "postgres")
+            db_user = os.getenv("DB_USER", "postgres")
+            db_password = os.getenv("DB_PASSWORD", "")
+
+            # Supabase requires SSL
+            ssl_mode = "require" if db_host != "localhost" else None
+
             ClsDatabasepool._pool = await asyncpg.create_pool(
-                host="localhost",
-                port=5432,
-                database="db_quotation_saas_pro_12_12_2025",
-                user="postgres",
-                password="Anand@123",
+                host=db_host,
+                port=db_port,
+                database=db_name,
+                user=db_user,
+                password=db_password,
                 command_timeout=60,
                 min_size=2,
                 max_size=10,
+                ssl=ssl_mode,
             )
-            print("Database Pool Created (Singleton)")
+            print(f"Database Pool Created - Connected to {db_host}")
         except Exception as e:
             print(f"Pool creation failed: '{e}'")
             raise e
