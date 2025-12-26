@@ -17,10 +17,10 @@ export default function Dashboard() {
 
   // Load user name from localStorage
   useEffect(() => {
-    const user = localStorage.getItem("user");
-    if (user) {
+    const userInfo = localStorage.getItem("userInfo");
+    if (userInfo) {
       try {
-        const userData = JSON.parse(user);
+        const userData = JSON.parse(userInfo);
         setUserName(userData.strUserName || userData.strBusinessName || "");
       } catch {
         setUserName("");

@@ -38,7 +38,6 @@ export default function Login() {
       const response = await authService.login(email, password);
 
       localStorage.setItem('access_token', response.strAccessToken);
-      localStorage.setItem('user', JSON.stringify(response.dctUserInfo));
       localStorage.setItem('userInfo', JSON.stringify(response.dctUserInfo));
 
       // Navigate to dashboard

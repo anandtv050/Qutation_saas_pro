@@ -18,10 +18,8 @@ async def fnLogin(mdlLoginRequest:MdlLoginRequest):
         return mdlLoginResponse
     
     except HTTPException:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unexpected Error"
-        )
+        # Re-raise HTTPException as-is (e.g., 401 for invalid credentials)
+        raise
     except asyncpg.PostgresError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

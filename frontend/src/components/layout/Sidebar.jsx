@@ -16,8 +16,9 @@ export default function Sidebar() {
   const isAdmin = userInfo.intUserId === 1;
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("userInfo");
+    localStorage.removeItem("user"); // Clean up legacy key
     window.location.href = "/";
   };
 

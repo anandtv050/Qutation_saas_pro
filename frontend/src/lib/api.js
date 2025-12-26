@@ -34,10 +34,14 @@ api.interceptors.response.use(
         return response
     },
     (error) => {
-        // if 401 (UnAuthorized ) clear token and redirect into login
-        if (error.response?.status === 401) {
+        // if 401 (UnAuthorized) clear token and redirect to login
+        // BUT skip redirect for login endpoint (let it show error message)
+        const isLoginEndpoint = error.config?.url?.includes('/auth/login');
+
+        if (error.response?.status === 401 && !isLoginEndpoint) {
             localStorage.removeItem('access_token');
-            localStorage.removeItem('user_info');
+            localStorage.removeItem('userInfo');
+            localStorage.removeItem('user'); // Clean up legacy key
             window.location.href = '/login';
         }
         return Promise.reject(error)
