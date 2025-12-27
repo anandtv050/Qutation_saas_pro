@@ -96,12 +96,18 @@ def fnCreateApp() -> FastAPI:
             "docs": "/docs"
         }
 
-    @app.get("/health")
+    @app.api_route("/health", methods=["GET", "HEAD"])
     async def health_check():
-        """Health check endpoint for monitoring"""
+        """Health check endpoint for monitoring - keeps DB connection alive"""
         insDb = ClsDatabasepool()
-        db_health = await insDb.fnHealthCheck()
+
+        # Quick check if pool exists
         pool_stats = await insDb.fnGetPoolStats()
+        if pool_stats.get("status") == "not_initialized":
+            return {"status": "starting", "database": "connecting"}
+
+        # Do health check (this keeps the connection warm)
+        db_health = await insDb.fnHealthCheck()
 
         return {
             "status": "ok" if db_health.get("status") == "healthy" else "degraded",

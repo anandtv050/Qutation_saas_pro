@@ -1,7 +1,9 @@
+import asyncio
 from fastapi  import HTTPException,status
 
 from app.api.login.schema import MdlLoginResponse
 from app.core.security import fnCreateAccesToken, fnVerifyPassword
+from app.core.logger import getUserLogger
 
 
 class ClsLoginService:
@@ -9,6 +11,7 @@ class ClsLoginService:
         self.insPool = insPool
 
     async def fnLoginService(self,mdlLoginRequest) :
+            logger = getUserLogger(0)  # Use 0 for login (user not known yet)
 
             # get user details using email
             strQuery = """ SELECT
@@ -20,8 +23,17 @@ class ClsLoginService:
                             FROM tbl_user
                             WHERE vchr_email = $1
                             """
-            async with self.insPool.acquire() as conn:
-                rstUser = await conn.fetchrow(strQuery,mdlLoginRequest.email)
+            try:
+                # Add timeout for connection acquire (10 seconds max)
+                async with asyncio.timeout(10):
+                    async with self.insPool.acquire() as conn:
+                        rstUser = await conn.fetchrow(strQuery,mdlLoginRequest.email)
+            except asyncio.TimeoutError:
+                logger.error(f"Database connection timeout for login: {mdlLoginRequest.email}")
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Database temporarily unavailable. Please try again."
+                )
 
             if not rstUser:
                 raise HTTPException(
