@@ -582,14 +582,39 @@ Example:
     <div className="p-4 md:p-6 pb-36 lg:pb-6">
       {/* Header */}
       <div className="mb-6">
-        {/* Top Row: Back button only (New button removed - dangerous on edit page) */}
-        <div className="flex items-center mb-2">
+        {/* Top Row: Back button + New button (always visible) */}
+        <div className="flex items-center justify-between mb-2">
           <button
             onClick={() => mode === "ai" ? setShowForm(false) : navigateWithConfirm(isEditMode ? "/reports" : "/dashboard")}
             className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg"
           >
             <ArrowLeft className="w-5 h-5 text-neutral-600" />
           </button>
+
+          {/* New button - always visible to clear and start fresh */}
+          <Button
+            onClick={() => {
+              if (hasUnsavedChanges && !window.confirm("Clear all data and start new quotation?")) {
+                return;
+              }
+              clearDraft();
+              navigate("/quotations/new?mode=ai");
+              setCustomerName("");
+              setCustomerPhone("");
+              setCustomerAddress("");
+              setItems([]);
+              setRawInput("");
+              setSavedQuotation(null);
+              setIsUpdated(false);
+              setShowForm(false);
+            }}
+            variant="outline"
+            size="sm"
+            className="h-9 px-3 border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+          >
+            <FilePlus className="w-4 h-4 mr-1.5" />
+            New
+          </Button>
         </div>
 
         {/* Quotation Info Bar */}
@@ -978,17 +1003,30 @@ Example:
       {/* Mobile Fixed Bottom Bar - User flow: Edit → Save → Print → Invoice */}
       <div className="lg:hidden fixed bottom-16 left-0 right-0 bg-white border-t border-neutral-200 p-3 z-40">
         <div className="flex items-center gap-2">
-          {/* Left: New button (only after save - safe location) */}
-          {savedQuotation && (
-            <Button
-              onClick={resetForm}
-              variant="ghost"
-              size="sm"
-              className="h-11 px-2 text-neutral-500 shrink-0"
-            >
-              <FilePlus className="w-4 h-4" />
-            </Button>
-          )}
+          {/* Left: New button - always visible to clear and start fresh */}
+          <Button
+            onClick={() => {
+              if (hasUnsavedChanges && !window.confirm("Clear all data and start new quotation?")) {
+                return;
+              }
+              clearDraft();
+              navigate("/quotations/new?mode=ai");
+              setCustomerName("");
+              setCustomerPhone("");
+              setCustomerAddress("");
+              setItems([]);
+              setRawInput("");
+              setSavedQuotation(null);
+              setIsUpdated(false);
+              setShowForm(false);
+            }}
+            variant="outline"
+            size="sm"
+            className="h-11 px-3 border-neutral-200 text-neutral-600 shrink-0"
+          >
+            <FilePlus className="w-4 h-4 mr-1" />
+            New
+          </Button>
 
           {/* Center: Total info */}
           <div className="flex-1 min-w-0">
