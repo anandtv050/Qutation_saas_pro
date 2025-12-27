@@ -51,8 +51,9 @@ class ClsDatabasepool:
                 database=db_name,
                 user=db_user,
                 password=db_password,
-                command_timeout=60,
-                min_size=2,
+                timeout=120,          # Connection timeout (for slow cold starts)
+                command_timeout=60,   # Query timeout
+                min_size=1,           # Lower min for cold start
                 max_size=10,
                 ssl=ssl_mode,
             )
