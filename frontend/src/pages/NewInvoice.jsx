@@ -64,9 +64,10 @@ export default function NewInvoice() {
       return fromQuotation.items.map((item, i) => ({
         id: Date.now() + i,
         // Handle both API format (strItemName) and old format (name)
-        name: item.strItemName || item.name,
-        qty: item.dblQuantity || item.qty,
-        rate: item.dblUnitPrice || item.rate,
+        name: item.strItemName || item.name || '',
+        // Use nullish coalescing (??) to handle 0 values correctly (0 is valid, undefined/null is not)
+        qty: item.dblQuantity ?? item.qty ?? 1,
+        rate: item.dblUnitPrice ?? item.rate ?? 0,
         unit: item.strUnit || item.unit || 'piece',
         code: item.strItemCode || item.code || null,
         inventoryId: item.intInventoryId || item.inventoryId || null,
@@ -125,8 +126,8 @@ export default function NewInvoice() {
     year: "numeric",
   });
 
-  // Calculate totals
-  const subtotal = items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
+  // Calculate totals - use || 0 to handle any undefined/null values
+  const subtotal = items.reduce((sum, item) => sum + ((item.qty || 0) * (item.rate || 0)), 0);
   /* Payment tracking - Commented for later
   const balance = subtotal - paidAmount;
   */
@@ -176,12 +177,14 @@ export default function NewInvoice() {
   };
 
   const formatCurrency = (amount) => {
-    if (amount === 0) return "₹0";
+    // Handle NaN, undefined, null - default to 0
+    const safeAmount = Number.isNaN(amount) || amount == null ? 0 : amount;
+    if (safeAmount === 0) return "₹0";
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(safeAmount);
   };
 
   /* Inventory search functionality - Commented for later

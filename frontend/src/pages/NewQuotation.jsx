@@ -57,7 +57,9 @@ export default function NewQuotation() {
   const [isSaving, setIsSaving] = useState(false);
 
   // Success state after save
-  const [savedQuotation, setSavedQuotation] = useState(draft?.savedQuotation || null);
+  // NOTE: Don't restore savedQuotation from draft - user should start fresh when clicking "New Quote"
+  // This prevents showing stale "Convert to Invoice" buttons for quotations that already have invoices
+  const [savedQuotation, setSavedQuotation] = useState(null);
   const [isUpdated, setIsUpdated] = useState(false); // Track if this was an update
 
   // Loading state for edit mode
@@ -183,6 +185,7 @@ export default function NewQuotation() {
   const hasUnsavedChanges = items.length > 0 || customerName.trim() || customerPhone.trim() || customerAddress.trim() || rawInput.trim();
 
   // Save draft to session storage whenever data changes
+  // NOTE: Don't save savedQuotation - it should not persist between sessions
   useEffect(() => {
     saveDraft({
       customerName,
@@ -191,9 +194,8 @@ export default function NewQuotation() {
       items,
       rawInput,
       showForm,
-      savedQuotation,
     });
-  }, [customerName, customerPhone, customerAddress, items, rawInput, showForm, savedQuotation]);
+  }, [customerName, customerPhone, customerAddress, items, rawInput, showForm]);
 
   // Warn before closing/refreshing browser tab with unsaved changes
   useEffect(() => {
