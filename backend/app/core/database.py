@@ -118,25 +118,48 @@ class ClsDatabasepool:
             await self.fnConnectDb()
         return ClsDatabasepool._pool
 
+    async def fnResetPool(self):
+        """Reset the pool - close existing and create new"""
+        logger.warning("Resetting database pool due to stale connection...")
+        if ClsDatabasepool._pool:
+            try:
+                await ClsDatabasepool._pool.close()
+            except Exception:
+                pass  # Ignore errors when closing dead pool
+        ClsDatabasepool._pool = None
+        await self.fnConnectDb()
+
     async def fnHealthCheck(self) -> dict:
-        """Check database connection health"""
+        """Check database connection health - reset pool if stale"""
         try:
             pool = await self.fnGetPool()
-            async with pool.acquire() as conn:
-                result = await conn.fetchval("SELECT 1")
-                pool_size = pool.get_size()
-                pool_free = pool.get_idle_size()
-                pool_used = pool_size - pool_free
 
-                health = {
-                    "status": "healthy",
-                    "pool_size": pool_size,
-                    "pool_used": pool_used,
-                    "pool_free": pool_free,
-                    "test_query": result == 1
-                }
-                logger.debug(f"Health check: {health}")
-                return health
+            # Try to acquire connection with timeout
+            try:
+                async with asyncio.timeout(10):
+                    async with pool.acquire() as conn:
+                        result = await conn.fetchval("SELECT 1")
+            except (asyncio.TimeoutError, asyncpg.PostgresError, OSError) as e:
+                # Connection is stale - reset pool and retry
+                logger.warning(f"Stale connection detected: {str(e)}")
+                await self.fnResetPool()
+                pool = await self.fnGetPool()
+                async with pool.acquire() as conn:
+                    result = await conn.fetchval("SELECT 1")
+
+            pool_size = pool.get_size()
+            pool_free = pool.get_idle_size()
+            pool_used = pool_size - pool_free
+
+            health = {
+                "status": "healthy",
+                "pool_size": pool_size,
+                "pool_used": pool_used,
+                "pool_free": pool_free,
+                "test_query": result == 1
+            }
+            logger.debug(f"Health check: {health}")
+            return health
 
         except Exception as e:
             logger.error(f"Health check failed: {str(e)}")
