@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# Logs - Don't commit log files
+misc/logger/app/*.log
+misc/logger/user/**/*.log
+
+# Keep directory structure
+!misc/logger/app/.gitkeep
+!misc/logger/user/.gitkeep

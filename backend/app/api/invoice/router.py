@@ -14,6 +14,7 @@ from app.api.invoice.service import ClsInvoiceService
 from app.core.database import ClsDatabasepool
 from app.core.baseSchema import ResponseStatus
 from app.core.security import fnGetCurrentUser
+from app.core.logger import getUserLogger
 
 router = APIRouter(prefix="/invoice", tags=["Invoice"])
 
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/invoice", tags=["Invoice"])
 @router.post("/list", response_model=MdlInvoiceListResponse)
 async def fnGetInvoiceList(intUserId: Annotated[int, Depends(fnGetCurrentUser)]):
     """Get all invoices"""
+    logger = getUserLogger(intUserId)
     try:
         insPool = ClsDatabasepool()
         pool = await insPool.fnGetPool()
@@ -28,6 +30,7 @@ async def fnGetInvoiceList(intUserId: Annotated[int, Depends(fnGetCurrentUser)])
         insService = ClsInvoiceService(pool, intUserId)
         return await insService.fnGetAllInvoiceList()
     except asyncpg.PostgresError as e:
+        logger.error(f"Database error in invoice list: {str(e)}")
         return MdlInvoiceListResponse(
             intStatus=ResponseStatus.ERROR,
             strStatus=ResponseStatus.ERROR_STR,
@@ -36,6 +39,7 @@ async def fnGetInvoiceList(intUserId: Annotated[int, Depends(fnGetCurrentUser)])
             lstInvoice=[]
         )
     except Exception as e:
+        logger.error(f"Error in invoice list: {str(e)}", exc_info=True)
         return MdlInvoiceListResponse(
             intStatus=ResponseStatus.ERROR,
             strStatus=ResponseStatus.ERROR_STR,
@@ -51,6 +55,7 @@ async def fnGetInvoice(
     mdlRequest: MdlGetInvoiceRequest
 ):
     """Get single invoice with items"""
+    logger = getUserLogger(intUserId)
     try:
         insPool = ClsDatabasepool()
         pool = await insPool.fnGetPool()
@@ -58,6 +63,7 @@ async def fnGetInvoice(
         insService = ClsInvoiceService(pool, intUserId)
         return await insService.fnGetSingleInvoiceDetails(mdlRequest.intInvoiceId)
     except asyncpg.PostgresError as e:
+        logger.error(f"Database error getting invoice {mdlRequest.intInvoiceId}: {str(e)}")
         return MdlInvoiceResponse(
             intStatus=ResponseStatus.ERROR,
             strStatus=ResponseStatus.ERROR_STR,
@@ -66,6 +72,7 @@ async def fnGetInvoice(
             data=None
         )
     except Exception as e:
+        logger.error(f"Error getting invoice {mdlRequest.intInvoiceId}: {str(e)}", exc_info=True)
         return MdlInvoiceResponse(
             intStatus=ResponseStatus.ERROR,
             strStatus=ResponseStatus.ERROR_STR,
@@ -81,6 +88,7 @@ async def fnAddInvoice(
     mdlRequest: MdlCreateInvoiceRequest
 ):
     """Create new invoice"""
+    logger = getUserLogger(intUserId)
     try:
         insPool = ClsDatabasepool()
         pool = await insPool.fnGetPool()
@@ -88,6 +96,7 @@ async def fnAddInvoice(
         insService = ClsInvoiceService(pool, intUserId)
         return await insService.fnAddInvoiceService(mdlRequest)
     except asyncpg.PostgresError as e:
+        logger.error(f"Database error creating invoice: {str(e)}")
         return MdlInvoiceResponse(
             intStatus=ResponseStatus.ERROR,
             strStatus=ResponseStatus.ERROR_STR,
@@ -96,6 +105,7 @@ async def fnAddInvoice(
             data=None
         )
     except Exception as e:
+        logger.error(f"Error creating invoice: {str(e)}", exc_info=True)
         return MdlInvoiceResponse(
             intStatus=ResponseStatus.ERROR,
             strStatus=ResponseStatus.ERROR_STR,
@@ -111,6 +121,7 @@ async def fnDeleteInvoice(
     mdlRequest: MdlDeleteInvoiceRequest
 ):
     """Delete invoice"""
+    logger = getUserLogger(intUserId)
     try:
         insPool = ClsDatabasepool()
         pool = await insPool.fnGetPool()
@@ -118,6 +129,7 @@ async def fnDeleteInvoice(
         insService = ClsInvoiceService(pool, intUserId)
         return await insService.fnDeleteInvoiceService(mdlRequest.intInvoiceId)
     except asyncpg.PostgresError as e:
+        logger.error(f"Database error deleting invoice {mdlRequest.intInvoiceId}: {str(e)}")
         return MdlDeleteInvoiceResponse(
             intStatus=ResponseStatus.ERROR,
             strStatus=ResponseStatus.ERROR_STR,
@@ -126,6 +138,7 @@ async def fnDeleteInvoice(
             intDeletedId=None
         )
     except Exception as e:
+        logger.error(f"Error deleting invoice {mdlRequest.intInvoiceId}: {str(e)}", exc_info=True)
         return MdlDeleteInvoiceResponse(
             intStatus=ResponseStatus.ERROR,
             strStatus=ResponseStatus.ERROR_STR,

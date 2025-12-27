@@ -7,12 +7,14 @@ from app.api.inventory.schema import (
     MdlDeleteInventoryResponse
 )
 from app.core.baseSchema import ResponseStatus
+from app.core.logger import getUserLogger
 
 
 class ClsInventoryService:
     def __init__(self, pool, intUserId: int) -> None:
         self.insPool = pool
         self.intUserId = intUserId
+        self.logger = getUserLogger(intUserId)
 
     async def fnGetInventoryListService(self):
         """Inventory listing"""
@@ -67,6 +69,7 @@ class ClsInventoryService:
 
     async def fnAddInventoryService(self, mdlCreateInventoryRequest):
         """Create a new inventory"""
+        self.logger.info(f"Adding inventory item: {mdlCreateInventoryRequest.strItemName}")
 
         # Check if item code already exists
         strCheckQuery = """
@@ -127,6 +130,7 @@ class ClsInventoryService:
             intStockQuantity=rstItems['int_stock_qty']
         )
 
+        self.logger.info(f"Inventory item created: ID={rstItems['pk_bint_inventory_id']}")
         return MdlInventoryResponse(
             intStatus=ResponseStatus.SUCCESS,
             strStatus=ResponseStatus.SUCCESS_STR,
@@ -251,6 +255,7 @@ class ClsInventoryService:
 
     async def fnDeleteInventory(self, intInventoryId: int):
         """Delete inventory item"""
+        self.logger.info(f"Deleting inventory item: ID={intInventoryId}")
 
         strQuery = """
             DELETE FROM tbl_inventory

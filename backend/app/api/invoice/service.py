@@ -2,6 +2,7 @@ import datetime
 from asyncpg import Pool
 
 from app.core.baseSchema import ResponseStatus
+from app.core.logger import getUserLogger
 from app.api.invoice.schema import (
     MdlCreateInvoiceRequest,
     MdlInvoiceResponse,
@@ -17,6 +18,7 @@ class ClsInvoiceService:
     def __init__(self, insPool: Pool, intUserId: int):
         self.insPool = insPool
         self.intUserId = intUserId
+        self.logger = getUserLogger(intUserId)
 
     async def fnGenerateInvoiceNumber(self):
         """Generate unique invoice number: INV-YYYY-NNNN"""
@@ -192,6 +194,7 @@ class ClsInvoiceService:
     
     async def fnAddInvoiceService(self, mdlRequest: MdlCreateInvoiceRequest):
         """Create new invoice"""
+        self.logger.info(f"Creating invoice for customer: {mdlRequest.strCustomerName}")
 
         # Check if quotation already has an invoice (prevent duplicate)
         if mdlRequest.intQuotationId:
@@ -264,7 +267,8 @@ class ClsInvoiceService:
                 )
                 
                 intInvoiceId = rstInvoice['pk_bint_invoice_id']
-                
+                self.logger.info(f"Invoice created: {strInvoiceNumber} | ID={intInvoiceId} | Amount={dblTotalAmount}")
+
                 strInsertItem = """
                     INSERT INTO tbl_invoice_item (
                         fk_bint_invoice_id,
@@ -298,7 +302,8 @@ class ClsInvoiceService:
     
     async def fnDeleteInvoiceService(self, intInvoiceId: int):
         """Delete invoice"""
-        
+        self.logger.info(f"Deleting invoice: ID={intInvoiceId}")
+
         strQuery = """
             DELETE FROM tbl_invoice
             WHERE pk_bint_invoice_id = $1 AND fk_bint_user_id = $2

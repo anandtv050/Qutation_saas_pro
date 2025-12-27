@@ -11,11 +11,14 @@ from app.api.quotation.schema import (
     MdlUpdateQuotationRequest
 )
 from app.core.baseSchema import ResponseStatus
+from app.core.logger import getUserLogger
+
 
 class ClsQuotationService:
     def __init__(self, pool, intUserId: int) -> None:
         self.insPool = pool
         self.intUserId = intUserId
+        self.logger = getUserLogger(intUserId)
         
     async def fnGenerateQuotationNumber(self) -> str:
         """Generate Qutation Number"""
@@ -190,7 +193,8 @@ class ClsQuotationService:
     
     async def fnAddQuotationService(self, mdlRequest: MdlCreateQuotationRequest):
         """Create new quotation with items"""
-        
+        self.logger.info(f"Creating quotation for customer: {mdlRequest.strCustomerName}")
+
         strQuotationNumber = await self.fnGenerateQuotationNumber()
         
         dblSubtotal = sum(item.dblQuantity * item.dblUnitPrice for item in mdlRequest.lstItems)
@@ -243,7 +247,8 @@ class ClsQuotationService:
                 )
                 
                 intQuotationId = rstQuotation['pk_bint_quotation_id']
-                
+                self.logger.info(f"Quotation created: {strQuotationNumber} | ID={intQuotationId} | Items={len(mdlRequest.lstItems)}")
+
                 strInsertItem = """
                     INSERT INTO tbl_quotation_item (
                         fk_bint_quotation_id,
@@ -426,7 +431,8 @@ class ClsQuotationService:
     
     async def fnDeleteQuotationService(self, intQuotationId: int):
         """Delete quotation and its items"""
-        
+        self.logger.info(f"Deleting quotation: ID={intQuotationId}")
+
         strQuery = """
             DELETE FROM tbl_quotation
             WHERE pk_bint_quotation_id = $1 AND fk_bint_user_id = $2

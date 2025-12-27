@@ -7,6 +7,7 @@ from app.api.pdf.schema import MdlQuotationPDFRequest, MdlInvoicePDFRequest
 from app.api.pdf.service import ClsPDFGenerator
 from app.core.database import ClsDatabasepool
 from app.core.security import fnGetCurrentUser
+from app.core.logger import getUserLogger
 
 router = APIRouter(prefix="/pdf", tags=["PDF"])
 
@@ -17,7 +18,9 @@ async def fnGenerateQuotationPDF(
     mdlRequest: MdlQuotationPDFRequest
 ):
     """Generate PDF for quotation"""
+    logger = getUserLogger(intUserId)
     try:
+        logger.info(f"Generating quotation PDF: ID={mdlRequest.intQuotationId}")
         # If quotation ID is provided, fetch from database
         if mdlRequest.intQuotationId:
             insPool = ClsDatabasepool()
@@ -38,6 +41,7 @@ async def fnGenerateQuotationPDF(
                 rstQuotation = await conn.fetchrow(strQuery, mdlRequest.intQuotationId, intUserId)
 
                 if not rstQuotation:
+                    logger.warning(f"Quotation not found: ID={mdlRequest.intQuotationId}")
                     return {"error": "Quotation not found"}
 
                 # Fetch quotation items
@@ -89,6 +93,7 @@ async def fnGenerateQuotationPDF(
 
         # Return PDF as streaming response
         filename = f"Quotation_{quotation_number or 'draft'}.pdf"
+        logger.info(f"Quotation PDF generated: {filename}")
         return StreamingResponse(
             pdf_buffer,
             media_type="application/pdf",
@@ -98,8 +103,10 @@ async def fnGenerateQuotationPDF(
         )
 
     except asyncpg.PostgresError as e:
+        logger.error(f"Database error generating quotation PDF: {str(e)}")
         return {"error": f"Database error: {str(e)}"}
     except Exception as e:
+        logger.error(f"Error generating quotation PDF: {str(e)}", exc_info=True)
         return {"error": f"Error generating PDF: {str(e)}"}
 
 
@@ -109,7 +116,9 @@ async def fnGenerateInvoicePDF(
     mdlRequest: MdlInvoicePDFRequest
 ):
     """Generate PDF for invoice"""
+    logger = getUserLogger(intUserId)
     try:
+        logger.info(f"Generating invoice PDF: ID={mdlRequest.intInvoiceId}")
         # If invoice ID is provided, fetch from database
         if mdlRequest.intInvoiceId:
             insPool = ClsDatabasepool()
@@ -131,6 +140,7 @@ async def fnGenerateInvoicePDF(
                 rstInvoice = await conn.fetchrow(strQuery, mdlRequest.intInvoiceId, intUserId)
 
                 if not rstInvoice:
+                    logger.warning(f"Invoice not found: ID={mdlRequest.intInvoiceId}")
                     return {"error": "Invoice not found"}
 
                 # Fetch invoice items
@@ -185,6 +195,7 @@ async def fnGenerateInvoicePDF(
 
         # Return PDF as streaming response
         filename = f"Invoice_{invoice_number or 'draft'}.pdf"
+        logger.info(f"Invoice PDF generated: {filename}")
         return StreamingResponse(
             pdf_buffer,
             media_type="application/pdf",
@@ -194,6 +205,8 @@ async def fnGenerateInvoicePDF(
         )
 
     except asyncpg.PostgresError as e:
+        logger.error(f"Database error generating invoice PDF: {str(e)}")
         return {"error": f"Database error: {str(e)}"}
     except Exception as e:
+        logger.error(f"Error generating invoice PDF: {str(e)}", exc_info=True)
         return {"error": f"Error generating PDF: {str(e)}"}

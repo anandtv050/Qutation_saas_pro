@@ -15,7 +15,10 @@ import importlib
 import os
 
 from app.core.database import ClsDatabasepool
+from app.core.logger import getLogger
 
+# Initialize app logger
+logger = getLogger()
 
 # Router registry - Easy to see all APIs
 LST_ROUTERS = [
@@ -36,11 +39,11 @@ async def lifespan(app:FastAPI):
     insDb = ClsDatabasepool()
     await insDb.fnConnectDb()  # Connect to database
     #startup
-    print("Starting Qutation Saas Pro API...")
+    logger.info("Starting Quotely API Server...")
     yield
     await insDb.fnDisconnectPool()
     #Shotdown
-    print("Shutting down Qutation Saas Pro API...")
+    logger.info("Shutting down Quotely API Server...")
 
 
 
@@ -58,7 +61,7 @@ def fnCreateApp() -> FastAPI:
     # CORS middleware - Read from environment variable
     cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
     cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
-    print(f"CORS Origins: {cors_origins}")
+    logger.info(f"CORS Origins: {cors_origins}")
 
     app.add_middleware(
         CORSMiddleware,
@@ -78,22 +81,35 @@ def fnCreateApp() -> FastAPI:
             "version": "1.0.0",
             "docs": "/docs"
         }
-        
-        # Dynamically load routers
+
+    @app.get("/health")
+    async def health_check():
+        """Health check endpoint for monitoring"""
+        insDb = ClsDatabasepool()
+        db_health = await insDb.fnHealthCheck()
+        pool_stats = await insDb.fnGetPoolStats()
+
+        return {
+            "status": "ok" if db_health.get("status") == "healthy" else "degraded",
+            "database": db_health,
+            "pool": pool_stats
+        }
+
+    # Dynamically load routers
     for strModulePath in LST_ROUTERS:
         try:
             module = importlib.import_module(strModulePath)
             router = getattr(module, 'router', None)
-            
+
             if router is None:
-                print(f"⚠️  Warning: Router not found in {strModulePath}")
+                logger.warning(f"Router not found in {strModulePath}")
                 continue
-            
+
             app.include_router(router)
-            print(f" Loaded router: {strModulePath}")
-            
+            logger.debug(f"Loaded router: {strModulePath}")
+
         except Exception as e:
-            print(f" Failed to load router {strModulePath}: {e}")
+            logger.error(f"Failed to load router {strModulePath}: {e}")
             raise
 
     return app

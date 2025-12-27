@@ -10,12 +10,14 @@ from app.api.ai.schema import (
     MdlAIQuotationItem
 )
 from app.core.baseSchema import ResponseStatus
+from app.core.logger import getUserLogger
 
 
 class ClsAIQuotationService:
     def __init__(self, insPool: Pool, intUserId: int):
         self.insPool = insPool
         self.intUserId = intUserId
+        self.logger = getUserLogger(intUserId)  # User-specific logger
         self.strGroqApiKey = os.getenv("GROQ_API_KEY", "")
         self.strGroqUrl = "https://api.groq.com/openai/v1/chat/completions"
         self.strModelName = "llama-3.3-70b-versatile"
@@ -120,6 +122,7 @@ class ClsAIQuotationService:
 
     async def fnProcessQuotation(self, strRawText: str) -> MdlProcessQuotationResponse:
         """Process raw text using Groq AI to generate quotation items"""
+        self.logger.info(f"Processing AI quotation request: {strRawText[:100]}...")
 
         if not self.strGroqApiKey:
             return MdlProcessQuotationResponse(
@@ -223,6 +226,8 @@ Return ONLY valid JSON, no markdown formatting.
                         strUnit=dctItem.get("unit", "piece")
                     ))
 
+                self.logger.info(f"AI quotation generated successfully | Items: {len(lstItems)} | Tokens: {intTokensInput}/{intTokensOutput}")
+
                 return MdlProcessQuotationResponse(
                     intStatus=ResponseStatus.SUCCESS,
                     strStatus=ResponseStatus.SUCCESS_STR,
@@ -238,6 +243,7 @@ Return ONLY valid JSON, no markdown formatting.
                 )
 
         except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse AI response: {str(e)}")
             return MdlProcessQuotationResponse(
                 intStatus=ResponseStatus.ERROR,
                 strStatus=ResponseStatus.ERROR_STR,
@@ -246,6 +252,7 @@ Return ONLY valid JSON, no markdown formatting.
                 lstItems=[]
             )
         except Exception as e:
+            self.logger.error(f"AI processing failed: {str(e)}", exc_info=True)
             return MdlProcessQuotationResponse(
                 intStatus=ResponseStatus.ERROR,
                 strStatus=ResponseStatus.ERROR_STR,

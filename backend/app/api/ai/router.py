@@ -3,12 +3,13 @@ from asyncpg import Pool
 
 from app.core.database import ClsDatabasepool
 from app.core.security import fnGetCurrentUser
+from app.core.logger import getUserLogger
+from app.core.baseSchema import ResponseStatus
 from app.api.ai.service import ClsAIQuotationService
 from app.api.ai.schema import (
     MdlProcessQuotationRequest,
     MdlProcessQuotationResponse
 )
-
 
 router = APIRouter(prefix="/ai", tags=["AI Quotation"])
 
@@ -34,5 +35,17 @@ async def fnProcessQuotation(
 
     Returns AI-generated quotation items matched with inventory.
     """
-    insService = ClsAIQuotationService(insPool, intUserId)
-    return await insService.fnProcessQuotation(mdlRequest.strRawText)
+    logger = getUserLogger(intUserId)
+    try:
+        logger.info(f"AI quotation request received")
+        insService = ClsAIQuotationService(insPool, intUserId)
+        return await insService.fnProcessQuotation(mdlRequest.strRawText)
+    except Exception as e:
+        logger.error(f"Error in AI processing: {str(e)}", exc_info=True)
+        return MdlProcessQuotationResponse(
+            intStatus=ResponseStatus.ERROR,
+            strStatus=ResponseStatus.ERROR_STR,
+            intStatusCode=ResponseStatus.HTTP_INTERNAL_ERROR,
+            strMessage=f"AI processing error: {str(e)}",
+            lstItems=[]
+        )

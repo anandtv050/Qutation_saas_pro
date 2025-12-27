@@ -5,15 +5,18 @@ from app.api.dashboard.schema import (
     MdlDashboardResponse
 )
 from app.core.baseSchema import ResponseStatus
+from app.core.logger import getUserLogger
 
 
 class ClsDashboardService:
     def __init__(self, pool: Pool, intUserId: int):
         self.pool = pool
         self.intUserId = intUserId
+        self.logger = getUserLogger(intUserId)
 
     async def fnGetDashboardSummary(self) -> MdlDashboardResponse:
         """Get dashboard summary with collected and today's earnings"""
+        self.logger.debug("Fetching dashboard summary")
         async with self.pool.acquire() as conn:
             # Get invoice summary - total collected (all time)
             strQuery = """

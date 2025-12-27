@@ -7,6 +7,7 @@ from app.api.dashboard.service import ClsDashboardService
 from app.core.database import ClsDatabasepool
 from app.core.baseSchema import ResponseStatus
 from app.core.security import fnGetCurrentUser
+from app.core.logger import getUserLogger
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -14,6 +15,7 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 @router.post("/summary", response_model=MdlDashboardResponse)
 async def fnGetDashboardSummary(intUserId: Annotated[int, Depends(fnGetCurrentUser)]):
     """Get dashboard summary with collected and pending amounts"""
+    logger = getUserLogger(intUserId)
     try:
         insPool = ClsDatabasepool()
         pool = await insPool.fnGetPool()
@@ -21,6 +23,7 @@ async def fnGetDashboardSummary(intUserId: Annotated[int, Depends(fnGetCurrentUs
         insService = ClsDashboardService(pool, intUserId)
         return await insService.fnGetDashboardSummary()
     except asyncpg.PostgresError as e:
+        logger.error(f"Database error in dashboard: {str(e)}")
         return MdlDashboardResponse(
             intStatus=ResponseStatus.ERROR,
             strStatus=ResponseStatus.ERROR_STR,
@@ -29,6 +32,7 @@ async def fnGetDashboardSummary(intUserId: Annotated[int, Depends(fnGetCurrentUs
             data=None
         )
     except Exception as e:
+        logger.error(f"Error in dashboard: {str(e)}", exc_info=True)
         return MdlDashboardResponse(
             intStatus=ResponseStatus.ERROR,
             strStatus=ResponseStatus.ERROR_STR,

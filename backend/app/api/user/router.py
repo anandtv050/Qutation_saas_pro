@@ -3,6 +3,7 @@ from asyncpg import Pool
 
 from app.core.database import ClsDatabasepool
 from app.core.security import fnGetAdminUser
+from app.core.logger import getLogger
 from app.api.user.service import ClsUserService
 from app.api.user.schema import (
     MdlCreateUserRequest,
@@ -13,6 +14,7 @@ from app.api.user.schema import (
     MdlDeleteUserResponse
 )
 
+logger = getLogger()
 
 router = APIRouter(prefix="/user", tags=["User Management"])
 

@@ -2,6 +2,7 @@ from asyncpg import Pool
 
 from app.core.baseSchema import ResponseStatus
 from app.core.security import fnHashPassword, ADMIN_USER_ID
+from app.core.logger import getLogger
 from app.api.user.schema import (
     MdlCreateUserRequest,
     MdlUserResponse,
@@ -15,9 +16,11 @@ class ClsUserService:
     def __init__(self, insPool: Pool, intUserId: int):
         self.insPool = insPool
         self.intUserId = intUserId
+        self.logger = getLogger()  # Admin operations use app logger
 
     async def fnGetAllUsers(self):
         """Get all users (Admin only)"""
+        self.logger.info(f"Admin user {self.intUserId} fetching all users")
 
         strQuery = """
             SELECT
@@ -55,6 +58,7 @@ class ClsUserService:
             )
             lstUsers.append(mdlUser)
 
+        self.logger.info(f"Found {len(lstUsers)} users")
         return MdlUserListResponse(
             intStatus=ResponseStatus.SUCCESS,
             strStatus=ResponseStatus.SUCCESS_STR,
@@ -82,6 +86,7 @@ class ClsUserService:
             rstUser = await conn.fetchrow(strQuery, intUserId)
 
         if not rstUser:
+            self.logger.warning(f"User not found: ID={intUserId}")
             return MdlUserResponse(
                 intStatus=ResponseStatus.NO_DATA,
                 strStatus=ResponseStatus.NO_DATA_STR,
@@ -109,6 +114,7 @@ class ClsUserService:
 
     async def fnAddUser(self, mdlRequest: MdlCreateUserRequest):
         """Create new user (Admin only)"""
+        self.logger.info(f"Creating new user: {mdlRequest.strEmail}")
 
         # Check if email already exists
         async with self.insPool.acquire() as conn:
@@ -118,6 +124,7 @@ class ClsUserService:
             rstExisting = await conn.fetchrow(strCheckQuery, mdlRequest.strEmail)
 
             if rstExisting:
+                self.logger.warning(f"Email already exists: {mdlRequest.strEmail}")
                 return MdlUserResponse(
                     intStatus=ResponseStatus.ERROR,
                     strStatus=ResponseStatus.ERROR_STR,
@@ -152,15 +159,18 @@ class ClsUserService:
             )
 
             intNewUserId = rstNew['pk_bint_user_id']
+            self.logger.info(f"User created: ID={intNewUserId} | Email={mdlRequest.strEmail}")
 
         # Return the created user
         return await self.fnGetSingleUser(intNewUserId)
 
     async def fnDeleteUser(self, intUserId: int):
         """Delete user (Admin only, cannot delete admin)"""
+        self.logger.info(f"Deleting user: ID={intUserId}")
 
         # Prevent deleting admin user
         if intUserId == ADMIN_USER_ID:
+            self.logger.warning(f"Attempted to delete admin user")
             return MdlDeleteUserResponse(
                 intStatus=ResponseStatus.ERROR,
                 strStatus=ResponseStatus.ERROR_STR,
@@ -179,6 +189,7 @@ class ClsUserService:
             rstDeleted = await conn.fetchrow(strQuery, intUserId)
 
         if not rstDeleted:
+            self.logger.warning(f"User not found for deletion: ID={intUserId}")
             return MdlDeleteUserResponse(
                 intStatus=ResponseStatus.NO_DATA,
                 strStatus=ResponseStatus.NO_DATA_STR,
@@ -187,6 +198,7 @@ class ClsUserService:
                 intDeletedId=None
             )
 
+        self.logger.info(f"User deleted: ID={intUserId}")
         return MdlDeleteUserResponse(
             intStatus=ResponseStatus.SUCCESS,
             strStatus=ResponseStatus.SUCCESS_STR,
