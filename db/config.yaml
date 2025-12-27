@@ -1,0 +1,6 @@
+# Database Configuration
+DB_HOST: localhost
+DB_PORT: 5432
+DB_NAME: db_quotation_saas_pro_12_12_2025
+DB_USER: postgres
+DB_PASSWORD: Anand@123

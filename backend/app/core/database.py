@@ -18,8 +18,8 @@ class ClsDatabasepool:
 
     _instance: Optional['ClsDatabasepool'] = None  # Singleton instance
     _pool: Optional[asyncpg.Pool] = None           # Shared pool
-    _connection_retries: int = 3                   # Retry attempts
-    _retry_delay: int = 5                          # Seconds between retries
+    _connection_retries: int = 5                   # Retry attempts (increased for cold starts)
+    _retry_delay: int = 10                         # Seconds between retries
 
     def __new__(cls):
         """Create only one instance (Singleton)"""
@@ -63,7 +63,7 @@ class ClsDatabasepool:
                     database=db_name,
                     user=db_user,
                     password=db_password,
-                    timeout=120,          # Connection timeout (for slow cold starts)
+                    timeout=30,           # Connection timeout (reduced - let retry handle it)
                     command_timeout=60,   # Query timeout
                     min_size=1,           # Lower min for cold start
                     max_size=10,

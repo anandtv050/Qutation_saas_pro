@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import importlib
+import asyncio
 import os
 
 from app.core.database import ClsDatabasepool
@@ -33,16 +34,29 @@ LST_ROUTERS = [
 ]
 
 
+async def fnConnectDbBackground():
+    """Connect to database in background (non-blocking)"""
+    try:
+        insDb = ClsDatabasepool()
+        await insDb.fnConnectDb()
+    except Exception as e:
+        logger.error(f"Background DB connection failed: {str(e)}")
+
+
 @asynccontextmanager
 async def lifespan(app:FastAPI):
-    """Application life span"""
-    insDb = ClsDatabasepool()
-    await insDb.fnConnectDb()  # Connect to database
-    #startup
+    """Application life span - Start server first, connect DB in background"""
     logger.info("Starting Quotely API Server...")
+
+    # Start DB connection in background (non-blocking)
+    # Server starts immediately, DB connects while server is running
+    asyncio.create_task(fnConnectDbBackground())
+
     yield
+
+    # Shutdown
+    insDb = ClsDatabasepool()
     await insDb.fnDisconnectPool()
-    #Shotdown
     logger.info("Shutting down Quotely API Server...")
 
 
