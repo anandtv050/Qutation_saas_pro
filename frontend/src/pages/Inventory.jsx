@@ -298,12 +298,21 @@ export default function Inventory() {
 
       {/* Items Table */}
       {filteredItems.length === 0 ? (
-        <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
-          <Package className="w-12 h-12 mx-auto text-neutral-300 mb-4" />
-          <h3 className="font-medium text-neutral-900 mb-1">No items found</h3>
-          <p className="text-sm text-neutral-500">
-            {searchQuery ? "Try a different search" : "Add your first item"}
+        <div className="bg-white border border-neutral-200 rounded-xl p-6 sm:p-12 text-center">
+          <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-neutral-300 mb-3 sm:mb-4" />
+          <h3 className="font-medium text-neutral-900 mb-1">No inventory items</h3>
+          <p className="text-sm text-neutral-500 mb-4">
+            {searchQuery ? "Try a different search" : "Add your first item to get started"}
           </p>
+          {!searchQuery && inventoryItems.length === 0 && (
+            <Button
+              onClick={() => { resetForm(); setShowAddModal(true); }}
+              className="bg-neutral-900 hover:bg-neutral-800"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Item
+            </Button>
+          )}
         </div>
       ) : (
         <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden">

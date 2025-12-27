@@ -346,14 +346,14 @@ export default function Reports() {
               </Button>
             </div>
           ) : filteredQuotations.length === 0 ? (
-            <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
-              <FileText className="w-12 h-12 mx-auto text-neutral-300 mb-4" />
-              <h3 className="font-medium text-neutral-900 mb-1">No quotations found</h3>
+            <div className="bg-white border border-neutral-200 rounded-xl p-6 sm:p-12 text-center">
+              <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-neutral-300 mb-3 sm:mb-4" />
+              <h3 className="font-medium text-neutral-900 mb-1">No quotations</h3>
               <p className="text-sm text-neutral-500 mb-4">
                 {quotations.length === 0 ? "Create your first quotation to get started" : "Try a different search or date"}
               </p>
               {quotations.length === 0 && (
-                <Button onClick={() => navigate("/quotations/new?mode=manual")}>
+                <Button onClick={() => navigate("/quotations/new?mode=manual")} className="bg-neutral-900 hover:bg-neutral-800">
                   Create Quotation
                 </Button>
               )}
@@ -456,11 +456,11 @@ export default function Reports() {
               </Button>
             </div>
           ) : filteredInvoices.length === 0 ? (
-            <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
-              <Receipt className="w-12 h-12 mx-auto text-neutral-300 mb-4" />
-              <h3 className="font-medium text-neutral-900 mb-1">No invoices found</h3>
-              <p className="text-sm text-neutral-500 mb-4">
-                {invoices.length === 0 ? "Create your first invoice from a quotation" : "Try a different search or date"}
+            <div className="bg-white border border-neutral-200 rounded-xl p-6 sm:p-12 text-center">
+              <Receipt className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-neutral-300 mb-3 sm:mb-4" />
+              <h3 className="font-medium text-neutral-900 mb-1">No invoices</h3>
+              <p className="text-sm text-neutral-500">
+                {invoices.length === 0 ? "Invoices will appear here when you convert quotations" : "Try a different search or date"}
               </p>
             </div>
           ) : (
