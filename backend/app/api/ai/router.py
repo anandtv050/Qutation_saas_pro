@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends
 from asyncpg import Pool
 
 from app.core.database import ClsDatabasepool
-from app.core.security import fnGetCurrentUser
 from app.core.logger import getUserLogger
 from app.core.baseSchema import ResponseStatus
 from app.api.ai.service import ClsAIQuotationService
@@ -10,9 +9,9 @@ from app.api.ai.schema import (
     MdlProcessQuotationRequest,
     MdlProcessQuotationResponse
 )
+from app.core.dependency import fnGetContext
 
 router = APIRouter(prefix="/ai", tags=["AI Quotation"])
-
 
 async def fnGetPool() -> Pool:
     insDb = ClsDatabasepool()
@@ -22,8 +21,7 @@ async def fnGetPool() -> Pool:
 @router.post("/process", response_model=MdlProcessQuotationResponse)
 async def fnProcessQuotation(
     mdlRequest: MdlProcessQuotationRequest,
-    insPool: Pool = Depends(fnGetPool),
-    intUserId: int = Depends(fnGetCurrentUser)
+    objContext = Depends(fnGetContext)
 ):
     """
     Process raw text using AI to generate quotation items.
@@ -35,13 +33,13 @@ async def fnProcessQuotation(
 
     Returns AI-generated quotation items matched with inventory.
     """
-    logger = getUserLogger(intUserId)
+    # logger = getUserLogger(intUserId)
     try:
-        logger.info(f"AI quotation request received")
-        insService = ClsAIQuotationService(insPool, intUserId)
+        # logger.info(f"AI quotation request received")
+        insService = ClsAIQuotationService(objContext.objPool, objContext.intUserId)
         return await insService.fnProcessQuotation(mdlRequest.strRawText)
     except Exception as e:
-        logger.error(f"Error in AI processing: {str(e)}", exc_info=True)
+        # logger.error(f"Error in AI processing: {str(e)}", exc_info=True)
         return MdlProcessQuotationResponse(
             intStatus=ResponseStatus.ERROR,
             strStatus=ResponseStatus.ERROR_STR,

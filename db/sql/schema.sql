@@ -231,6 +231,22 @@ CREATE TABLE tbl_invoice_item (
 
 CREATE INDEX idx_invoice_item_invoice_id ON tbl_invoice_item(fk_bint_invoice_id);
 
+
+-- =====================================================
+-- Table 9: tbl_document_counter (For Quotation & Invoice)
+-- =====================================================
+
+-- no need of primary key becaus  Because this table should be uniquely identified by:(user + document_type + year) 
+CREATE TABLE tbl_document_counter(
+    fk_bint_user_id BIGINT NOT NULL,
+    vchr_document_type VARCHAR(20) NOT NULL , -- INVOICE | QUOTATION
+    int_year INTEGER NOT NULL,
+    int_last_number INTEGER NOT NULL,
+
+    PRIMARY KEY (fk_bint_user_id, vchr_document_type, int_year),
+
+    FOREIGN KEY (fk_bint_user_id) REFERENCES tbl_user(pk_bint_user_id) ON DELETE CASCADE
+)
 -- =====================================================
 -- End of Schema
 -- =====================================================

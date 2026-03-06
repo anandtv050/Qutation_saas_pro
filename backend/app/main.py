@@ -34,28 +34,16 @@ LST_ROUTERS = [
 ]
 
 
-async def fnConnectDbBackground():
-    """Connect to database in background (non-blocking)"""
-    try:
-        insDb = ClsDatabasepool()
-        await insDb.fnConnectDb()
-    except Exception as e:
-        logger.error(f"Background DB connection failed: {str(e)}")
-
 
 @asynccontextmanager
 async def lifespan(app:FastAPI):
     """Application life span - Start server first, connect DB in background"""
     logger.info("Starting Quotely API Server...")
-
-    # Start DB connection in background (non-blocking)
-    # Server starts immediately, DB connects while server is running
-    asyncio.create_task(fnConnectDbBackground())
+    insDb = ClsDatabasepool()
+    await insDb.fnStartUp()
 
     yield
-
-    # Shutdown
-    insDb = ClsDatabasepool()
+    
     await insDb.fnDisconnectPool()
     logger.info("Shutting down Quotely API Server...")
 
@@ -73,7 +61,7 @@ def fnCreateApp() -> FastAPI:
     )
     
     # CORS middleware - Read from environment variable
-    cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
+    cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:5174,http://localhost:3000")
     cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
     logger.info(f"CORS Origins: {cors_origins}")
 
