@@ -14,20 +14,18 @@ from app.api.quotation.schema import (
 from app.api.quotation.service import ClsQuotationService
 from app.core.database import ClsDatabasepool
 from app.core.baseSchema import ResponseStatus
-from app.core.security import fnGetCurrentUser
+from app.core.dependency import fnGetContext
 from app.core.logger import getUserLogger
 
 router = APIRouter(prefix="/quotation", tags=["Quotation"])
 
 
 @router.post("/list", response_model=MdlQuotationListResponse)
-async def fnGetQutationList(intUserId: Annotated[int, Depends(fnGetCurrentUser)]):
-    logger = getUserLogger(intUserId)
+async def fnGetQutationList(objContext = Depends(fnGetContext)):
+    logger = getUserLogger(objContext.intUserId)
     try:
-        insPool = ClsDatabasepool()
-        pool = await insPool.fnGetPool()
 
-        insQuotationService = ClsQuotationService(pool, intUserId)
+        insQuotationService = ClsQuotationService(objContext.objPool, objContext.intUserId)
         return await insQuotationService.fnGetAllQuotationList()
     except asyncpg.PostgresError as e:
         logger.error(f"Database error in quotation list: {str(e)}")
@@ -51,15 +49,13 @@ async def fnGetQutationList(intUserId: Annotated[int, Depends(fnGetCurrentUser)]
 
 @router.post("/get", response_model=MdlQuotationResponse)
 async def fnGetQuotation(
-    intUserId: Annotated[int, Depends(fnGetCurrentUser)],
-    mdlGetQuotationRequest: MdlGetQuotationRequest
+    mdlGetQuotationRequest= MdlGetQuotationRequest,
+    objContext = Depends(fnGetContext)
 ):
-    logger = getUserLogger(intUserId)
+    logger = getUserLogger(objContext.intUserId)
     try:
-        insPool = ClsDatabasepool()
-        pool = await insPool.fnGetPool()
 
-        insQuotationService = ClsQuotationService(pool, intUserId)
+        insQuotationService = ClsQuotationService(objContext.objPool, objContext.intUserId)
         return await insQuotationService.fnGetSingleQuotationDetails(mdlGetQuotationRequest.intQuotationId)
     except asyncpg.PostgresError as e:
         logger.error(f"Database error getting quotation {mdlGetQuotationRequest.intQuotationId}: {str(e)}")
@@ -81,15 +77,15 @@ async def fnGetQuotation(
 
 @router.post("/add", response_model=MdlQuotationResponse)
 async def fnAddQuotation(
-    intUserId: Annotated[int, Depends(fnGetCurrentUser)],
-    mdlCreateQuotationRequest: MdlCreateQuotationRequest
+    mdlCreateQuotationRequest: MdlCreateQuotationRequest,
+    objContext = Depends(fnGetContext)
 ):
-    logger = getUserLogger(intUserId)
+    logger = getUserLogger(objContext.intUserId)
     try:
         insPool = ClsDatabasepool()
         pool = await insPool.fnGetPool()
 
-        insQuotationService = ClsQuotationService(pool, intUserId)
+        insQuotationService = ClsQuotationService(pool, objContext.intUserId)
         return await insQuotationService.fnAddQuotationService(mdlCreateQuotationRequest)
 
     except asyncpg.PostgresError as e:
@@ -114,15 +110,13 @@ async def fnAddQuotation(
 
 @router.post("/update", response_model=MdlQuotationResponse)
 async def fnUpdateQuotation(
-    intUserId: Annotated[int, Depends(fnGetCurrentUser)],
-    mdlUpdateQuotationRequest: MdlUpdateQuotationRequest
+    mdlUpdateQuotationRequest: MdlUpdateQuotationRequest,
+    objContext = Depends(fnGetContext),
 ):
-    logger = getUserLogger(intUserId)
+    logger = getUserLogger(objContext.intUserId)
     try:
-        insPool = ClsDatabasepool()
-        pool = await insPool.fnGetPool()
 
-        insQuotationService = ClsQuotationService(pool, intUserId)
+        insQuotationService = ClsQuotationService(objContext.objPool, objContext.intUserId)
         return await insQuotationService.fnUpdateQuotationService(mdlUpdateQuotationRequest)
 
     except asyncpg.PostgresError as e:
@@ -147,15 +141,13 @@ async def fnUpdateQuotation(
 
 @router.post("/delete", response_model=MdlDeleteQuotationResponse)
 async def fnDeleteQuotation(
-    intUserId: Annotated[int, Depends(fnGetCurrentUser)],
-    mdlDeleteQuotationRequest: MdlDeleteQuotationRequest
+    mdlDeleteQuotationRequest: MdlDeleteQuotationRequest,
+    objContext = Depends(fnGetContext)
 ):
-    logger = getUserLogger(intUserId)
+    logger = getUserLogger(objContext.intUserId)
     try:
-        insPool = ClsDatabasepool()
-        pool = await insPool.fnGetPool()
 
-        insQuotationService = ClsQuotationService(pool, intUserId)
+        insQuotationService = ClsQuotationService(objContext.objPool, objContext.intUserId)
         return await insQuotationService.fnDeleteQuotationService(mdlDeleteQuotationRequest.intQuotationId)
 
     except asyncpg.PostgresError as e:

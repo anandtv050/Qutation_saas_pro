@@ -1,24 +1,22 @@
-from fastapi import APIRouter,HTTPException,status
+from fastapi import APIRouter,HTTPException,status,Depends
 import asyncpg
 
 from app.api.login.schema import MdlLoginRequest,MdlLoginResponse
 from app.api.login.service import ClsLoginService
 from app.core.database import ClsDatabasepool
 from app.core.logger import getLogger
+from app.core.dependency import fnGetContext
 
 logger = getLogger()
 
 router = APIRouter(prefix="/auth",tags=["Authentication"])
 
-
 @router.post("/login",response_model=MdlLoginResponse)
-async def fnLogin(mdlLoginRequest:MdlLoginRequest):
+async def fnLogin(mdlLoginRequest:MdlLoginRequest,objContext = Depends(fnGetContext)):
     try:
         logger.info(f"Login attempt: {mdlLoginRequest.email}")
-        insPool = ClsDatabasepool()
-        pool = await insPool.fnGetPool()
-
-        insLoginService = ClsLoginService(pool)
+        
+        insLoginService = ClsLoginService(objContext.objPool)
         mdlLoginResponse = await insLoginService.fnLoginService(mdlLoginRequest)
         logger.info(f"Login successful: {mdlLoginRequest.email}")
         return mdlLoginResponse

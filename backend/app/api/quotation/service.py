@@ -1,4 +1,6 @@
 import datetime
+from decimal import Decimal
+
 
 from app.api.quotation.schema import (
     MdlQuotationResponse,
@@ -19,25 +21,35 @@ class ClsQuotationService:
         self.insPool = pool
         self.intUserId = intUserId
         self.logger = getUserLogger(intUserId)
-        
+
+    ##### Helper function fro get the increment Quotation number   
     async def fnGenerateQuotationNumber(self) -> str:
         """Generate Qutation Number"""
-        strYear = datetime.datetime.now().strftime("%Y")
+        intYear = datetime.datetime.now().year
 
         strQuery = """
-            SELECT MAX(CAST(SUBSTRING(vchr_quotation_number FROM 9) AS INTEGER)) as max_num
-            FROM tbl_quotation
-            WHERE fk_bint_user_id = $1
-            AND vchr_quotation_number LIKE $2
+            INSERT INTO tbl_document_counter (
+                fk_bint_user_id,
+                Vchr_document_type,
+                int_year,
+                int_last_number
+            )
+            VALUES ($1, 'QUOTATION', $2, 6)
+
+            ON CONFLICT (fk_bint_user_id, Vchr_document_type, int_year)
+            DO UPDATE
+            SET int_last_number = tbl_document_counter.int_last_number + 1
+
+            RETURNING int_last_number;
         """
 
         async with self.insPool.acquire() as conn:
-            rstMax = await conn.fetchrow(strQuery, self.intUserId, f"QT-{strYear}-%")
+            rstMax = await conn.fetchrow(strQuery, self.intUserId, intYear)
 
-        intNextNum = (rstMax['max_num'] or 0) + 1
-        return f"QT-{strYear}-{intNextNum:04d}"
+        intNextNum = rstMax["int_last_number"]
+        return f"QT-{intYear}-{intNextNum:04d}"
 
-    
+    ##### List All Quotation 
     async def fnGetAllQuotationList(self):
         """Get all quotations for user"""
         
@@ -90,7 +102,8 @@ class ClsQuotationService:
             strMessage=f"Found {len(lstItems)} quotations",
             lstQuotation=lstItems
         )
-
+   
+    ##### Get the SIngle quotation Details
     async def fnGetSingleQuotationDetails(self, intQuotationId: int):
         """Get single quotation with items and linked invoice info"""
 
@@ -191,18 +204,26 @@ class ClsQuotationService:
             data=mdlQuotation
         )
     
+    ##### Save Single Quotation 
     async def fnAddQuotationService(self, mdlRequest: MdlCreateQuotationRequest):
         """Create new quotation with items"""
         self.logger.info(f"Creating quotation for customer: {mdlRequest.strCustomerName}")
-
         strQuotationNumber = await self.fnGenerateQuotationNumber()
         
-        dblSubtotal = sum(item.dblQuantity * item.dblUnitPrice for item in mdlRequest.lstItems)
-        dblTaxAmount = dblSubtotal * (mdlRequest.dblTaxPercent or 0) / 100
-        dblTotalAmount = dblSubtotal + dblTaxAmount - (mdlRequest.dblDiscountAmount or 0)
+        # calculate item sub total
+        dblSubtotal = sum(Decimal(item.dblQuantity) * Decimal(item.dblUnitPrice) for item in mdlRequest.lstItems)
+        
+        # use decimal instead of float bcz roudning issue 
+        dblTaxPercentage = Decimal(mdlRequest.dblTaxPercent or 0)
+        dblDiscountAmount = Decimal(mdlRequest.dblDiscountAmount or 0)
+        # calculate tax amount
+        dblTaxAmount = (dblSubtotal * dblTaxPercentage) / 100
+        
+        # NOTE ::  case fixed when User enters ₹5000 discount on ₹2000 quotation
+        dblTotalAmount = max(Decimal(0), dblSubtotal + dblTaxAmount - dblDiscountAmount)
         
         datQuotationDate = mdlRequest.datQuotationDate or datetime.date.today()
-        
+        # insert into master tabel only single raw
         async with self.insPool.acquire() as conn:
             async with conn.transaction():
                 strInsertQuotation = """
@@ -248,7 +269,7 @@ class ClsQuotationService:
                 
                 intQuotationId = rstQuotation['pk_bint_quotation_id']
                 self.logger.info(f"Quotation created: {strQuotationNumber} | ID={intQuotationId} | Items={len(mdlRequest.lstItems)}")
-
+                # item table each item have each raw
                 strInsertItem = """
                     INSERT INTO tbl_quotation_item (
                         fk_bint_quotation_id,
@@ -279,7 +300,7 @@ class ClsQuotationService:
 
         return await self.fnGetSingleQuotationDetails(intQuotationId)
             
-    
+    ##### update Quotation 
     async def fnUpdateQuotationService(self, mdlRequest: MdlUpdateQuotationRequest):
         """Update existing quotation"""
         
@@ -429,6 +450,7 @@ class ClsQuotationService:
 
         return await self.fnGetSingleQuotationDetails(mdlRequest.intPkQuotationId)
     
+    ##### Delete QUotation 
     async def fnDeleteQuotationService(self, intQuotationId: int):
         """Delete quotation and its items"""
         self.logger.info(f"Deleting quotation: ID={intQuotationId}")
