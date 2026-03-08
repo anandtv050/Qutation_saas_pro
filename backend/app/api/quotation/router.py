@@ -49,7 +49,7 @@ async def fnGetQutationList(objContext = Depends(fnGetContext)):
 
 @router.post("/get", response_model=MdlQuotationResponse)
 async def fnGetQuotation(
-    mdlGetQuotationRequest= MdlGetQuotationRequest,
+    mdlGetQuotationRequest: MdlGetQuotationRequest,
     objContext = Depends(fnGetContext)
 ):
     logger = getUserLogger(objContext.intUserId)
