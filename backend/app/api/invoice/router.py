@@ -13,21 +13,18 @@ from app.api.invoice.schema import (
 from app.api.invoice.service import ClsInvoiceService
 from app.core.database import ClsDatabasepool
 from app.core.baseSchema import ResponseStatus
-from app.core.security import fnGetCurrentUser
+from app.core.dependency import fnGetContext
 from app.core.logger import getUserLogger
 
 router = APIRouter(prefix="/invoice", tags=["Invoice"])
 
 
 @router.post("/list", response_model=MdlInvoiceListResponse)
-async def fnGetInvoiceList(intUserId: Annotated[int, Depends(fnGetCurrentUser)]):
+async def fnGetInvoiceList(objContext=Depends(fnGetContext)):
     """Get all invoices"""
-    logger = getUserLogger(intUserId)
+    logger = getUserLogger(objContext.intUserId)
     try:
-        insPool = ClsDatabasepool()
-        pool = await insPool.fnGetPool()
-
-        insService = ClsInvoiceService(pool, intUserId)
+        insService = ClsInvoiceService(objContext.objPool, objContext.intUserId)
         return await insService.fnGetAllInvoiceList()
     except asyncpg.PostgresError as e:
         logger.error(f"Database error in invoice list: {str(e)}")
@@ -51,16 +48,14 @@ async def fnGetInvoiceList(intUserId: Annotated[int, Depends(fnGetCurrentUser)])
 
 @router.post("/get", response_model=MdlInvoiceResponse)
 async def fnGetInvoice(
-    intUserId: Annotated[int, Depends(fnGetCurrentUser)],
-    mdlRequest: MdlGetInvoiceRequest
+    mdlRequest : MdlGetInvoiceRequest,
+    objContext=Depends(fnGetContext)
 ):
     """Get single invoice with items"""
-    logger = getUserLogger(intUserId)
+    logger = getUserLogger(objContext.intUserId)
     try:
-        insPool = ClsDatabasepool()
-        pool = await insPool.fnGetPool()
 
-        insService = ClsInvoiceService(pool, intUserId)
+        insService = ClsInvoiceService(objContext.objPool, objContext.intUserId)
         return await insService.fnGetSingleInvoiceDetails(mdlRequest.intInvoiceId)
     except asyncpg.PostgresError as e:
         logger.error(f"Database error getting invoice {mdlRequest.intInvoiceId}: {str(e)}")
@@ -84,16 +79,16 @@ async def fnGetInvoice(
 
 @router.post("/add", response_model=MdlInvoiceResponse)
 async def fnAddInvoice(
-    intUserId: Annotated[int, Depends(fnGetCurrentUser)],
-    mdlRequest: MdlCreateInvoiceRequest
+    mdlRequest : MdlCreateInvoiceRequest,
+    objContext=Depends(fnGetContext)
 ):
     """Create new invoice"""
-    logger = getUserLogger(intUserId)
+    logger = getUserLogger(objContext.intUserId)
     try:
         insPool = ClsDatabasepool()
         pool = await insPool.fnGetPool()
 
-        insService = ClsInvoiceService(pool, intUserId)
+        insService = ClsInvoiceService(objContext.objPool, objContext.intUserId)
         return await insService.fnAddInvoiceService(mdlRequest)
     except asyncpg.PostgresError as e:
         logger.error(f"Database error creating invoice: {str(e)}")
@@ -117,16 +112,14 @@ async def fnAddInvoice(
 
 @router.post("/delete", response_model=MdlDeleteInvoiceResponse)
 async def fnDeleteInvoice(
-    intUserId: Annotated[int, Depends(fnGetCurrentUser)],
-    mdlRequest: MdlDeleteInvoiceRequest
+    mdlRequest : MdlDeleteInvoiceRequest,
+    objContext=Depends(fnGetContext)
 ):
     """Delete invoice"""
-    logger = getUserLogger(intUserId)
+    logger = getUserLogger(objContext.intUserId)
     try:
-        insPool = ClsDatabasepool()
-        pool = await insPool.fnGetPool()
 
-        insService = ClsInvoiceService(pool, intUserId)
+        insService = ClsInvoiceService(objContext.objPool, objContext.intUserId)
         return await insService.fnDeleteInvoiceService(mdlRequest.intInvoiceId)
     except asyncpg.PostgresError as e:
         logger.error(f"Database error deleting invoice {mdlRequest.intInvoiceId}: {str(e)}")

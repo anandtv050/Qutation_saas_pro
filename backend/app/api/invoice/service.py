@@ -22,19 +22,28 @@ class ClsInvoiceService:
 
     async def fnGenerateInvoiceNumber(self):
         """Generate unique invoice number: INV-YYYY-NNNN"""
-        strYear = str(datetime.date.today().year)
+        intYear = datetime.datetime.now().year
 
         strQuery = """
-            SELECT MAX(CAST(SUBSTRING(vchr_invoice_number FROM 10) AS INTEGER)) as max_num
-            FROM tbl_invoice
-            WHERE fk_bint_user_id = $1
-            AND vchr_invoice_number LIKE $2
+            INSERT INTO tbl_document_counter (
+                fk_bint_user_id,
+                Vchr_document_type,
+                int_year,
+                int_last_number
+            )
+            VALUES ($1, 'INVOICE', $2, 6)
+
+            ON CONFLICT (fk_bint_user_id, Vchr_document_type, int_year)
+            DO UPDATE
+            SET int_last_number = tbl_document_counter.int_last_number + 1
+
+            RETURNING int_last_number;
         """
         async with self.insPool.acquire() as conn:
-            rstMax = await conn.fetchrow(strQuery, self.intUserId, f"INV-{strYear}-%")
-            intNextNum = (rstMax['max_num'] or 0) + 1
+            rstMax = await conn.fetchrow(strQuery, self.intUserId, intYear)
 
-        return f"INV-{strYear}-{str(intNextNum).zfill(4)}"
+        intNextNum = rstMax["int_last_number"]
+        return f"INV-{intYear}-{intNextNum:04d}"
     
     async def fnGetAllInvoiceList(self):
         """Get all invoices for user"""
@@ -298,8 +307,7 @@ class ClsInvoiceService:
                     )
 
         return await self.fnGetSingleInvoiceDetails(intInvoiceId)
-    
-    
+        
     async def fnDeleteInvoiceService(self, intInvoiceId: int):
         """Delete invoice"""
         self.logger.info(f"Deleting invoice: ID={intInvoiceId}")

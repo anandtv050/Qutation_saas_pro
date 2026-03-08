@@ -13,7 +13,7 @@ from app.api.inventory.schema import (
 from app.api.inventory.service import ClsInventoryService
 from app.core.database import ClsDatabasepool
 from app.core.baseSchema import ResponseStatus
-from app.core.security import fnGetCurrentUser
+from app.core.dependency import fnGetContext
 from app.core.logger import getUserLogger
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
@@ -21,13 +21,11 @@ router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
 # List - Get all inventory
 @router.post("/list", response_model=MdlInventoryListResponse)
-async def fnGetInventoryList(intUserId: Annotated[int, Depends(fnGetCurrentUser)]):
-    logger = getUserLogger(intUserId)
+async def fnGetInventoryList(objContext=Depends(fnGetContext)):
+    logger = getUserLogger(objContext.intUserId)
     try:
-        insPool = ClsDatabasepool()
-        pool = await insPool.fnGetPool()
 
-        insInventoryService = ClsInventoryService(pool, intUserId)
+        insInventoryService = ClsInventoryService(objContext.objPool, objContext.intUserId)
         return await insInventoryService.fnGetInventoryListService()
 
     except asyncpg.PostgresError as e:
@@ -53,15 +51,15 @@ async def fnGetInventoryList(intUserId: Annotated[int, Depends(fnGetCurrentUser)
 # Add - Create new inventory
 @router.post("/add", response_model=MdlInventoryResponse)
 async def fnAddInventory(
-    intUserId: Annotated[int, Depends(fnGetCurrentUser)],
-    mdlCreateInventoryRequest: MdlCreateInventoryRequest
+    mdlCreateInventoryRequest: MdlCreateInventoryRequest,
+    objContext=Depends(fnGetContext)
 ):
-    logger = getUserLogger(intUserId)
+    logger = getUserLogger(objContext.intUserId)
     try:
         insPool = ClsDatabasepool()
         pool = await insPool.fnGetPool()
 
-        insInventoryService = ClsInventoryService(pool, intUserId)
+        insInventoryService = ClsInventoryService(objContext.objPool, objContext.intUserId)
         return await insInventoryService.fnAddInventoryService(mdlCreateInventoryRequest)
 
     except asyncpg.PostgresError as e:
@@ -87,15 +85,13 @@ async def fnAddInventory(
 # Update - Update Inventory
 @router.post("/update", response_model=MdlInventoryResponse)
 async def fnUpdateInventory(
-    intUserId: Annotated[int, Depends(fnGetCurrentUser)],
-    mdlUpdateInventoryRequest: MdlUpdateInventoryRequest
+    mdlUpdateInventoryRequest: MdlUpdateInventoryRequest,
+    objContext=Depends(fnGetContext),
 ):
-    logger = getUserLogger(intUserId)
+    logger = getUserLogger(objContext.intUserId)
     try:
-        insPool = ClsDatabasepool()
-        pool = await insPool.fnGetPool()
 
-        insInventoryService = ClsInventoryService(pool, intUserId)
+        insInventoryService = ClsInventoryService(objContext.objPool, objContext.intUserId)
         return await insInventoryService.fnUpdateInventoryService(mdlUpdateInventoryRequest)
 
     except asyncpg.PostgresError as e:
@@ -121,15 +117,13 @@ async def fnUpdateInventory(
 # Delete - Delete inventory
 @router.post("/delete", response_model=MdlDeleteInventoryResponse)
 async def fnDeleteInventory(
-    intUserId: Annotated[int, Depends(fnGetCurrentUser)],
-    mdlDeleteInventoryRequest: MdlDeleteInventoryRequest
+    mdlDeleteInventoryRequest: MdlDeleteInventoryRequest,
+    objContext=Depends(fnGetContext),
 ):
-    logger = getUserLogger(intUserId)
+    logger = getUserLogger(objContext.intUserId)
     try:
-        insPool = ClsDatabasepool()
-        pool = await insPool.fnGetPool()
 
-        insInventoryService = ClsInventoryService(pool, intUserId)
+        insInventoryService = ClsInventoryService(objContext.objPool, objContext.intUserId)
         return await insInventoryService.fnDeleteInventory(
             mdlDeleteInventoryRequest.intInventoryId
         )
