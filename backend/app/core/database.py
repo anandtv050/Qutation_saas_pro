@@ -11,13 +11,13 @@ class ClsDatabasepool:
     def __init__(self) -> None:
         pass
         
-    def _get_lock(self)->asyncio.lock:
+    def _get_lock(self)->asyncio.Lock:
         if ClsDatabasepool._shared_lock is None:
             ClsDatabasepool._shared_lock = asyncio.Lock()
         return ClsDatabasepool._shared_lock
         
     
-    async def fnCreatePool(self)->asyncpg.pool:
+    async def fnCreatePool(self)->asyncpg.Pool:
         """ pool creation """
         # Read from environment variables
         db_host = os.getenv("DB_HOST", "localhost")
