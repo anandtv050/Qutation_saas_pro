@@ -13,7 +13,7 @@ class MdlDepndencyContext:
     intUserId: int
 
 
-async def fnGetContext():
+async def fnGetContext(intUserId: int = Depends(fnGetCurrentUser)):
     """
     Dependency that provides database pool and current user ID.
 
@@ -24,5 +24,5 @@ async def fnGetContext():
     objDatabase = ClsDatabasepool()
     objPool = await objDatabase.fnGetPool()
 
-    yield MdlDepndencyContext(objPool=objPool, intUserId=1) 
+    yield MdlDepndencyContext(objPool=objPool, intUserId=intUserId)
     
