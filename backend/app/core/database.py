@@ -40,7 +40,7 @@ class ClsDatabasepool:
             command_timeout=60,   # Query timeout
             min_size=1,           # Lower min for cold start
             max_size=10,
-            # ssl=ssl_mode,
+            ssl=ssl_mode,
         )
         
         return objPool
