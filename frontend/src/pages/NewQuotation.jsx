@@ -179,7 +179,7 @@ export default function NewQuotation() {
   const total = items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
 
   // Check for custom items with zero rate (needs attention)
-  const hasZeroRateItems = items.some(item => !item.fromInventory && item.rate === 0);
+  const hasZeroRateItems = items.some(item => item.rate === 0);
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = items.length > 0 || customerName.trim() || customerPhone.trim() || customerAddress.trim() || rawInput.trim();
@@ -336,15 +336,18 @@ export default function NewQuotation() {
   };
 
   const addItemFromInventory = (inventoryItem) => {
-    const existing = items.find(item => item.name === inventoryItem.name);
+    const existing = items.find(item => item.inventoryId === inventoryItem.id);
     if (existing) {
       setItems(items.map(item =>
-        item.name === inventoryItem.name ? { ...item, qty: item.qty + 1 } : item
+        item.inventoryId === inventoryItem.id ? { ...item, qty: item.qty + 1 } : item
       ));
     } else {
       setItems([...items, {
         id: Date.now(),
+        inventoryId: inventoryItem.id,
+        code: inventoryItem.code,
         name: inventoryItem.name,
+        unit: inventoryItem.unit,
         qty: 1,
         rate: inventoryItem.rate,
         fromInventory: true,
@@ -376,8 +379,13 @@ export default function NewQuotation() {
   };
 
   const updateRate = (id, rate) => {
+    const sanitized = rate.replace(/[^0-9.]/g, '');
+    const parts = sanitized.split('.');
+    const cleaned = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : sanitized;
+    const numValue = parseFloat(cleaned);
+    const finalRate = isNaN(numValue) || numValue < 0 ? 0 : numValue;
     setItems(items.map(item =>
-      item.id === id ? { ...item, rate: Number(rate) || 0 } : item
+      item.id === id ? { ...item, rate: finalRate } : item
     ));
   };
 
@@ -790,10 +798,11 @@ Example:
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1 min-w-0 pr-2">
                           <p className="text-sm font-medium text-neutral-900 truncate">{item.name}</p>
-                          {!item.fromInventory && (
-                            <span className={`text-xs ${item.rate === 0 ? "text-red-500 font-medium" : "text-amber-600"}`}>
-                              {item.rate === 0 ? "⚠ Enter rate" : "Custom item"}
-                            </span>
+                          {item.rate === 0 && (
+                            <span className="text-xs text-red-500 font-medium">⚠ Enter rate</span>
+                          )}
+                          {!item.fromInventory && item.rate !== 0 && (
+                            <span className="text-xs text-amber-600">Custom item</span>
                           )}
                         </div>
                         <button
@@ -820,7 +829,20 @@ Example:
                               <Plus className="w-3 h-3 text-neutral-600" />
                             </button>
                           </div>
-                          <span className="text-xs text-neutral-500">× {formatCurrency(item.rate)}</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-neutral-500">×</span>
+                            <Input
+                              type="number"
+                              placeholder="Rate"
+                              min="0"
+                              value={item.rate || ""}
+                              onChange={(e) => updateRate(item.id, e.target.value)}
+                              onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
+                              className={`w-16 h-7 text-xs text-center rounded-lg ${
+                                item.rate === 0 ? "border-red-300 bg-red-50" : "border-neutral-200"
+                              }`}
+                            />
+                          </div>
                         </div>
                         <p className="text-sm font-semibold text-neutral-900">{formatCurrency(item.qty * item.rate)}</p>
                       </div>
@@ -830,10 +852,11 @@ Example:
                     <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-3 items-center">
                       <div className="col-span-5">
                         <p className="text-sm font-medium text-neutral-900">{item.name}</p>
-                        {!item.fromInventory && (
-                          <span className={`text-xs ${item.rate === 0 ? "text-red-500 font-medium" : "text-amber-600"}`}>
-                            {item.rate === 0 ? "⚠ Enter rate" : "Custom item"}
-                          </span>
+                        {item.rate === 0 && (
+                          <span className="text-xs text-red-500 font-medium">⚠ Enter rate</span>
+                        )}
+                        {!item.fromInventory && item.rate !== 0 && (
+                          <span className="text-xs text-amber-600">Custom item</span>
                         )}
                       </div>
                       <div className="col-span-2 flex justify-center">
@@ -854,19 +877,17 @@ Example:
                         </div>
                       </div>
                       <div className="col-span-2 flex justify-center">
-                        {item.fromInventory ? (
-                          <span className="text-sm font-medium text-neutral-700">{formatCurrency(item.rate)}</span>
-                        ) : (
-                          <Input
-                            type="number"
-                            placeholder="Rate"
-                            value={item.rate || ""}
-                            onChange={(e) => updateRate(item.id, e.target.value)}
-                            className={`w-20 h-8 text-sm text-center rounded-lg ${
-                              item.rate === 0 ? "border-red-300 bg-red-50" : "border-neutral-200"
-                            }`}
-                          />
-                        )}
+                        <Input
+                          type="number"
+                          placeholder="Rate"
+                          min="0"
+                          value={item.rate || ""}
+                          onChange={(e) => updateRate(item.id, e.target.value)}
+                          onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
+                          className={`w-20 h-8 text-sm text-center rounded-lg ${
+                            item.rate === 0 ? "border-red-300 bg-red-50" : "border-neutral-200"
+                          }`}
+                        />
                       </div>
                       <div className="col-span-2 text-right">
                         <p className="text-sm font-semibold text-neutral-900">{formatCurrency(item.qty * item.rate)}</p>
@@ -888,7 +909,7 @@ Example:
               {hasZeroRateItems && (
                 <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 text-amber-700 text-xs flex items-center gap-2">
                   <span className="w-4 h-4 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center font-bold text-[10px]">!</span>
-                  Custom item has no price. Please enter a rate.
+                  Some items have no price. Please enter a rate.
                 </div>
               )}
 
