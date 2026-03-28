@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { MessageSquareText, ListPlus, ArrowRight, Loader2 } from "lucide-react";
+import { MessageSquareText, ListPlus, ArrowRight, Loader2, LayoutDashboard } from "lucide-react";
 import dashboardService from "@/services/dashboardService";
 
 export default function Dashboard() {
   const [userName, setUserName] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
   const [summary, setSummary] = useState({
     dblTotalCollected: 0,
     dblTodayEarnings: 0,
@@ -22,6 +23,7 @@ export default function Dashboard() {
       try {
         const userData = JSON.parse(userInfo);
         setUserName(userData.strUserName || userData.strBusinessName || "");
+        setIsAdmin(userData.intUserId === 1);
       } catch {
         setUserName("");
       }
@@ -122,6 +124,24 @@ export default function Dashboard() {
             </div>
           </div>
         </Link>
+
+        {/* Admin Quick Link */}
+        {isAdmin && (
+          <Link to="/admin" className="block mt-6 group">
+            <div className="rounded-xl bg-purple-50 border border-purple-200 p-4 hover:border-purple-300 active:scale-[0.98] transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <LayoutDashboard className="w-[18px] h-[18px] text-purple-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-purple-900 text-sm">Admin Dashboard</p>
+                  <p className="text-purple-500 text-xs">Monitor users & usage</p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-purple-300 group-hover:text-purple-500 transition-colors" />
+              </div>
+            </div>
+          </Link>
+        )}
 
       </div>
     </div>

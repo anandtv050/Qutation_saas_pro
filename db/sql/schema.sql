@@ -28,7 +28,9 @@ CREATE TABLE tbl_user (
     vchr_currency_code VARCHAR(10) DEFAULT 'INR',
     vchr_gst_number VARCHAR(50),
     tim_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    tim_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    tim_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    tim_last_heartbeat TIMESTAMP DEFAULT NULL,
+    tim_last_login TIMESTAMP DEFAULT NULL
 );
 
 CREATE INDEX idx_email ON tbl_user(vchr_email);

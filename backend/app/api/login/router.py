@@ -1,10 +1,12 @@
-from fastapi import APIRouter,HTTPException,status
+from fastapi import APIRouter,HTTPException,status,Depends
 import asyncpg
 
 from app.api.login.schema import MdlLoginRequest,MdlLoginResponse
 from app.api.login.service import ClsLoginService
 from app.core.database import ClsDatabasepool
 from app.core.logger import getLogger
+from app.core.security import fnGetCurrentUser
+from app.core.presence import ClsPresenceTracker
 
 logger = getLogger()
 
@@ -37,3 +39,17 @@ async def fnLogin(mdlLoginRequest:MdlLoginRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
         )
+
+
+@router.post("/logout")
+async def fnLogout(intUserId: int = Depends(fnGetCurrentUser)):
+    """Logout: clear user heartbeat so they appear offline immediately"""
+    try:
+        objDatabase = ClsDatabasepool()
+        objPool = await objDatabase.fnGetPool()
+        insPresence = ClsPresenceTracker()
+        await insPresence.fnClearPresence(objPool, intUserId)
+        return {"strMessage": "Logged out successfully"}
+    except Exception as e:
+        logger.error(f"Logout error for user {intUserId}: {str(e)}")
+        return {"strMessage": "Logged out"}

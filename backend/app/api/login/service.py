@@ -4,6 +4,7 @@ from fastapi  import HTTPException,status
 from app.api.login.schema import MdlLoginResponse
 from app.core.security import fnCreateAccesToken, fnVerifyPassword
 from app.core.logger import getUserLogger
+from app.core.presence import ClsPresenceTracker
 
 
 class ClsLoginService:
@@ -62,6 +63,10 @@ class ClsLoginService:
                 "strUserName": rstUser['vchr_username'],
                 "strBusinessName": rstUser['vchr_business_name']
             }
+
+            # Update presence: mark user as logged in
+            insPresence = ClsPresenceTracker()
+            await insPresence.fnSetLogin(self.insPool, rstUser['pk_bint_user_id'])
 
             # Return instance, not class!
             return MdlLoginResponse(

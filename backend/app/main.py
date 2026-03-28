@@ -15,8 +15,12 @@ import importlib
 import asyncio
 import os
 
+from fastapi import Request
+from starlette.background import BackgroundTask
 from app.core.database import ClsDatabasepool
 from app.core.logger import getLogger
+from app.core.security import fnDecodeAccessToken
+from app.core.presence import ClsPresenceTracker
 
 # Initialize app logger
 logger = getLogger()
@@ -72,6 +76,28 @@ def fnCreateApp() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Presence middleware — updates user heartbeat on every authenticated request
+    @app.middleware("http")
+    async def presence_middleware(request: Request, call_next):
+        response = await call_next(request)
+
+        # Extract user_id from JWT token (non-blocking, after response)
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.replace("Bearer ", "")
+            payload = fnDecodeAccessToken(token)
+            if payload and "user_id" in payload:
+                intUserId = int(payload["user_id"])
+                # Update presence in background (throttled: max 1 DB write per 60s)
+                insDb = ClsDatabasepool()
+                pool = await insDb.fnGetPool()
+                if pool:
+                    insPresence = ClsPresenceTracker()
+                    await insPresence.fnUpdatePresence(pool, intUserId)
+
+        return response
+
 # Register routers
 
 

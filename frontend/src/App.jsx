@@ -7,6 +7,7 @@ import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
 import Profile from "./pages/Profile";
 import UserManagement from "./pages/UserManagement";
+import AdminDashboard from "./pages/AdminDashboard";
 import MainLayout from "./components/layout/MainLayout";
 
 function App() {
@@ -47,6 +48,7 @@ function App() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/users" element={<UserManagement />} />
+          <Route path="/admin" element={<AdminDashboard />} />
         </Route>
 
         {/* Redirect unknown routes */}
