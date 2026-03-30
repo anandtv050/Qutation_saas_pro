@@ -616,6 +616,29 @@ class ClsQuotationService:
                     await conn.execute(strUpdateQuery, *lstValues)
 
                 if mdlRequest.lstItems is not None:
+                    # Preserve existing warranty data before deleting items
+                    strGetWarranty = """
+                        SELECT fk_bint_inventory_id, vchr_item_name,
+                               int_warranty_years, int_warranty_months, int_warranty_days,
+                               dat_implementation_date, dat_expiry_date, bln_manual_expiry_override
+                        FROM tbl_quotation_item
+                        WHERE fk_bint_quotation_id = $1
+                    """
+                    rstExistingItems = await conn.fetch(strGetWarranty, mdlRequest.intPkQuotationId)
+                    # Key by (inventory_id, item_name) to match old items to new items
+                    dctSavedWarranty = {}
+                    for row in rstExistingItems:
+                        intInvId = row["fk_bint_inventory_id"]
+                        strName = row["vchr_item_name"]
+                        dctSavedWarranty[(intInvId, strName)] = {
+                            "years": int(row["int_warranty_years"] or 0),
+                            "months": int(row["int_warranty_months"] or 0),
+                            "days": int(row["int_warranty_days"] or 0),
+                            "impl_date": row["dat_implementation_date"],
+                            "expiry_date": row["dat_expiry_date"],
+                            "manual_override": bool(row["bln_manual_expiry_override"]),
+                        }
+
                     strDeleteItems = "DELETE FROM tbl_quotation_item WHERE fk_bint_quotation_id = $1"
                     await conn.execute(strDeleteItems, mdlRequest.intPkQuotationId)
 
@@ -648,32 +671,51 @@ class ClsQuotationService:
                     for intIndex, mdlItem in enumerate(mdlRequest.lstItems):
                         dblItemTotal = mdlItem.dblQuantity * mdlItem.dblUnitPrice
 
-                        tplWarranty = dctInventoryWarranty.get(mdlItem.intInventoryId or 0, (0, 0, 0))
-                        intWarrantyYears = (
-                            int(mdlItem.intWarrantyYears)
-                            if mdlItem.intWarrantyYears is not None
-                            else tplWarranty[0]
+                        # Check if this item had saved warranty data
+                        dctPrevWarranty = dctSavedWarranty.get(
+                            (mdlItem.intInventoryId, mdlItem.strItemName), None
                         )
-                        intWarrantyMonths = (
-                            int(mdlItem.intWarrantyMonths)
-                            if mdlItem.intWarrantyMonths is not None
-                            else tplWarranty[1]
-                        )
-                        intWarrantyDays = (
-                            int(mdlItem.intWarrantyDays)
-                            if mdlItem.intWarrantyDays is not None
-                            else tplWarranty[2]
-                        )
-                        blnManualExpiryOverride = bool(mdlItem.blnManualExpiryOverride)
-                        datImplementationDate = mdlItem.datImplementationDate
-                        datExpiryDate = self.fnResolveWarrantyDates(
-                            datImplementationDate,
-                            intWarrantyYears,
-                            intWarrantyMonths,
-                            intWarrantyDays,
-                            blnManualExpiryOverride,
-                            mdlItem.datExpiryDate,
-                        )
+
+                        if mdlItem.intWarrantyYears is not None:
+                            intWarrantyYears = int(mdlItem.intWarrantyYears)
+                        elif dctPrevWarranty:
+                            intWarrantyYears = dctPrevWarranty["years"]
+                        else:
+                            tplWarranty = dctInventoryWarranty.get(mdlItem.intInventoryId or 0, (0, 0, 0))
+                            intWarrantyYears = tplWarranty[0]
+
+                        if mdlItem.intWarrantyMonths is not None:
+                            intWarrantyMonths = int(mdlItem.intWarrantyMonths)
+                        elif dctPrevWarranty:
+                            intWarrantyMonths = dctPrevWarranty["months"]
+                        else:
+                            tplWarranty = dctInventoryWarranty.get(mdlItem.intInventoryId or 0, (0, 0, 0))
+                            intWarrantyMonths = tplWarranty[1]
+
+                        if mdlItem.intWarrantyDays is not None:
+                            intWarrantyDays = int(mdlItem.intWarrantyDays)
+                        elif dctPrevWarranty:
+                            intWarrantyDays = dctPrevWarranty["days"]
+                        else:
+                            tplWarranty = dctInventoryWarranty.get(mdlItem.intInventoryId or 0, (0, 0, 0))
+                            intWarrantyDays = tplWarranty[2]
+
+                        # Preserve saved dates if no new warranty fields sent
+                        if dctPrevWarranty and mdlItem.datImplementationDate is None:
+                            datImplementationDate = dctPrevWarranty["impl_date"]
+                            blnManualExpiryOverride = dctPrevWarranty["manual_override"]
+                            datExpiryDate = dctPrevWarranty["expiry_date"]
+                        else:
+                            blnManualExpiryOverride = bool(mdlItem.blnManualExpiryOverride)
+                            datImplementationDate = mdlItem.datImplementationDate
+                            datExpiryDate = self.fnResolveWarrantyDates(
+                                datImplementationDate,
+                                intWarrantyYears,
+                                intWarrantyMonths,
+                                intWarrantyDays,
+                                blnManualExpiryOverride,
+                                mdlItem.datExpiryDate,
+                            )
 
                         await conn.execute(
                             strInsertItem,

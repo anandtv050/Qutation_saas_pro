@@ -87,21 +87,8 @@ const quotationService = {
                     strUnit: item.strUnit || 'piece',
                     dblQuantity: parseFloat(item.dblQuantity) || 1,
                     dblUnitPrice: parseFloat(item.dblUnitPrice) || 0,
-                    intWarrantyYears: parseInt(item.intWarrantyYears || 0),
-                    intWarrantyMonths: parseInt(item.intWarrantyMonths || 0),
-                    intWarrantyDays: parseInt(item.intWarrantyDays || 0),
                     intSortOrder: item.intSortOrder || index
                 };
-
-                if (item.datImplementationDate !== undefined) {
-                    mapped.datImplementationDate = item.datImplementationDate || null;
-                }
-                if (item.datExpiryDate !== undefined) {
-                    mapped.datExpiryDate = item.datExpiryDate || null;
-                }
-                if (item.blnManualExpiryOverride !== undefined) {
-                    mapped.blnManualExpiryOverride = !!item.blnManualExpiryOverride;
-                }
 
                 return mapped;
             });
@@ -173,30 +160,15 @@ const quotationService = {
             // If items provided, transform them
             if (quotationData.lstItems !== undefined) {
                 payload.lstItems = quotationData.lstItems.map((item, index) => {
-                    const mapped = {
+                    return {
                         intInventoryId: item.intInventoryId || null,
                         strItemCode: item.strItemCode || null,
                         strItemName: item.strItemName,
                         strUnit: item.strUnit || 'piece',
                         dblQuantity: parseFloat(item.dblQuantity) || 1,
                         dblUnitPrice: parseFloat(item.dblUnitPrice) || 0,
-                        intWarrantyYears: parseInt(item.intWarrantyYears || 0),
-                        intWarrantyMonths: parseInt(item.intWarrantyMonths || 0),
-                        intWarrantyDays: parseInt(item.intWarrantyDays || 0),
                         intSortOrder: item.intSortOrder || index
                     };
-
-                    if (item.datImplementationDate !== undefined) {
-                        mapped.datImplementationDate = item.datImplementationDate || null;
-                    }
-                    if (item.datExpiryDate !== undefined) {
-                        mapped.datExpiryDate = item.datExpiryDate || null;
-                    }
-                    if (item.blnManualExpiryOverride !== undefined) {
-                        mapped.blnManualExpiryOverride = !!item.blnManualExpiryOverride;
-                    }
-
-                    return mapped;
                 });
             }
 
