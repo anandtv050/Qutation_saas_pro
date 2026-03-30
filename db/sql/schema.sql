@@ -62,6 +62,9 @@ CREATE TABLE tbl_inventory (
     vchr_unit VARCHAR(20) DEFAULT 'piece',
     dbl_unit_price DECIMAL(12,2) NOT NULL,
     int_stock_qty INTEGER DEFAULT 0,
+    int_warranty_years INTEGER DEFAULT 0 CHECK (int_warranty_years >= 0),
+    int_warranty_months INTEGER DEFAULT 0 CHECK (int_warranty_months >= 0),
+    int_warranty_days INTEGER DEFAULT 0 CHECK (int_warranty_days >= 0),
     txt_description TEXT,
     tim_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     tim_updated_at TIMESTAMP DEFAULT NULL,
@@ -168,10 +171,22 @@ CREATE TABLE tbl_quotation_item (
     dbl_quantity DECIMAL(10,2) NOT NULL,
     dbl_unit_price DECIMAL(12,2) NOT NULL,
     dbl_total_price DECIMAL(12,2) NOT NULL,
+    int_warranty_years INTEGER DEFAULT 0 CHECK (int_warranty_years >= 0),
+    int_warranty_months INTEGER DEFAULT 0 CHECK (int_warranty_months >= 0),
+    int_warranty_days INTEGER DEFAULT 0 CHECK (int_warranty_days >= 0),
+    dat_implementation_date DATE,
+    dat_expiry_date DATE,
+    bln_manual_expiry_override BOOLEAN DEFAULT FALSE,
     int_sort_order INTEGER DEFAULT 0,
 
     FOREIGN KEY (fk_bint_quotation_id) REFERENCES tbl_quotation(pk_bint_quotation_id) ON DELETE CASCADE,
-    FOREIGN KEY (fk_bint_inventory_id) REFERENCES tbl_inventory(pk_bint_inventory_id) ON DELETE SET NULL
+    FOREIGN KEY (fk_bint_inventory_id) REFERENCES tbl_inventory(pk_bint_inventory_id) ON DELETE SET NULL,
+    CONSTRAINT chk_quotation_item_expiry_after_impl
+        CHECK (
+            dat_expiry_date IS NULL
+            OR dat_implementation_date IS NULL
+            OR dat_expiry_date >= dat_implementation_date
+        )
 );
 
 CREATE INDEX idx_quotation_item_quotation_id ON tbl_quotation_item(fk_bint_quotation_id);

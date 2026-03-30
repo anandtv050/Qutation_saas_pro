@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Minus, X, Loader2, ChevronRight, Search, Printer, FilePlus, Calendar, Check, FileText } from "lucide-react";
+import { ArrowLeft, Plus, Minus, X, Loader2, ChevronRight, Search, Printer, FilePlus, Calendar, Check, FileText, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -985,6 +985,14 @@ Example:
                     )}
                     {isPrinting ? "Generating PDF..." : "Print Quotation"}
                   </Button>
+                  <Button
+                    onClick={() => navigate(`/warranty?sourceType=quotation&sourceId=${savedQuotation.intPkQuotationId}`)}
+                    variant="outline"
+                    className="w-full h-11 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-lg font-medium"
+                  >
+                    <ShieldCheck className="w-4 h-4 mr-2" />
+                    Warranty Certificate
+                  </Button>
                   {/* Convert to Invoice OR View Invoice if already converted */}
                   {savedQuotation.linkedInvoiceId ? (
                     <Button
@@ -1021,95 +1029,78 @@ Example:
         </div>
       </div>
 
-      {/* Mobile Fixed Bottom Bar - User flow: Edit → Save → Print → Invoice */}
-      <div className="lg:hidden fixed bottom-16 left-0 right-0 bg-white border-t border-neutral-200 p-3 z-40">
-        <div className="flex items-center gap-2">
-          {/* Left: New button - always visible to clear and start fresh */}
-          <Button
-            onClick={() => {
-              if (hasUnsavedChanges && !window.confirm("Clear all data and start new quotation?")) {
-                return;
-              }
-              clearDraft();
-              navigate("/quotations/new?mode=ai");
-              setCustomerName("");
-              setCustomerPhone("");
-              setCustomerAddress("");
-              setItems([]);
-              setRawInput("");
-              setSavedQuotation(null);
-              setIsUpdated(false);
-              setShowForm(false);
-            }}
-            variant="outline"
-            size="sm"
-            className="h-11 px-3 border-neutral-200 text-neutral-600 shrink-0"
-          >
-            <FilePlus className="w-4 h-4 mr-1" />
-            New
-          </Button>
-
-          {/* Center: Total info */}
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-neutral-500">{items.length} items</p>
-            <p className="text-lg font-bold text-neutral-900">{formatCurrency(total)}</p>
-          </div>
-
-          {/* Right: Action buttons (thumb zone) */}
-          {savedQuotation ? (
-            <>
-              {/* Print */}
-              <Button
+      {/* Mobile Fixed Bottom Bar */}
+      <div className="lg:hidden fixed bottom-16 left-0 right-0 bg-white border-t border-neutral-200 z-40">
+        {savedQuotation ? (
+          <div className="px-3 py-2 space-y-2">
+            {/* Row 1: Info + quick actions */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-neutral-400 leading-none">{items.length} items</p>
+                <p className="text-base font-bold text-neutral-900">{formatCurrency(total)}</p>
+              </div>
+              <button
                 onClick={handlePrint}
                 disabled={isPrinting}
-                variant="outline"
-                className="h-11 px-3 border-neutral-200 shrink-0"
+                className="w-10 h-10 flex items-center justify-center rounded-full border border-neutral-200 text-neutral-600 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40"
               >
-                {isPrinting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Printer className="w-4 h-4" />
-                )}
-              </Button>
-              {/* Convert to Invoice OR View Invoice */}
+                {isPrinting ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : <Printer className="w-[18px] h-[18px]" />}
+              </button>
+              <button
+                onClick={() => navigate(`/warranty?sourceType=quotation&sourceId=${savedQuotation.intPkQuotationId}`)}
+                className="h-10 px-3 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-semibold shadow-sm shadow-amber-200 hover:from-amber-600 hover:to-orange-600 active:from-amber-700 active:to-orange-700"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                Warranty
+              </button>
+            </div>
+            {/* Row 2: Primary CTAs */}
+            <div className="flex items-center gap-2">
               {savedQuotation.linkedInvoiceId ? (
                 <Button
                   onClick={() => navigate(`/invoices/view/${savedQuotation.linkedInvoiceId}`)}
-                  className="h-11 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium shrink-0"
+                  className="h-11 flex-1 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl font-medium text-sm"
                 >
-                  <FileText className="w-4 h-4 mr-1" />
-                  View
+                  <FileText className="w-4 h-4 mr-1.5" />
+                  View Invoice
                 </Button>
               ) : (
                 <Button
                   onClick={() => navigate("/invoices/new", { state: { fromQuotation: savedQuotation } })}
-                  className="h-11 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shrink-0"
+                  className="h-11 flex-1 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl font-medium text-sm"
                 >
-                  <FileText className="w-4 h-4 mr-1" />
+                  <FileText className="w-4 h-4 mr-1.5" />
                   Invoice
                 </Button>
               )}
-              {/* Update */}
               <Button
                 onClick={handleSave}
                 disabled={isSaving}
-                variant="outline"
-                className="h-11 px-3 border-neutral-200 shrink-0"
+                className="h-11 flex-1 bg-neutral-900 hover:bg-neutral-800 active:bg-black disabled:bg-neutral-200 disabled:text-neutral-400 text-white rounded-xl font-medium text-sm"
               >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
+                {isSaving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : null}
+                Update
               </Button>
-            </>
-          ) : (
-            /* Save is PRIMARY before first save */
-            <Button
-              onClick={handleSave}
-              disabled={isSaving || !customerName.trim() || items.length === 0}
-              className="h-11 px-5 bg-neutral-900 hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400 text-white rounded-lg font-medium shrink-0"
-            >
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
-            </Button>
-          )}
-        </div>
+            </div>
+          </div>
+        ) : (
+          <div className="px-3 py-2">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-neutral-400 leading-none">{items.length} items</p>
+                <p className="text-base font-bold text-neutral-900">{formatCurrency(total)}</p>
+              </div>
+              <Button
+                onClick={handleSave}
+                disabled={isSaving || !customerName.trim() || items.length === 0}
+                className="h-11 px-6 bg-neutral-900 hover:bg-neutral-800 active:bg-black disabled:bg-neutral-200 disabled:text-neutral-400 text-white rounded-xl font-medium"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : null}
+                Save
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

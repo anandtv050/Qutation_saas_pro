@@ -55,6 +55,26 @@ const pdfService = {
     },
 
     /**
+     * Generate Warranty Certificate PDF
+     *
+     * @param {Object} data - Warranty certificate data
+     * @param {number} data.intQuotationId - Quotation ID (preferred)
+     * @param {number} data.intInvoiceId - Invoice ID (optional; resolves linked quotation)
+     * @returns {Blob} PDF file blob
+     */
+    generateWarrantyCertificatePDF: async (data) => {
+        try {
+            const response = await api.post('/pdf/warranty-certificate', data, {
+                responseType: 'blob'
+            });
+            return response.data;
+        } catch (error) {
+            const strMessage = error.response?.data?.detail || 'Failed to generate warranty certificate PDF';
+            throw new Error(strMessage);
+        }
+    },
+
+    /**
      * Open PDF in new tab for printing
      * @param {Blob} pdfBlob - PDF blob
      */

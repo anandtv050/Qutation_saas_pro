@@ -27,7 +27,10 @@ class ClsInventoryService:
                     vchr_category,
                     vchr_unit,
                     dbl_unit_price,
-                    int_stock_qty
+                    int_stock_qty,
+                    int_warranty_years,
+                    int_warranty_months,
+                    int_warranty_days
                 FROM
                     tbl_inventory
                 WHERE
@@ -55,7 +58,10 @@ class ClsInventoryService:
                 strCategory=dctItem['vchr_category'],
                 strUnit=dctItem['vchr_unit'],
                 dblUnitPrice=dctItem['dbl_unit_price'],
-                intStockQuantity=dctItem['int_stock_qty']
+                intStockQuantity=dctItem['int_stock_qty'],
+                intWarrantyYears=dctItem['int_warranty_years'] or 0,
+                intWarrantyMonths=dctItem['int_warranty_months'] or 0,
+                intWarrantyDays=dctItem['int_warranty_days'] or 0
             )
             lstItems.append(mdlInventoryItem)
 
@@ -70,6 +76,19 @@ class ClsInventoryService:
     async def fnAddInventoryService(self, mdlCreateInventoryRequest):
         """Create a new inventory"""
         self.logger.info(f"Adding inventory item: {mdlCreateInventoryRequest.strItemName}")
+
+        if (
+            (mdlCreateInventoryRequest.intWarrantyYears or 0) < 0
+            or (mdlCreateInventoryRequest.intWarrantyMonths or 0) < 0
+            or (mdlCreateInventoryRequest.intWarrantyDays or 0) < 0
+        ):
+            return MdlInventoryResponse(
+                intStatus=ResponseStatus.ERROR,
+                strStatus=ResponseStatus.ERROR_STR,
+                intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                strMessage="Warranty period values cannot be negative",
+                data=None
+            )
 
         # Check if item code already exists
         strCheckQuery = """
@@ -101,9 +120,12 @@ class ClsInventoryService:
                     vchr_unit,
                     dbl_unit_price,
                     int_stock_qty,
+                    int_warranty_years,
+                    int_warranty_months,
+                    int_warranty_days,
                     txt_description,
                     tim_created_at
-                ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+                ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
                 RETURNING *
         """
         async with self.insPool.acquire() as conn:
@@ -116,6 +138,9 @@ class ClsInventoryService:
                 mdlCreateInventoryRequest.strUnit,
                 mdlCreateInventoryRequest.dblUnitPrice,
                 mdlCreateInventoryRequest.intStockQuantity,
+                mdlCreateInventoryRequest.intWarrantyYears or 0,
+                mdlCreateInventoryRequest.intWarrantyMonths or 0,
+                mdlCreateInventoryRequest.intWarrantyDays or 0,
                 mdlCreateInventoryRequest.strDescription,
                 datetime.datetime.now()
             )
@@ -127,7 +152,10 @@ class ClsInventoryService:
             strCategory=rstItems['vchr_category'],
             strUnit=rstItems['vchr_unit'],
             dblUnitPrice=rstItems['dbl_unit_price'],
-            intStockQuantity=rstItems['int_stock_qty']
+            intStockQuantity=rstItems['int_stock_qty'],
+            intWarrantyYears=rstItems['int_warranty_years'] or 0,
+            intWarrantyMonths=rstItems['int_warranty_months'] or 0,
+            intWarrantyDays=rstItems['int_warranty_days'] or 0
         )
 
         self.logger.info(f"Inventory item created: ID={rstItems['pk_bint_inventory_id']}")
@@ -141,6 +169,19 @@ class ClsInventoryService:
 
     async def fnUpdateInventoryService(self, mdlUpdateInventoryRequest):
         """Update Inventory"""
+
+        if (
+            (mdlUpdateInventoryRequest.intWarrantyYears is not None and mdlUpdateInventoryRequest.intWarrantyYears < 0)
+            or (mdlUpdateInventoryRequest.intWarrantyMonths is not None and mdlUpdateInventoryRequest.intWarrantyMonths < 0)
+            or (mdlUpdateInventoryRequest.intWarrantyDays is not None and mdlUpdateInventoryRequest.intWarrantyDays < 0)
+        ):
+            return MdlInventoryResponse(
+                intStatus=ResponseStatus.ERROR,
+                strStatus=ResponseStatus.ERROR_STR,
+                intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                strMessage="Warranty period values cannot be negative",
+                data=None
+            )
 
         # Check if inventory exists
         strCheckQuery = """
@@ -203,6 +244,21 @@ class ClsInventoryService:
             lstValues.append(mdlUpdateInventoryRequest.intStockQuantity)
             intParamsCount += 1
 
+        if mdlUpdateInventoryRequest.intWarrantyYears is not None:
+            lstFields.append(f"int_warranty_years = ${intParamsCount}")
+            lstValues.append(mdlUpdateInventoryRequest.intWarrantyYears)
+            intParamsCount += 1
+
+        if mdlUpdateInventoryRequest.intWarrantyMonths is not None:
+            lstFields.append(f"int_warranty_months = ${intParamsCount}")
+            lstValues.append(mdlUpdateInventoryRequest.intWarrantyMonths)
+            intParamsCount += 1
+
+        if mdlUpdateInventoryRequest.intWarrantyDays is not None:
+            lstFields.append(f"int_warranty_days = ${intParamsCount}")
+            lstValues.append(mdlUpdateInventoryRequest.intWarrantyDays)
+            intParamsCount += 1
+
         if mdlUpdateInventoryRequest.strDescription is not None:
             lstFields.append(f"txt_description = ${intParamsCount}")
             lstValues.append(mdlUpdateInventoryRequest.strDescription)
@@ -242,7 +298,10 @@ class ClsInventoryService:
             strCategory=rstItems['vchr_category'],
             strUnit=rstItems['vchr_unit'],
             dblUnitPrice=rstItems['dbl_unit_price'],
-            intStockQuantity=rstItems['int_stock_qty']
+            intStockQuantity=rstItems['int_stock_qty'],
+            intWarrantyYears=rstItems['int_warranty_years'] or 0,
+            intWarrantyMonths=rstItems['int_warranty_months'] or 0,
+            intWarrantyDays=rstItems['int_warranty_days'] or 0
         )
 
         return MdlInventoryResponse(

@@ -30,14 +30,24 @@ def fnCalcPctChange(intCurrent, intPrevious):
     return round((intCurrent - intPrevious) / intPrevious * 100, 1)
 
 
-def fnGetHealthStatus(strLastActive: str | None) -> str:
-    if not strLastActive:
+def fnGetHealthStatus(strLastActive: str | None, timHeartbeat=None) -> str:
+    """Health based on latest of document creation OR heartbeat."""
+    datLatest = None
+    if strLastActive:
+        try:
+            datLatest = datetime.fromisoformat(str(strLastActive))
+        except (ValueError, TypeError):
+            pass
+    if timHeartbeat:
+        try:
+            datHb = datetime.fromisoformat(str(timHeartbeat)) if isinstance(timHeartbeat, str) else timHeartbeat
+            if datLatest is None or datHb > datLatest:
+                datLatest = datHb
+        except (ValueError, TypeError):
+            pass
+    if not datLatest:
         return "inactive"
-    try:
-        datLast = datetime.fromisoformat(str(strLastActive))
-    except (ValueError, TypeError):
-        return "inactive"
-    intDaysAgo = (datetime.utcnow() - datLast).days
+    intDaysAgo = (datetime.utcnow() - datLatest).days
     if intDaysAgo <= 3:
         return "active"
     if intDaysAgo <= 7:
@@ -310,12 +320,7 @@ class ClsDashboardService:
                            COALESCE(q.cnt,0) as q_cnt,
                            COALESCE(i.cnt,0) as i_cnt,
                            COALESCE(i.rev,0) as rev,
-                           GREATEST(
-                               u.tim_created_at,
-                               COALESCE(a.last_t, u.tim_created_at),
-                               COALESCE(q.last_t, u.tim_created_at),
-                               COALESCE(i.last_t, u.tim_created_at)
-                           ) as last_active
+                           COALESCE(u.tim_last_heartbeat, u.tim_created_at) as last_seen
                     FROM tbl_user u
                     LEFT JOIN (SELECT fk_bint_user_id, COUNT(*) cnt, MAX(tim_created_at) last_t
                                FROM tbl_ai_response GROUP BY 1) a ON a.fk_bint_user_id=u.pk_bint_user_id
@@ -325,7 +330,7 @@ class ClsDashboardService:
                                SUM(CASE WHEN vchr_payment_status='paid' THEN dbl_total_amount ELSE 0 END) rev,
                                MAX(tim_created_at) last_t
                                FROM tbl_invoice GROUP BY 1) i ON i.fk_bint_user_id=u.pk_bint_user_id
-                    ORDER BY last_active DESC
+                    ORDER BY last_seen DESC
                 """)
             else:
                 lstUserRows = await conn.fetch("""
@@ -336,12 +341,7 @@ class ClsDashboardService:
                            COALESCE(q.cnt,0) as q_cnt,
                            COALESCE(i.cnt,0) as i_cnt,
                            COALESCE(i.rev,0) as rev,
-                           GREATEST(
-                               u.tim_created_at,
-                               COALESCE(a.last_t, u.tim_created_at),
-                               COALESCE(q.last_t, u.tim_created_at),
-                               COALESCE(i.last_t, u.tim_created_at)
-                           ) as last_active
+                           COALESCE(u.tim_last_heartbeat, u.tim_created_at) as last_seen
                     FROM tbl_user u
                     LEFT JOIN (SELECT fk_bint_user_id, COUNT(*) cnt, MAX(tim_created_at) last_t
                                FROM tbl_ai_response WHERE tim_created_at >= $1
@@ -354,12 +354,13 @@ class ClsDashboardService:
                                MAX(tim_created_at) last_t
                                FROM tbl_invoice WHERE tim_created_at >= $1
                                GROUP BY 1) i ON i.fk_bint_user_id=u.pk_bint_user_id
-                    ORDER BY last_active DESC
+                    ORDER BY last_seen DESC
                 """, datCurrent)
 
             lstUsers = []
             for r in lstUserRows:
-                strLastActive = str(r['last_active']) if r['last_active'] else None
+                timHb = r['tim_last_heartbeat']
+                strLastSeen = str(timHb) if timHb else None
                 lstUsers.append(MdlUserRow(
                     intUserId=int(r['uid']),
                     strName=r['name'] or r['vchr_email'],
@@ -368,9 +369,9 @@ class ClsDashboardService:
                     intQuotations=int(r['q_cnt']),
                     intInvoices=int(r['i_cnt']),
                     dblRevenue=float(r['rev']),
-                    strLastSeen=strLastActive,
-                    strHealth=fnGetHealthStatus(strLastActive),
-                    blnOnline=fnCheckIsOnline(r['tim_last_heartbeat']),
+                    strLastSeen=strLastSeen,
+                    strHealth=fnGetHealthStatus(strLastSeen, timHb),
+                    blnOnline=fnCheckIsOnline(timHb),
                 ))
 
             return MdlAdminDashboardResponse(
@@ -668,19 +669,9 @@ class ClsDashboardService:
                 ) for r in lstDailyRows
             ]
 
-            # Last active (safe against all-None)
-            lstLastDates = [rstUser['tim_created_at']]
-            datLatestQ = await conn.fetchval(
-                "SELECT MAX(tim_created_at) FROM tbl_quotation WHERE fk_bint_user_id=$1", intTargetUserId)
-            datLatestA = await conn.fetchval(
-                "SELECT MAX(tim_created_at) FROM tbl_ai_response WHERE fk_bint_user_id=$1", intTargetUserId)
-            datLatestI = await conn.fetchval(
-                "SELECT MAX(tim_created_at) FROM tbl_invoice WHERE fk_bint_user_id=$1", intTargetUserId)
-            for d in [datLatestQ, datLatestA, datLatestI]:
-                if d:
-                    lstLastDates.append(d)
-            lstValidDates = [d for d in lstLastDates if d]
-            datLastActive = max(lstValidDates) if lstValidDates else datetime.utcnow()
+            # Last seen = heartbeat (tracks every API call)
+            timHb = rstUser['tim_last_heartbeat']
+            datLastActive = timHb if timHb else None
 
             objDetail = MdlUserDetail(
                 intUserId=rstUser['pk_bint_user_id'],
@@ -690,7 +681,7 @@ class ClsDashboardService:
                 strPhone=rstUser['vchr_phone'] or '',
                 datJoined=str(rstUser['tim_created_at']) if rstUser['tim_created_at'] else None,
                 blnOnline=fnCheckIsOnline(rstUser['tim_last_heartbeat']),
-                strLastSeen=str(datLastActive),
+                strLastSeen=str(datLastActive) if datLastActive else None,
                 # Funnel
                 intAiCalls=intAiCur,
                 intAiCallsPrev=int(rstMetrics['ai_prev']),

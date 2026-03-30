@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Loader2, Printer, Calendar, Check, Share2 } from "lucide-react";
+import { ArrowLeft, Loader2, Printer, Calendar, Check, Share2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import invoiceService from "@/services/invoiceService";
@@ -71,6 +71,9 @@ export default function NewInvoice() {
         unit: item.strUnit || item.unit || 'piece',
         code: item.strItemCode || item.code || null,
         inventoryId: item.intInventoryId || item.inventoryId || null,
+        intWarrantyYears: item.intWarrantyYears || 0,
+        intWarrantyMonths: item.intWarrantyMonths || 0,
+        intWarrantyDays: item.intWarrantyDays || 0,
         fromInventory: true,
       }));
     }
@@ -284,6 +287,9 @@ export default function NewInvoice() {
         strUnit: item.unit || 'piece',
         dblQuantity: item.qty,
         dblUnitPrice: item.rate,
+        intWarrantyYears: item.intWarrantyYears || 0,
+        intWarrantyMonths: item.intWarrantyMonths || 0,
+        intWarrantyDays: item.intWarrantyDays || 0,
         intSortOrder: index
       }));
 
@@ -325,10 +331,15 @@ export default function NewInvoice() {
 
   const [isPrinting, setIsPrinting] = useState(false);
 
+  const getInvoiceSourceId = () => {
+    if (isViewMode) return parseInt(invoiceId);
+    return savedInvoice?.intPkInvoiceId;
+  };
+
   const handlePrint = async () => {
     // For view mode, use invoiceId from URL
     // For saved invoice, use savedInvoice.intPkInvoiceId
-    const invoiceIdToUse = isViewMode ? parseInt(invoiceId) : savedInvoice?.intPkInvoiceId;
+    const invoiceIdToUse = getInvoiceSourceId();
 
     if (!invoiceIdToUse) {
       alert("Please save the invoice first");
@@ -395,6 +406,9 @@ export default function NewInvoice() {
             unit: item.strUnit || 'piece',
             code: item.strItemCode || null,
             inventoryId: item.intInventoryId || null,
+            intWarrantyYears: item.intWarrantyYears || 0,
+            intWarrantyMonths: item.intWarrantyMonths || 0,
+            intWarrantyDays: item.intWarrantyDays || 0,
             fromInventory: !!item.intInventoryId,
           }));
           setItems(uiItems);
@@ -910,6 +924,14 @@ export default function NewInvoice() {
                     )}
                     {isPrinting ? "Generating PDF..." : "Print Invoice"}
                   </Button>
+                  <Button
+                    onClick={() => navigate(`/warranty?sourceType=invoice&sourceId=${getInvoiceSourceId()}`)}
+                    variant="outline"
+                    className="w-full h-11 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-lg font-medium"
+                  >
+                    <ShieldCheck className="w-4 h-4 mr-2" />
+                    Warranty Certificate
+                  </Button>
                   {/* Share */}
                   <Button
                     onClick={handleShare}
@@ -963,6 +985,13 @@ export default function NewInvoice() {
                 ) : (
                   <Printer className="w-4 h-4" />
                 )}
+              </Button>
+              <Button
+                onClick={() => navigate(`/warranty?sourceType=invoice&sourceId=${getInvoiceSourceId()}`)}
+                className="h-11 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium shrink-0"
+              >
+                <ShieldCheck className="w-4 h-4 mr-1" />
+                Warranty
               </Button>
               {/* Share */}
               <Button

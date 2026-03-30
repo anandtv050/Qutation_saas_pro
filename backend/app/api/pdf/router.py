@@ -1,7 +1,11 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends,HTTPException,status
 
-from app.api.pdf.schema import MdlQuotationPDFRequest, MdlInvoicePDFRequest
+from app.api.pdf.schema import (
+    MdlQuotationPDFRequest,
+    MdlInvoicePDFRequest,
+    MdlWarrantyCertificatePDFRequest,
+)
 from app.api.pdf.service import ClsPdfGenerator
 from app.core.dependency import fnGetContext
 
@@ -37,6 +41,26 @@ async def fnGenerateInvoicePDF(
     try:
         insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
         mdlResponse = await insPdfService.fnGetInvoicePdf(mdlRequest)
+        return mdlResponse
+
+    except Exception as e:
+        print(str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
+
+
+@router.post("/warranty-certificate")
+async def fnGenerateWarrantyCertificatePDF(
+    mdlRequest: MdlWarrantyCertificatePDFRequest,
+    objContext=Depends(fnGetContext)
+):
+    "generate warranty certificate print"
+
+    try:
+        insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
+        mdlResponse = await insPdfService.fnGetWarrantyCertificatePdf(mdlRequest)
         return mdlResponse
 
     except Exception as e:

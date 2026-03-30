@@ -79,15 +79,32 @@ const quotationService = {
     add: async (quotationData) => {
         try {
             // Transform items to match backend schema
-            const lstItems = quotationData.lstItems.map((item, index) => ({
-                intInventoryId: item.intInventoryId || null,
-                strItemCode: item.strItemCode || null,
-                strItemName: item.strItemName,
-                strUnit: item.strUnit || 'piece',
-                dblQuantity: parseFloat(item.dblQuantity) || 1,
-                dblUnitPrice: parseFloat(item.dblUnitPrice) || 0,
-                intSortOrder: item.intSortOrder || index
-            }));
+            const lstItems = quotationData.lstItems.map((item, index) => {
+                const mapped = {
+                    intInventoryId: item.intInventoryId || null,
+                    strItemCode: item.strItemCode || null,
+                    strItemName: item.strItemName,
+                    strUnit: item.strUnit || 'piece',
+                    dblQuantity: parseFloat(item.dblQuantity) || 1,
+                    dblUnitPrice: parseFloat(item.dblUnitPrice) || 0,
+                    intWarrantyYears: parseInt(item.intWarrantyYears || 0),
+                    intWarrantyMonths: parseInt(item.intWarrantyMonths || 0),
+                    intWarrantyDays: parseInt(item.intWarrantyDays || 0),
+                    intSortOrder: item.intSortOrder || index
+                };
+
+                if (item.datImplementationDate !== undefined) {
+                    mapped.datImplementationDate = item.datImplementationDate || null;
+                }
+                if (item.datExpiryDate !== undefined) {
+                    mapped.datExpiryDate = item.datExpiryDate || null;
+                }
+                if (item.blnManualExpiryOverride !== undefined) {
+                    mapped.blnManualExpiryOverride = !!item.blnManualExpiryOverride;
+                }
+
+                return mapped;
+            });
 
             const response = await api.post('/quotation/add', {
                 strCustomerName: quotationData.strCustomerName,
@@ -155,15 +172,32 @@ const quotationService = {
 
             // If items provided, transform them
             if (quotationData.lstItems !== undefined) {
-                payload.lstItems = quotationData.lstItems.map((item, index) => ({
-                    intInventoryId: item.intInventoryId || null,
-                    strItemCode: item.strItemCode || null,
-                    strItemName: item.strItemName,
-                    strUnit: item.strUnit || 'piece',
-                    dblQuantity: parseFloat(item.dblQuantity) || 1,
-                    dblUnitPrice: parseFloat(item.dblUnitPrice) || 0,
-                    intSortOrder: item.intSortOrder || index
-                }));
+                payload.lstItems = quotationData.lstItems.map((item, index) => {
+                    const mapped = {
+                        intInventoryId: item.intInventoryId || null,
+                        strItemCode: item.strItemCode || null,
+                        strItemName: item.strItemName,
+                        strUnit: item.strUnit || 'piece',
+                        dblQuantity: parseFloat(item.dblQuantity) || 1,
+                        dblUnitPrice: parseFloat(item.dblUnitPrice) || 0,
+                        intWarrantyYears: parseInt(item.intWarrantyYears || 0),
+                        intWarrantyMonths: parseInt(item.intWarrantyMonths || 0),
+                        intWarrantyDays: parseInt(item.intWarrantyDays || 0),
+                        intSortOrder: item.intSortOrder || index
+                    };
+
+                    if (item.datImplementationDate !== undefined) {
+                        mapped.datImplementationDate = item.datImplementationDate || null;
+                    }
+                    if (item.datExpiryDate !== undefined) {
+                        mapped.datExpiryDate = item.datExpiryDate || null;
+                    }
+                    if (item.blnManualExpiryOverride !== undefined) {
+                        mapped.blnManualExpiryOverride = !!item.blnManualExpiryOverride;
+                    }
+
+                    return mapped;
+                });
             }
 
             const response = await api.post('/quotation/update', payload);
@@ -196,6 +230,43 @@ const quotationService = {
             return response.data;
         } catch (error) {
             const strMessage = error.response?.data?.detail || 'Failed to delete quotation';
+            throw new Error(strMessage);
+        }
+    },
+
+    /**
+     * Update ONLY warranty fields on existing quotation items.
+     * Does NOT delete/re-insert items - only updates warranty columns by item PK.
+     *
+     * ENDPOINT: POST /quotation/update-warranty
+     *
+     * PARAMS:
+     * {
+     *   intPkQuotationId: number,
+     *   lstItems: [{
+     *     intPkQuotationItemId: number,
+     *     intWarrantyYears, intWarrantyMonths, intWarrantyDays,
+     *     datImplementationDate, datExpiryDate, blnManualExpiryOverride
+     *   }]
+     * }
+     */
+    updateWarranty: async (intPkQuotationId, lstItems) => {
+        try {
+            const response = await api.post('/quotation/update-warranty', {
+                intPkQuotationId,
+                lstItems: lstItems.map((item) => ({
+                    intPkQuotationItemId: item.intPkQuotationItemId,
+                    intWarrantyYears: parseInt(item.intWarrantyYears || 0),
+                    intWarrantyMonths: parseInt(item.intWarrantyMonths || 0),
+                    intWarrantyDays: parseInt(item.intWarrantyDays || 0),
+                    datImplementationDate: item.datImplementationDate || null,
+                    datExpiryDate: item.datExpiryDate || null,
+                    blnManualExpiryOverride: !!item.blnManualExpiryOverride,
+                })),
+            });
+            return response.data;
+        } catch (error) {
+            const strMessage = error.response?.data?.detail || 'Failed to update warranty';
             throw new Error(strMessage);
         }
     },

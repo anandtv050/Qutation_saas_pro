@@ -8,6 +8,7 @@ import Reports from "./pages/Reports";
 import Profile from "./pages/Profile";
 import UserManagement from "./pages/UserManagement";
 import AdminDashboard from "./pages/AdminDashboard";
+import WarrantyCertificate from "./pages/WarrantyCertificate";
 import MainLayout from "./components/layout/MainLayout";
 
 function App() {
@@ -44,6 +45,7 @@ function App() {
           <Route path="/quotations/edit/:id" element={<NewQuotation />} />
           <Route path="/invoices/new" element={<NewInvoice />} />
           <Route path="/invoices/view/:id" element={<NewInvoice />} />
+          <Route path="/warranty" element={<WarrantyCertificate />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/profile" element={<Profile />} />

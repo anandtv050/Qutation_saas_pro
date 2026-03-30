@@ -810,3 +810,311 @@ class ClsPdfGenerator:
                     f"inline; filename=Invoice_{strInvoiceNumber}.pdf"
             },
         )
+
+    async def fnGetWarrantyCertificatePdf(self, mdlRequest):
+        """Generate warranty certificate PDF directly from quotation items."""
+        strBusinessName = strEmail = strShopPhoneNumber = strShopGstNumber = ""
+
+        async with self.objPool.acquire() as conn:
+            intQuotationId = mdlRequest.intQuotationId
+            strInvoiceNumber = None
+
+            if mdlRequest.intInvoiceId and not intQuotationId:
+                rstInvoiceLink = await conn.fetchrow(
+                    """
+                    SELECT fk_bint_quotation_id, vchr_invoice_number
+                    FROM tbl_invoice
+                    WHERE pk_bint_invoice_id = $1
+                      AND fk_bint_user_id = $2
+                    """,
+                    mdlRequest.intInvoiceId,
+                    self.intUserId,
+                )
+                if not rstInvoiceLink:
+                    return {"error": "Invoice not found"}
+                intQuotationId = rstInvoiceLink["fk_bint_quotation_id"]
+                strInvoiceNumber = rstInvoiceLink["vchr_invoice_number"]
+
+            if not intQuotationId:
+                return {"error": "Quotation ID is required for warranty certificate"}
+
+            strHeaderQuery = """
+                SELECT
+                    u.vchr_business_name,
+                    u.vchr_email,
+                    u.vchr_phone,
+                    u.vchr_gst_number,
+                    q.vchr_quotation_number,
+                    q.dat_quotation_date,
+                    q.vchr_customer_name,
+                    q.vchr_customer_phone,
+                    q.txt_customer_address,
+                    i.vchr_invoice_number
+                FROM tbl_quotation q
+                LEFT JOIN tbl_user u ON q.fk_bint_user_id = u.pk_bint_user_id
+                LEFT JOIN tbl_invoice i ON i.fk_bint_quotation_id = q.pk_bint_quotation_id
+                WHERE q.pk_bint_quotation_id = $1
+                  AND q.fk_bint_user_id = $2
+                ORDER BY i.pk_bint_invoice_id DESC
+                LIMIT 1
+            """
+            rstHeader = await conn.fetchrow(strHeaderQuery, intQuotationId, self.intUserId)
+            if not rstHeader:
+                return {"error": "Quotation not found"}
+
+            strItemsQuery = """
+                SELECT
+                    vchr_item_name,
+                    dbl_quantity,
+                    vchr_unit,
+                    dat_implementation_date,
+                    int_warranty_years,
+                    int_warranty_months,
+                    int_warranty_days,
+                    dat_expiry_date
+                FROM tbl_quotation_item
+                WHERE fk_bint_quotation_id = $1
+                  AND (
+                      COALESCE(int_warranty_years, 0) > 0
+                      OR COALESCE(int_warranty_months, 0) > 0
+                      OR COALESCE(int_warranty_days, 0) > 0
+                      OR COALESCE(bln_manual_expiry_override, FALSE) = TRUE
+                  )
+                ORDER BY int_sort_order
+            """
+            rstItems = await conn.fetch(strItemsQuery, intQuotationId)
+
+            dctItems = [
+                {
+                    "name": row["vchr_item_name"],
+                    "quantity": float(row["dbl_quantity"] or 0),
+                    "unit": row["vchr_unit"] or "piece",
+                    "implementation_date": row["dat_implementation_date"],
+                    "years": int(row["int_warranty_years"] or 0),
+                    "months": int(row["int_warranty_months"] or 0),
+                    "days": int(row["int_warranty_days"] or 0),
+                    "expiry_date": row["dat_expiry_date"],
+                }
+                for row in rstItems
+            ]
+
+            # Get common implementation date (first item's date)
+            strImplementationDate = None
+            if dctItems:
+                strImplementationDate = dctItems[0].get("implementation_date")
+
+            strCustomerName = rstHeader["vchr_customer_name"]
+            strCustomerPhone = rstHeader["vchr_customer_phone"]
+            strCustomerAddress = rstHeader["txt_customer_address"]
+            strBusinessName = rstHeader["vchr_business_name"]
+            strEmail = rstHeader["vchr_email"]
+            strShopPhoneNumber = rstHeader["vchr_phone"]
+            strShopGstNumber = rstHeader["vchr_gst_number"]
+            strQuotationNumber = rstHeader["vchr_quotation_number"]
+            strInvoiceNumber = strInvoiceNumber or rstHeader["vchr_invoice_number"]
+            strCertificateNumber = f"WAR-{strQuotationNumber}"
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=40,
+            leftMargin=40,
+            topMargin=105,
+            bottomMargin=70,
+        )
+
+        styles = getSampleStyleSheet()
+        elements = []
+
+        stSectionLabel = ParagraphStyle(
+            "wSecLabel", parent=styles["Normal"],
+            fontSize=7.5, fontName="Helvetica-Bold",
+            textColor=BRAND_ACCENT, spaceAfter=3,
+        )
+        stName = ParagraphStyle(
+            "wSecName", parent=styles["Normal"],
+            fontSize=11, fontName="Helvetica-Bold",
+            textColor=TEXT_DARK, spaceAfter=2,
+        )
+        stDetail = ParagraphStyle(
+            "wSecDetail", parent=styles["Normal"],
+            fontSize=9, fontName="Helvetica",
+            textColor=TEXT_DARK, spaceAfter=1, leading=12,
+        )
+        stDetailRight = ParagraphStyle(
+            "wSecDetailR", parent=styles["Normal"],
+            fontSize=9, fontName="Helvetica",
+            textColor=TEXT_DARK, spaceAfter=1, leading=12,
+            alignment=TA_RIGHT,
+        )
+        stLabelRight = ParagraphStyle(
+            "wSecLabelR", parent=styles["Normal"],
+            fontSize=7.5, fontName="Helvetica-Bold",
+            textColor=BRAND_ACCENT, spaceAfter=3,
+            alignment=TA_RIGHT,
+        )
+        stNameRight = ParagraphStyle(
+            "wSecNameR", parent=styles["Normal"],
+            fontSize=11, fontName="Helvetica-Bold",
+            textColor=TEXT_DARK, spaceAfter=2,
+            alignment=TA_RIGHT,
+        )
+
+        from_col = []
+        from_col.append(Paragraph("FROM", stSectionLabel))
+        from_col.append(Paragraph((strBusinessName or "Your Business").upper(), stName))
+        if strShopPhoneNumber:
+            from_col.append(Paragraph(f"Phone: {strShopPhoneNumber}", stDetail))
+        if strEmail:
+            from_col.append(Paragraph(f"Email: {strEmail}", stDetail))
+        if strShopGstNumber:
+            from_col.append(Paragraph(f"GST: {strShopGstNumber}", stDetail))
+
+        to_col = []
+        to_col.append(Paragraph("CUSTOMER", stLabelRight))
+        to_col.append(Paragraph(strCustomerName or "-", stNameRight))
+        if strCustomerPhone:
+            to_col.append(Paragraph(f"Phone: {strCustomerPhone}", stDetailRight))
+        if strCustomerAddress:
+            to_col.append(Paragraph(strCustomerAddress, stDetailRight))
+
+        addr_table = Table([[from_col, to_col]], colWidths=[260, 250])
+        addr_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        elements.append(addr_table)
+        elements.append(Spacer(1, 10))
+
+        stMetaLabel = ParagraphStyle(
+            "wMetaLbl", parent=styles["Normal"],
+            fontSize=8, fontName="Helvetica",
+            textColor=TEXT_MUTED,
+        )
+        stMetaVal = ParagraphStyle(
+            "wMetaVal", parent=styles["Normal"],
+            fontSize=9.5, fontName="Helvetica-Bold",
+            textColor=TEXT_DARK,
+        )
+
+        meta_tbl = Table(
+            [[
+                Paragraph("Certificate No.", stMetaLabel),
+                Paragraph(str(strCertificateNumber or "-"), stMetaVal),
+                Paragraph("Implementation Date", stMetaLabel),
+                Paragraph(str(strImplementationDate or "-"), stMetaVal),
+            ]],
+            colWidths=[90, 170, 110, 140],
+        )
+        meta_tbl.setStyle(TableStyle([
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("BACKGROUND",    (0, 0), (-1, -1), LIGHT_BG),
+        ]))
+        elements.append(meta_tbl)
+        elements.append(Spacer(1, 14))
+
+        strDocLabel = "Invoice No." if strInvoiceNumber else "Quotation No."
+        strDocValue = strInvoiceNumber or strQuotationNumber or "-"
+        doc_ref_table = Table(
+            [[
+                Paragraph(strDocLabel, stMetaLabel),
+                Paragraph(str(strDocValue), stMetaVal),
+            ]],
+            colWidths=[90, 420],
+        )
+        doc_ref_table.setStyle(TableStyle([
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("BACKGROUND",    (0, 0), (-1, -1), colors.white),
+            ("BOX",           (0, 0), (-1, -1), 0.5, BORDER_CLR),
+        ]))
+        elements.append(doc_ref_table)
+        elements.append(Spacer(1, 12))
+
+        elements.append(HRFlowable(
+            width="100%", thickness=0.5, color=BORDER_CLR,
+            spaceBefore=0, spaceAfter=12,
+        ))
+
+        header_row = ["#", "Item", "Qty", "Expiry"]
+        tbl_data = [header_row]
+        stItemDesc = ParagraphStyle(
+            "wItemDesc", parent=styles["Normal"],
+            fontSize=9, fontName="Helvetica", leading=12,
+        )
+
+        for idx, item in enumerate(dctItems, start=1):
+            dblQty = item["quantity"]
+            strQty = f"{int(dblQty)}" if dblQty == int(dblQty) else f"{dblQty}"
+            tbl_data.append([
+                str(idx),
+                Paragraph(item["name"], stItemDesc),
+                strQty,
+                str(item["expiry_date"] or "-"),
+            ])
+
+        if len(tbl_data) == 1:
+            tbl_data.append(["", Paragraph("No items", stItemDesc), "-", "-"])
+
+        tbl = Table(tbl_data, colWidths=[30, 310, 60, 110], repeatRows=1)
+        tbl_style_rules = [
+            ("BACKGROUND",    (0, 0), (-1, 0), TABLE_HEADER),
+            ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE",      (0, 0), (-1, 0), 9),
+            ("TOPPADDING",    (0, 0), (-1, 0), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
+            ("FONTNAME",      (0, 1), (-1, -1), "Helvetica"),
+            ("FONTSIZE",      (0, 1), (-1, -1), 9),
+            ("TOPPADDING",    (0, 1), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 7),
+            ("VALIGN",        (0, 1), (-1, -1), "MIDDLE"),
+            ("ALIGN",         (0, 0), (0, -1), "CENTER"),
+            ("ALIGN",         (2, 0), (-1, -1), "CENTER"),
+            ("LINEBELOW",     (0, 0), (-1, 0), 0.8, TABLE_HEADER),
+            ("LINEBELOW",     (0, 1), (-1, -1), 0.3, BORDER_CLR),
+        ]
+        for i in range(1, len(tbl_data)):
+            if i % 2 == 0:
+                tbl_style_rules.append(("BACKGROUND", (0, i), (-1, i), ROW_ALT))
+
+        tbl.setStyle(TableStyle(tbl_style_rules))
+        elements.append(tbl)
+        elements.append(Spacer(1, 20))
+
+        stNote = ParagraphStyle(
+            "wNote", parent=styles["Normal"],
+            fontSize=9, fontName="Helvetica-Oblique",
+            textColor=TEXT_MUTED, spaceAfter=4,
+        )
+        elements.append(Paragraph("This certificate is generated based on recorded implementation details.", stNote))
+
+        def on_page(cvs, doc_ref):
+            self._draw_header(
+                cvs, doc_ref,
+                business_name=strBusinessName,
+                email=strEmail,
+                phone=strShopPhoneNumber,
+                gst=strShopGstNumber,
+                doc_title="WARRANTY CERTIFICATE",
+            )
+            self._draw_footer(
+                cvs, doc_ref,
+                business_name=strBusinessName,
+                phone=strShopPhoneNumber,
+            )
+
+        doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)
+        buffer.seek(0)
+
+        return StreamingResponse(
+            buffer,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition":
+                    f"inline; filename=Warranty_{strQuotationNumber}.pdf"
+            },
+        )

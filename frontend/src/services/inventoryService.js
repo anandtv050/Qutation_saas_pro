@@ -22,6 +22,9 @@ const inventoryService = {
                 strUnit: itemData.strUnit || 'piece',
                 dblUnitPrice: parseFloat(itemData.dblUnitPrice),
                 intStockQuantity: parseInt(itemData.intStockQuantity),
+                intWarrantyYears: parseInt(itemData.intWarrantyYears || 0),
+                intWarrantyMonths: parseInt(itemData.intWarrantyMonths || 0),
+                intWarrantyDays: parseInt(itemData.intWarrantyDays || 0),
                 strDescription: itemData.strDescription || null
             });
             return response.data;
@@ -42,6 +45,9 @@ const inventoryService = {
                 strUnit: itemData.strUnit || null,
                 dblUnitPrice: itemData.dblUnitPrice ? parseFloat(itemData.dblUnitPrice) : null,
                 intStockQuantity: itemData.intStockQuantity !== undefined ? parseInt(itemData.intStockQuantity) : null,
+                intWarrantyYears: itemData.intWarrantyYears !== undefined ? parseInt(itemData.intWarrantyYears || 0) : null,
+                intWarrantyMonths: itemData.intWarrantyMonths !== undefined ? parseInt(itemData.intWarrantyMonths || 0) : null,
+                intWarrantyDays: itemData.intWarrantyDays !== undefined ? parseInt(itemData.intWarrantyDays || 0) : null,
                 strDescription: itemData.strDescription || null
             });
             return response.data;

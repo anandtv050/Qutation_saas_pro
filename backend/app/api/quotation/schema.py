@@ -34,6 +34,12 @@ class MdlQuotationItemRequest(BaseModel):
     strUnit: Optional[str] = "piece"
     dblQuantity: float
     dblUnitPrice: float
+    intWarrantyYears: Optional[int] = None
+    intWarrantyMonths: Optional[int] = None
+    intWarrantyDays: Optional[int] = None
+    datImplementationDate: Optional[date] = None
+    datExpiryDate: Optional[date] = None
+    blnManualExpiryOverride: Optional[bool] = False
     intSortOrder: Optional[int] = 0
 
 
@@ -69,6 +75,12 @@ class MdlQuotationItem(BaseModel):
     dblQuantity: float
     dblUnitPrice: float
     dblTotalPrice: float  # Calculated by backend
+    intWarrantyYears: int = 0
+    intWarrantyMonths: int = 0
+    intWarrantyDays: int = 0
+    datImplementationDate: Optional[date] = None
+    datExpiryDate: Optional[date] = None
+    blnManualExpiryOverride: bool = False
     intSortOrder: int
 
 
@@ -163,6 +175,27 @@ class MdlUpdateQuotationRequest(MdlBaseRequest):
     strNotes: Optional[str] = None
     strStatus: Optional[str] = None
     lstItems: Optional[List[MdlQuotationItemRequest]] = None  # Replaces ALL items
+
+
+class MdlWarrantyItemUpdate(BaseModel):
+    """Single item warranty update - identified by existing item PK"""
+    intPkQuotationItemId: int
+    intWarrantyYears: int = 0
+    intWarrantyMonths: int = 0
+    intWarrantyDays: int = 0
+    datImplementationDate: Optional[date] = None
+    datExpiryDate: Optional[date] = None
+    blnManualExpiryOverride: bool = False
+
+
+class MdlUpdateWarrantyRequest(MdlBaseRequest):
+    """
+    REQUEST: Update ONLY warranty fields on existing quotation items.
+    ENDPOINT: POST /quotation/update-warranty
+    Does NOT delete/re-insert items. Only UPDATEs warranty columns by item PK.
+    """
+    intPkQuotationId: int
+    lstItems: List[MdlWarrantyItemUpdate]
 
 
 class MdlGetQuotationRequest(MdlBaseRequest):

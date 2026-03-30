@@ -5,6 +5,7 @@ import asyncpg
 from app.api.quotation.schema import (
     MdlCreateQuotationRequest,
     MdlUpdateQuotationRequest,
+    MdlUpdateWarrantyRequest,
     MdlGetQuotationRequest,
     MdlDeleteQuotationRequest,
     MdlQuotationResponse,
@@ -130,6 +131,35 @@ async def fnUpdateQuotation(
         )
     except Exception as e:
         logger.error(f"Error updating quotation {mdlUpdateQuotationRequest.intPkQuotationId}: {str(e)}", exc_info=True)
+        return MdlQuotationResponse(
+            intStatus=ResponseStatus.ERROR,
+            strStatus=ResponseStatus.ERROR_STR,
+            intStatusCode=ResponseStatus.HTTP_INTERNAL_ERROR,
+            strMessage=f"Unexpected error: {str(e)}",
+            data=None
+        )
+
+
+@router.post("/update-warranty", response_model=MdlQuotationResponse)
+async def fnUpdateWarranty(
+    mdlUpdateWarrantyRequest: MdlUpdateWarrantyRequest,
+    objContext = Depends(fnGetContext),
+):
+    logger = getUserLogger(objContext.intUserId)
+    try:
+        insQuotationService = ClsQuotationService(objContext.objPool, objContext.intUserId)
+        return await insQuotationService.fnUpdateWarrantyService(mdlUpdateWarrantyRequest)
+    except asyncpg.PostgresError as e:
+        logger.error(f"Database error updating warranty {mdlUpdateWarrantyRequest.intPkQuotationId}: {str(e)}")
+        return MdlQuotationResponse(
+            intStatus=ResponseStatus.ERROR,
+            strStatus=ResponseStatus.ERROR_STR,
+            intStatusCode=ResponseStatus.HTTP_INTERNAL_ERROR,
+            strMessage=f"Database error: {str(e)}",
+            data=None
+        )
+    except Exception as e:
+        logger.error(f"Error updating warranty {mdlUpdateWarrantyRequest.intPkQuotationId}: {str(e)}", exc_info=True)
         return MdlQuotationResponse(
             intStatus=ResponseStatus.ERROR,
             strStatus=ResponseStatus.ERROR_STR,

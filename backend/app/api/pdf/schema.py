@@ -29,3 +29,9 @@ class MdlInvoicePDFRequest(BaseModel):
     strDueDate: Optional[str] = None
     lstItems: Optional[List[MdlPDFItem]] = None
     blnIncludeInfoPage: bool = False
+
+
+class MdlWarrantyCertificatePDFRequest(BaseModel):
+    intQuotationId: Optional[int] = None
+    intInvoiceId: Optional[int] = None
+    strCertificateDate: Optional[str] = None

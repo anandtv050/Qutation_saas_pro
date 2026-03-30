@@ -12,6 +12,9 @@ class MdlCreateInventoryRequest(MdlBaseRequest):
     strUnit: str = "piece"
     dblUnitPrice: float
     intStockQuantity: int
+    intWarrantyYears: int = 0
+    intWarrantyMonths: int = 0
+    intWarrantyDays: int = 0
     strDescription: Optional[str] = None
 
 
@@ -24,6 +27,9 @@ class MdlUpdateInventoryRequest(MdlBaseRequest):
     strUnit: Optional[str] = None
     dblUnitPrice: Optional[float] = None
     intStockQuantity: Optional[int] = None
+    intWarrantyYears: Optional[int] = None
+    intWarrantyMonths: Optional[int] = None
+    intWarrantyDays: Optional[int] = None
     strDescription: Optional[str] = None
 
 
@@ -41,6 +47,9 @@ class MdlInventoryItem(BaseModel):
     strUnit: str
     dblUnitPrice: float
     intStockQuantity: int
+    intWarrantyYears: int = 0
+    intWarrantyMonths: int = 0
+    intWarrantyDays: int = 0
 
 
 # Response for single inventory (create/update)

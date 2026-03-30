@@ -1,4 +1,5 @@
 import datetime
+import calendar
 from decimal import Decimal
 
 
@@ -10,7 +11,8 @@ from app.api.quotation.schema import (
     MdlQuotationItem,
     MdlDeleteQuotationResponse,
     MdlCreateQuotationRequest,
-    MdlUpdateQuotationRequest
+    MdlUpdateQuotationRequest,
+    MdlUpdateWarrantyRequest
 )
 from app.core.baseSchema import ResponseStatus
 from app.core.logger import getUserLogger
@@ -21,6 +23,73 @@ class ClsQuotationService:
         self.insPool = pool
         self.intUserId = intUserId
         self.logger = getUserLogger(intUserId)
+
+    @staticmethod
+    def fnAddWarrantyPeriod(datImplementationDate, intYears: int, intMonths: int, intDays: int):
+        """Add warranty period to implementation date."""
+        if not datImplementationDate:
+            return None
+
+        intTotalMonths = (intYears or 0) * 12 + (intMonths or 0)
+        datResult = datImplementationDate
+
+        if intTotalMonths:
+            intMonthIndex = (datImplementationDate.month - 1) + intTotalMonths
+            intYear = datImplementationDate.year + (intMonthIndex // 12)
+            intMonth = (intMonthIndex % 12) + 1
+            intDay = min(datImplementationDate.day, calendar.monthrange(intYear, intMonth)[1])
+            datResult = datetime.date(intYear, intMonth, intDay)
+
+        if intDays:
+            datResult = datResult + datetime.timedelta(days=intDays)
+
+        return datResult
+
+    @staticmethod
+    def fnResolveWarrantyDates(
+        datImplementationDate,
+        intWarrantyYears: int,
+        intWarrantyMonths: int,
+        intWarrantyDays: int,
+        blnManualExpiryOverride: bool,
+        datExpiryDate,
+    ):
+        if blnManualExpiryOverride:
+            datFinalExpiry = datExpiryDate
+        else:
+            datFinalExpiry = ClsQuotationService.fnAddWarrantyPeriod(
+                datImplementationDate,
+                intWarrantyYears,
+                intWarrantyMonths,
+                intWarrantyDays,
+            )
+
+        return datFinalExpiry
+
+    async def fnGetInventoryWarrantyDefaults(self, conn, lstInventoryIds: list[int]) -> dict[int, tuple[int, int, int]]:
+        """Fetch warranty defaults for inventory items in one query."""
+        if not lstInventoryIds:
+            return {}
+
+        strQuery = """
+            SELECT
+                pk_bint_inventory_id,
+                int_warranty_years,
+                int_warranty_months,
+                int_warranty_days
+            FROM tbl_inventory
+            WHERE fk_bint_user_id = $1
+              AND pk_bint_inventory_id = ANY($2::BIGINT[])
+        """
+        rstRows = await conn.fetch(strQuery, self.intUserId, lstInventoryIds)
+        return {
+            row["pk_bint_inventory_id"]: (
+                int(row["int_warranty_years"] or 0),
+                int(row["int_warranty_months"] or 0),
+                int(row["int_warranty_days"] or 0),
+            )
+            for row in rstRows
+        }
 
     ##### Helper function fro get the increment Quotation number   
     async def fnGenerateQuotationNumber(self) -> str:
@@ -152,6 +221,12 @@ class ClsQuotationService:
                 dbl_quantity,
                 dbl_unit_price,
                 dbl_total_price,
+                int_warranty_years,
+                int_warranty_months,
+                int_warranty_days,
+                dat_implementation_date,
+                dat_expiry_date,
+                bln_manual_expiry_override,
                 int_sort_order
             FROM tbl_quotation_item
             WHERE fk_bint_quotation_id = $1
@@ -171,6 +246,12 @@ class ClsQuotationService:
                 dblQuantity=float(dctItem['dbl_quantity']),
                 dblUnitPrice=float(dctItem['dbl_unit_price']),
                 dblTotalPrice=float(dctItem['dbl_total_price']),
+                intWarrantyYears=int(dctItem['int_warranty_years'] or 0),
+                intWarrantyMonths=int(dctItem['int_warranty_months'] or 0),
+                intWarrantyDays=int(dctItem['int_warranty_days'] or 0),
+                datImplementationDate=dctItem['dat_implementation_date'],
+                datExpiryDate=dctItem['dat_expiry_date'],
+                blnManualExpiryOverride=bool(dctItem['bln_manual_expiry_override']),
                 intSortOrder=dctItem['int_sort_order'] or 0
             )
             lstQuotationItems.append(mdlItem)
@@ -208,6 +289,41 @@ class ClsQuotationService:
     async def fnAddQuotationService(self, mdlRequest: MdlCreateQuotationRequest):
         """Create new quotation with items"""
         self.logger.info(f"Creating quotation for customer: {mdlRequest.strCustomerName}")
+
+        for mdlItem in mdlRequest.lstItems:
+            if (
+                (mdlItem.intWarrantyYears is not None and mdlItem.intWarrantyYears < 0)
+                or (mdlItem.intWarrantyMonths is not None and mdlItem.intWarrantyMonths < 0)
+                or (mdlItem.intWarrantyDays is not None and mdlItem.intWarrantyDays < 0)
+            ):
+                return MdlQuotationResponse(
+                    intStatus=ResponseStatus.ERROR,
+                    strStatus=ResponseStatus.ERROR_STR,
+                    intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                    strMessage="Warranty period values cannot be negative",
+                    data=None
+                )
+            if mdlItem.blnManualExpiryOverride and mdlItem.datImplementationDate and not mdlItem.datExpiryDate:
+                return MdlQuotationResponse(
+                    intStatus=ResponseStatus.ERROR,
+                    strStatus=ResponseStatus.ERROR_STR,
+                    intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                    strMessage="Manual expiry is enabled, so expiry date is required",
+                    data=None
+                )
+            if (
+                mdlItem.datImplementationDate is not None
+                and mdlItem.datExpiryDate is not None
+                and mdlItem.datExpiryDate < mdlItem.datImplementationDate
+            ):
+                return MdlQuotationResponse(
+                    intStatus=ResponseStatus.ERROR,
+                    strStatus=ResponseStatus.ERROR_STR,
+                    intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                    strMessage="Expiry date cannot be before implementation date",
+                    data=None
+                )
+
         strQuotationNumber = await self.fnGenerateQuotationNumber()
         
         # calculate item sub total
@@ -269,6 +385,14 @@ class ClsQuotationService:
                 
                 intQuotationId = rstQuotation['pk_bint_quotation_id']
                 self.logger.info(f"Quotation created: {strQuotationNumber} | ID={intQuotationId} | Items={len(mdlRequest.lstItems)}")
+
+                lstInventoryIds = [
+                    int(item.intInventoryId)
+                    for item in mdlRequest.lstItems
+                    if item.intInventoryId
+                ]
+                dctInventoryWarranty = await self.fnGetInventoryWarrantyDefaults(conn, lstInventoryIds)
+
                 # item table each item have each raw
                 strInsertItem = """
                     INSERT INTO tbl_quotation_item (
@@ -280,11 +404,45 @@ class ClsQuotationService:
                         dbl_quantity,
                         dbl_unit_price,
                         dbl_total_price,
+                        int_warranty_years,
+                        int_warranty_months,
+                        int_warranty_days,
+                        dat_implementation_date,
+                        dat_expiry_date,
+                        bln_manual_expiry_override,
                         int_sort_order
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                 """
                 for intIndex, mdlItem in enumerate(mdlRequest.lstItems):
                     dblItemTotal = mdlItem.dblQuantity * mdlItem.dblUnitPrice
+
+                    tplWarranty = dctInventoryWarranty.get(mdlItem.intInventoryId or 0, (0, 0, 0))
+                    intWarrantyYears = (
+                        int(mdlItem.intWarrantyYears)
+                        if mdlItem.intWarrantyYears is not None
+                        else tplWarranty[0]
+                    )
+                    intWarrantyMonths = (
+                        int(mdlItem.intWarrantyMonths)
+                        if mdlItem.intWarrantyMonths is not None
+                        else tplWarranty[1]
+                    )
+                    intWarrantyDays = (
+                        int(mdlItem.intWarrantyDays)
+                        if mdlItem.intWarrantyDays is not None
+                        else tplWarranty[2]
+                    )
+                    blnManualExpiryOverride = bool(mdlItem.blnManualExpiryOverride)
+                    datImplementationDate = mdlItem.datImplementationDate
+                    datExpiryDate = self.fnResolveWarrantyDates(
+                        datImplementationDate,
+                        intWarrantyYears,
+                        intWarrantyMonths,
+                        intWarrantyDays,
+                        blnManualExpiryOverride,
+                        mdlItem.datExpiryDate,
+                    )
+
                     await conn.execute(
                         strInsertItem,
                         intQuotationId,
@@ -295,6 +453,12 @@ class ClsQuotationService:
                         mdlItem.dblQuantity,
                         mdlItem.dblUnitPrice,
                         dblItemTotal,
+                        intWarrantyYears,
+                        intWarrantyMonths,
+                        intWarrantyDays,
+                        datImplementationDate,
+                        datExpiryDate,
+                        blnManualExpiryOverride,
                         mdlItem.intSortOrder or intIndex
                     )
 
@@ -303,6 +467,41 @@ class ClsQuotationService:
     ##### update Quotation 
     async def fnUpdateQuotationService(self, mdlRequest: MdlUpdateQuotationRequest):
         """Update existing quotation"""
+
+        if mdlRequest.lstItems:
+            for mdlItem in mdlRequest.lstItems:
+                if (
+                    (mdlItem.intWarrantyYears is not None and mdlItem.intWarrantyYears < 0)
+                    or (mdlItem.intWarrantyMonths is not None and mdlItem.intWarrantyMonths < 0)
+                    or (mdlItem.intWarrantyDays is not None and mdlItem.intWarrantyDays < 0)
+                ):
+                    return MdlQuotationResponse(
+                        intStatus=ResponseStatus.ERROR,
+                        strStatus=ResponseStatus.ERROR_STR,
+                        intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                        strMessage="Warranty period values cannot be negative",
+                        data=None
+                    )
+                if mdlItem.blnManualExpiryOverride and mdlItem.datImplementationDate and not mdlItem.datExpiryDate:
+                    return MdlQuotationResponse(
+                        intStatus=ResponseStatus.ERROR,
+                        strStatus=ResponseStatus.ERROR_STR,
+                        intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                        strMessage="Manual expiry is enabled, so expiry date is required",
+                        data=None
+                    )
+                if (
+                    mdlItem.datImplementationDate is not None
+                    and mdlItem.datExpiryDate is not None
+                    and mdlItem.datExpiryDate < mdlItem.datImplementationDate
+                ):
+                    return MdlQuotationResponse(
+                        intStatus=ResponseStatus.ERROR,
+                        strStatus=ResponseStatus.ERROR_STR,
+                        intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                        strMessage="Expiry date cannot be before implementation date",
+                        data=None
+                    )
         
         strCheckQuery = """
             SELECT pk_bint_quotation_id FROM tbl_quotation
@@ -420,6 +619,13 @@ class ClsQuotationService:
                     strDeleteItems = "DELETE FROM tbl_quotation_item WHERE fk_bint_quotation_id = $1"
                     await conn.execute(strDeleteItems, mdlRequest.intPkQuotationId)
 
+                    lstInventoryIds = [
+                        int(item.intInventoryId)
+                        for item in mdlRequest.lstItems
+                        if item.intInventoryId
+                    ]
+                    dctInventoryWarranty = await self.fnGetInventoryWarrantyDefaults(conn, lstInventoryIds)
+
                     strInsertItem = """
                         INSERT INTO tbl_quotation_item (
                             fk_bint_quotation_id,
@@ -430,11 +636,45 @@ class ClsQuotationService:
                             dbl_quantity,
                             dbl_unit_price,
                             dbl_total_price,
+                            int_warranty_years,
+                            int_warranty_months,
+                            int_warranty_days,
+                            dat_implementation_date,
+                            dat_expiry_date,
+                            bln_manual_expiry_override,
                             int_sort_order
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                     """
                     for intIndex, mdlItem in enumerate(mdlRequest.lstItems):
                         dblItemTotal = mdlItem.dblQuantity * mdlItem.dblUnitPrice
+
+                        tplWarranty = dctInventoryWarranty.get(mdlItem.intInventoryId or 0, (0, 0, 0))
+                        intWarrantyYears = (
+                            int(mdlItem.intWarrantyYears)
+                            if mdlItem.intWarrantyYears is not None
+                            else tplWarranty[0]
+                        )
+                        intWarrantyMonths = (
+                            int(mdlItem.intWarrantyMonths)
+                            if mdlItem.intWarrantyMonths is not None
+                            else tplWarranty[1]
+                        )
+                        intWarrantyDays = (
+                            int(mdlItem.intWarrantyDays)
+                            if mdlItem.intWarrantyDays is not None
+                            else tplWarranty[2]
+                        )
+                        blnManualExpiryOverride = bool(mdlItem.blnManualExpiryOverride)
+                        datImplementationDate = mdlItem.datImplementationDate
+                        datExpiryDate = self.fnResolveWarrantyDates(
+                            datImplementationDate,
+                            intWarrantyYears,
+                            intWarrantyMonths,
+                            intWarrantyDays,
+                            blnManualExpiryOverride,
+                            mdlItem.datExpiryDate,
+                        )
+
                         await conn.execute(
                             strInsertItem,
                             mdlRequest.intPkQuotationId,
@@ -445,12 +685,106 @@ class ClsQuotationService:
                             mdlItem.dblQuantity,
                             mdlItem.dblUnitPrice,
                             dblItemTotal,
+                            intWarrantyYears,
+                            intWarrantyMonths,
+                            intWarrantyDays,
+                            datImplementationDate,
+                            datExpiryDate,
+                            blnManualExpiryOverride,
                             mdlItem.intSortOrder or intIndex
                         )
 
         return await self.fnGetSingleQuotationDetails(mdlRequest.intPkQuotationId)
     
-    ##### Delete QUotation 
+    ##### Update Warranty Only
+    async def fnUpdateWarrantyService(self, mdlRequest: MdlUpdateWarrantyRequest):
+        """Update ONLY warranty fields on existing quotation items (no delete/re-insert)."""
+
+        for mdlItem in mdlRequest.lstItems:
+            if mdlItem.intWarrantyYears < 0 or mdlItem.intWarrantyMonths < 0 or mdlItem.intWarrantyDays < 0:
+                return MdlQuotationResponse(
+                    intStatus=ResponseStatus.ERROR,
+                    strStatus=ResponseStatus.ERROR_STR,
+                    intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                    strMessage="Warranty period values cannot be negative",
+                    data=None
+                )
+            if mdlItem.blnManualExpiryOverride and mdlItem.datImplementationDate and not mdlItem.datExpiryDate:
+                return MdlQuotationResponse(
+                    intStatus=ResponseStatus.ERROR,
+                    strStatus=ResponseStatus.ERROR_STR,
+                    intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                    strMessage="Manual expiry is enabled, so expiry date is required",
+                    data=None
+                )
+            if (
+                mdlItem.datImplementationDate is not None
+                and mdlItem.datExpiryDate is not None
+                and mdlItem.datExpiryDate < mdlItem.datImplementationDate
+            ):
+                return MdlQuotationResponse(
+                    intStatus=ResponseStatus.ERROR,
+                    strStatus=ResponseStatus.ERROR_STR,
+                    intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                    strMessage="Expiry date cannot be before implementation date",
+                    data=None
+                )
+
+        strCheckQuery = """
+            SELECT pk_bint_quotation_id FROM tbl_quotation
+            WHERE pk_bint_quotation_id = $1 AND fk_bint_user_id = $2
+        """
+
+        async with self.insPool.acquire() as conn:
+            rstExist = await conn.fetchrow(strCheckQuery, mdlRequest.intPkQuotationId, self.intUserId)
+
+        if not rstExist:
+            return MdlQuotationResponse(
+                intStatus=ResponseStatus.NO_DATA,
+                strStatus=ResponseStatus.NO_DATA_STR,
+                intStatusCode=ResponseStatus.HTTP_NOT_FOUND,
+                strMessage="Quotation not found",
+            )
+
+        strUpdateItem = """
+            UPDATE tbl_quotation_item
+            SET int_warranty_years = $1,
+                int_warranty_months = $2,
+                int_warranty_days = $3,
+                dat_implementation_date = $4,
+                dat_expiry_date = $5,
+                bln_manual_expiry_override = $6
+            WHERE pk_bint_quotation_item_id = $7
+              AND fk_bint_quotation_id = $8
+        """
+
+        async with self.insPool.acquire() as conn:
+            async with conn.transaction():
+                for mdlItem in mdlRequest.lstItems:
+                    datExpiryDate = self.fnResolveWarrantyDates(
+                        mdlItem.datImplementationDate,
+                        mdlItem.intWarrantyYears,
+                        mdlItem.intWarrantyMonths,
+                        mdlItem.intWarrantyDays,
+                        mdlItem.blnManualExpiryOverride,
+                        mdlItem.datExpiryDate,
+                    )
+
+                    await conn.execute(
+                        strUpdateItem,
+                        mdlItem.intWarrantyYears,
+                        mdlItem.intWarrantyMonths,
+                        mdlItem.intWarrantyDays,
+                        mdlItem.datImplementationDate,
+                        datExpiryDate,
+                        mdlItem.blnManualExpiryOverride,
+                        mdlItem.intPkQuotationItemId,
+                        mdlRequest.intPkQuotationId,
+                    )
+
+        return await self.fnGetSingleQuotationDetails(mdlRequest.intPkQuotationId)
+
+    ##### Delete QUotation
     async def fnDeleteQuotationService(self, intQuotationId: int):
         """Delete quotation and its items"""
         self.logger.info(f"Deleting quotation: ID={intQuotationId}")

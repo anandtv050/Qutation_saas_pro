@@ -48,6 +48,9 @@ export default function Inventory() {
     strUnit: "piece",
     dblUnitPrice: "",
     intStockQuantity: "",
+    intWarrantyYears: 0,
+    intWarrantyMonths: 0,
+    intWarrantyDays: 0,
     strDescription: ""
   });
 
@@ -91,6 +94,16 @@ export default function Inventory() {
     }).format(amount);
   };
 
+  const formatWarranty = (item) => {
+    const years = item.intWarrantyYears || 0;
+    const months = item.intWarrantyMonths || 0;
+    const days = item.intWarrantyDays || 0;
+    if (years === 0 && months === 0 && days === 0) {
+      return "No warranty";
+    }
+    return `${years}Y ${months}M ${days}D`;
+  };
+
   // Filter items
   const filteredItems = useMemo(() => {
     return inventoryItems.filter(item => {
@@ -111,6 +124,9 @@ export default function Inventory() {
       strUnit: "piece",
       dblUnitPrice: "",
       intStockQuantity: "",
+      intWarrantyYears: 0,
+      intWarrantyMonths: 0,
+      intWarrantyDays: 0,
       strDescription: ""
     });
     setModalError("");
@@ -156,6 +172,9 @@ export default function Inventory() {
       strUnit: item.strUnit,
       dblUnitPrice: item.dblUnitPrice.toString(),
       intStockQuantity: item.intStockQuantity.toString(),
+      intWarrantyYears: item.intWarrantyYears || 0,
+      intWarrantyMonths: item.intWarrantyMonths || 0,
+      intWarrantyDays: item.intWarrantyDays || 0,
       strDescription: item.strDescription || ""
     });
     setShowEditModal(true);
@@ -319,11 +338,12 @@ export default function Inventory() {
           {/* Table Header - Desktop */}
           <div className="hidden lg:grid grid-cols-12 gap-2 px-4 py-3 bg-neutral-50 border-b border-neutral-200 text-xs font-medium text-neutral-500 uppercase">
             <div className="col-span-1">Code</div>
-            <div className="col-span-4">Item Name</div>
+            <div className="col-span-3">Item Name</div>
             <div className="col-span-2">Category</div>
+            <div className="col-span-2">Warranty</div>
             <div className="col-span-2 text-right">Rate</div>
             <div className="col-span-1 text-right">Stock</div>
-            <div className="col-span-2 text-right">Actions</div>
+            <div className="col-span-1 text-right">Actions</div>
           </div>
 
           {/* Items */}
@@ -358,9 +378,10 @@ export default function Inventory() {
                       </button>
                     </div>
                   </div>
-                  <div className={`flex gap-4 text-sm ${isOutOfStock ? 'text-red-500' : 'text-neutral-500'}`}>
+                  <div className={`flex flex-wrap gap-3 text-sm ${isOutOfStock ? 'text-red-500' : 'text-neutral-500'}`}>
                     <span>{item.strCategory}</span>
                     <span>{formatCurrency(item.dblUnitPrice)}/{item.strUnit}</span>
+                    <span>{formatWarranty(item)}</span>
                     <span className={`font-medium ${isOutOfStock ? 'text-red-600' : item.intStockQuantity < 10 ? 'text-amber-500' : 'text-emerald-600'}`}>
                       {isOutOfStock ? 'Out of stock' : `${item.intStockQuantity} in stock`}
                     </span>
@@ -371,11 +392,14 @@ export default function Inventory() {
                 <div className={`hidden lg:block col-span-1 text-xs font-mono ${isOutOfStock ? 'text-red-400' : 'text-neutral-500'}`}>
                   {item.strItemCode}
                 </div>
-                <div className={`hidden lg:block col-span-4 font-medium ${isOutOfStock ? 'text-red-600' : 'text-neutral-900'}`}>
+                <div className={`hidden lg:block col-span-3 font-medium ${isOutOfStock ? 'text-red-600' : 'text-neutral-900'}`}>
                   {item.strItemName}
                 </div>
                 <div className={`hidden lg:block col-span-2 text-sm ${isOutOfStock ? 'text-red-500' : 'text-neutral-600'}`}>
                   {item.strCategory}
+                </div>
+                <div className={`hidden lg:block col-span-2 text-sm ${isOutOfStock ? 'text-red-500' : 'text-neutral-600'}`}>
+                  {formatWarranty(item)}
                 </div>
                 <div className={`hidden lg:block col-span-2 text-right font-medium ${isOutOfStock ? 'text-red-600' : 'text-neutral-900'}`}>
                   {formatCurrency(item.dblUnitPrice)}
@@ -389,7 +413,7 @@ export default function Inventory() {
                     {item.intStockQuantity}
                   </span>
                 </div>
-                <div className="hidden lg:flex col-span-2 justify-end gap-1">
+                <div className="hidden lg:flex col-span-1 justify-end gap-1">
                   <button
                     onClick={() => handleEditClick(item)}
                     className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg"
@@ -506,6 +530,37 @@ export default function Inventory() {
                   value={formData.intStockQuantity}
                   onChange={(e) => setFormData({...formData, intStockQuantity: e.target.value})}
                 />
+              </div>
+
+              {/* Warranty Defaults */}
+              <div>
+                <label className="text-sm font-medium text-neutral-700 mb-1 block">Default Warranty (Y/M/D)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Years"
+                    className="h-10"
+                    value={formData.intWarrantyYears}
+                    onChange={(e) => setFormData({ ...formData, intWarrantyYears: Math.max(0, Number(e.target.value) || 0) })}
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Months"
+                    className="h-10"
+                    value={formData.intWarrantyMonths}
+                    onChange={(e) => setFormData({ ...formData, intWarrantyMonths: Math.max(0, Number(e.target.value) || 0) })}
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Days"
+                    className="h-10"
+                    value={formData.intWarrantyDays}
+                    onChange={(e) => setFormData({ ...formData, intWarrantyDays: Math.max(0, Number(e.target.value) || 0) })}
+                  />
+                </div>
               </div>
 
               {/* Description */}
@@ -630,6 +685,37 @@ export default function Inventory() {
                   value={formData.intStockQuantity}
                   onChange={(e) => setFormData({...formData, intStockQuantity: e.target.value})}
                 />
+              </div>
+
+              {/* Warranty Defaults */}
+              <div>
+                <label className="text-sm font-medium text-neutral-700 mb-1 block">Default Warranty (Y/M/D)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Years"
+                    className="h-10"
+                    value={formData.intWarrantyYears}
+                    onChange={(e) => setFormData({ ...formData, intWarrantyYears: Math.max(0, Number(e.target.value) || 0) })}
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Months"
+                    className="h-10"
+                    value={formData.intWarrantyMonths}
+                    onChange={(e) => setFormData({ ...formData, intWarrantyMonths: Math.max(0, Number(e.target.value) || 0) })}
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Days"
+                    className="h-10"
+                    value={formData.intWarrantyDays}
+                    onChange={(e) => setFormData({ ...formData, intWarrantyDays: Math.max(0, Number(e.target.value) || 0) })}
+                  />
+                </div>
               </div>
 
               {/* Description */}
