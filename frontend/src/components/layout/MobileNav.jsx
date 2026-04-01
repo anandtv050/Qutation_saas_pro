@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, FilePlus, Package, BarChart3, Users, User, LogOut, X } from "lucide-react";
+import { Home, FilePlus, Package, BarChart3, Users, User, LogOut, X, Printer } from "lucide-react";
 
 const navItems = [
   { path: "/dashboard", label: "Home", icon: Home },
@@ -71,6 +71,17 @@ export default function MobileNav() {
                 >
                   <Users className="w-5 h-5" />
                   <span className="font-medium">User Management</span>
+                </Link>
+              )}
+
+              {isAdmin && (
+                <Link
+                  to="/print-settings"
+                  onClick={() => setShowProfileMenu(false)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-purple-600 hover:bg-purple-50 transition-colors"
+                >
+                  <Printer className="w-5 h-5" />
+                  <span className="font-medium">Print Settings</span>
                 </Link>
               )}
 

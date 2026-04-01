@@ -9,6 +9,7 @@ import Profile from "./pages/Profile";
 import UserManagement from "./pages/UserManagement";
 import AdminDashboard from "./pages/AdminDashboard";
 import WarrantyCertificate from "./pages/WarrantyCertificate";
+import PrintModelSettings from "./pages/PrintModelSettings";
 import MainLayout from "./components/layout/MainLayout";
 
 function App() {
@@ -51,6 +52,7 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/users" element={<UserManagement />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/print-settings" element={<PrintModelSettings />} />
         </Route>
 
         {/* Redirect unknown routes */}

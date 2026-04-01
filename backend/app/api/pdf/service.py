@@ -2,6 +2,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_RIGHT
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.platypus import (
     SimpleDocTemplate,
     Table,
@@ -9,15 +10,45 @@ from reportlab.platypus import (
     Paragraph,
     Spacer,
     HRFlowable,
+    Image,
 )
 from fastapi.responses import StreamingResponse
 import io
+import json
+from pathlib import Path
 
-# ── colour palette ──────────────────────────────────────────────
-BRAND_DARK   = colors.HexColor("#1B2A4A")
-BRAND_ACCENT = colors.HexColor("#2563EB")
+# ── column registry: maps column key → DB field per module ──────
+MODULE_COLUMN_REGISTRY = {
+    "QUOTATION": {
+        "item_code":  {"db_field": "vchr_item_code",  "label": "Item Code"},
+        "item_name":  {"db_field": "vchr_item_name",  "label": "Item"},
+        "unit":       {"db_field": "vchr_unit",        "label": "Unit"},
+        "qty":        {"db_field": "dbl_quantity",     "label": "Qty"},
+        "unit_price": {"db_field": "dbl_unit_price",   "label": "Unit Price"},
+        "amount":     {"db_field": None,               "label": "Amount"},  # computed: qty × unit_price
+    },
+    "INVOICE": {
+        "item_code":  {"db_field": "vchr_item_code",  "label": "Item Code"},
+        "item_name":  {"db_field": "vchr_item_name",  "label": "Description"},
+        "unit":       {"db_field": "vchr_unit",        "label": "Unit"},
+        "qty":        {"db_field": "dbl_quantity",     "label": "Qty"},
+        "unit_price": {"db_field": "dbl_unit_price",   "label": "Unit Price"},
+        "amount":     {"db_field": None,               "label": "Amount"},
+    },
+    "WARRANTY": {
+        "item_name":           {"db_field": "vchr_item_name",         "label": "Item"},
+        "qty":                 {"db_field": "dbl_quantity",            "label": "Qty"},
+        "warranty_period":     {"db_field": None,                      "label": "Warranty Period"},  # computed
+        "implementation_date": {"db_field": "dat_implementation_date", "label": "Impl. Date"},
+        "expiry_date":         {"db_field": "dat_expiry_date",         "label": "Expiry"},
+    },
+}
+
+# ── default colour palette (fallback when no user settings) ─────
+DEF_BRAND_DARK   = "#1B2A4A"
+DEF_BRAND_ACCENT = "#2563EB"
+
 LIGHT_BG     = colors.HexColor("#F8FAFC")
-TABLE_HEADER = colors.HexColor("#1E3A5F")
 ROW_ALT      = colors.HexColor("#F1F5F9")
 BORDER_CLR   = colors.HexColor("#CBD5E1")
 TEXT_DARK    = colors.HexColor("#1E293B")
@@ -31,47 +62,276 @@ class ClsPdfGenerator:
     def __init__(self, objPool, intUserid) -> None:
         self.intUserId = intUserid
         self.objPool = objPool
+        # Dynamic colours — set from user print settings (loaded lazily)
+        self._print_settings = None
+        self._column_config = []
+        self.BRAND_DARK   = colors.HexColor(DEF_BRAND_DARK)
+        self.BRAND_ACCENT = colors.HexColor(DEF_BRAND_ACCENT)
+        self.TABLE_HEADER = colors.HexColor("#1E3A5F")
 
-    # ── canvas: header on every page ────────────────────────────
-    def _draw_header(self, canvas, doc, *, business_name, email, phone, gst,
-                     doc_title="QUOTATION"):
-        canvas.saveState()
-        w, h = A4
+    def _setting(self, key, default=None):
+        if not self._print_settings:
+            return default
+        return self._print_settings.get(key, default)
 
-        # dark navy bar
-        bar_h = 80
-        canvas.setFillColor(BRAND_DARK)
-        canvas.rect(0, h - bar_h, w, bar_h, fill=True, stroke=False)
+    def _setting_bool(self, key, default=True):
+        return bool(self._setting(key, default))
 
-        # accent stripe
-        canvas.setFillColor(BRAND_ACCENT)
-        canvas.rect(0, h - bar_h - 3, w, 3, fill=True, stroke=False)
+    def _asset_path_or_url(self, raw_path):
+        """Resolve DB asset value to local absolute path (if possible) or URL."""
+        if not raw_path:
+            return None
+        p = str(raw_path).strip()
+        if not p:
+            return None
+        if p.startswith("http://") or p.startswith("https://"):
+            # If API URL points to /uploads/*, resolve to local backend/uploads/*.
+            try:
+                parsed = urlparse(p)
+                if parsed.path and "/uploads/" in parsed.path:
+                    rel = parsed.path.split("/uploads/", 1)[1].replace("\\", "/")
+                    base_dir = Path(__file__).resolve().parents[3]
+                    rel_parts = [seg for seg in rel.split("/") if seg]
+                    return str((base_dir / "uploads").joinpath(*rel_parts).resolve())
+            except Exception:
+                pass
+            return p
+        # Typical DB value: uploads/logos/file.png
+        base_dir = Path(__file__).resolve().parents[3]
+        norm = p.lstrip("/\\").replace("\\", "/")
+        rel_parts = [seg for seg in norm.split("/") if seg]
+        return str(base_dir.joinpath(*rel_parts).resolve())
 
-        # business name — large, left
-        canvas.setFillColor(colors.white)
-        canvas.setFont("Helvetica-Bold", 20)
-        canvas.drawString(40, h - 38, (business_name or "Your Business").upper())
+    def _footer_terms_lines(self):
+        txt = self._setting("txt_terms_text", "")
+        return [ln.strip() for ln in str(txt or "").splitlines() if ln.strip()]
 
-        # contact details below name — smaller
-        canvas.setFont("Helvetica", 8.5)
-        contact_parts = []
-        if phone:
-            contact_parts.append(phone)
-        if email:
-            contact_parts.append(email)
-        if gst:
-            contact_parts.append(f"GST: {gst}")
-        contact_line = "   |   ".join(contact_parts)
-        canvas.drawString(40, h - 55, contact_line)
+    def _clean_text(self, val):
+        txt = str(val or "").strip()
+        return txt
 
-        # doc title — right side, large
-        canvas.setFont("Helvetica-Bold", 22)
-        canvas.drawRightString(w - 40, h - 38, doc_title)
+    def _build_preview_style_header(
+        self,
+        *,
+        styles,
+        business_name,
+        phone,
+        email,
+        doc_title,
+        doc_number,
+        doc_date,
+    ):
+        """Build top header block closer to Print Model Settings preview."""
+        elements = []
+        # Accent top line like preview
+        elements.append(HRFlowable(
+            width="100%", thickness=4, color=self.BRAND_ACCENT,
+            spaceBefore=0, spaceAfter=10,
+        ))
 
-        canvas.restoreState()
+        stBiz = ParagraphStyle(
+            "pmBiz", parent=styles["Normal"],
+            fontSize=15, fontName="Helvetica-Bold", textColor=self.BRAND_DARK, leading=18,
+        )
+        stMini = ParagraphStyle(
+            "pmMini", parent=styles["Normal"],
+            fontSize=8.5, fontName="Helvetica", textColor=TEXT_DARK, leading=11,
+        )
+        # Fit title to right column width to avoid overlap with date/number.
+        title_text = str(doc_title or "QUOTATION").strip()
+        right_col_w = 230
+        usable_title_w = right_col_w - 6
+        title_size = 22
+        while title_size > 12 and stringWidth(title_text, "Helvetica-Bold", title_size) > usable_title_w:
+            title_size -= 1
+        stTitle = ParagraphStyle(
+            "pmTitle", parent=styles["Normal"],
+            fontSize=title_size, leading=title_size + 2,
+            fontName="Helvetica-Bold", textColor=self.BRAND_DARK, alignment=TA_RIGHT,
+            spaceAfter=2,
+        )
+        stMetaR = ParagraphStyle(
+            "pmMetaR", parent=styles["Normal"],
+            fontSize=8, fontName="Helvetica", textColor=TEXT_MUTED, alignment=TA_RIGHT, leading=10.5,
+        )
+        stMetaL = ParagraphStyle(
+            "pmMetaL", parent=styles["Normal"],
+            fontSize=8, fontName="Helvetica", textColor=TEXT_MUTED, alignment=TA_LEFT, leading=10.5,
+        )
+
+        left_parts = []
+        logo_path = self._asset_path_or_url(self._setting("vchr_logo_url"))
+        if logo_path:
+            try:
+                lw = float(self._setting("int_logo_width", 150) or 150)
+                lh = float(self._setting("int_logo_height", 150) or 150)
+                # Use DB-configured size directly (with only safety clamps).
+                draw_w = max(20, min(lw, 260))
+                draw_h = max(20, min(lh, 140))
+                left_parts.append(Image(logo_path, width=draw_w, height=draw_h))
+                left_parts.append(Spacer(1, 4))
+            except Exception:
+                pass
+        biz_txt = self._clean_text(business_name)
+        if self._setting_bool("bln_show_company_name", True) and biz_txt:
+            left_parts.append(Paragraph(biz_txt.lower(), stBiz))
+
+        contacts = []
+        if self._setting_bool("bln_show_phone", True) and phone:
+            contacts.append(str(phone))
+        if self._setting_bool("bln_show_email", True) and email:
+            contacts.append(str(email))
+        if contacts:
+            left_parts.append(Paragraph("   |   ".join(contacts), stMini))
+
+        right_parts = [
+            Paragraph(title_text, stTitle),
+            Paragraph(str(doc_date or "-"), stMetaR),
+            Paragraph(f"No: {doc_number or '-'}", stMetaR),
+        ]
+
+        header_tbl = Table([[left_parts, right_parts]], colWidths=[280, right_col_w])
+        header_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        elements.append(header_tbl)
+
+        # subtle contact strip
+        strip_txt = "   ".join([c for c in contacts if c])
+        if strip_txt:
+            strip_tbl = Table([[Paragraph(strip_txt, stMetaL)]], colWidths=[510])
+            strip_tbl.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FFFFFF")),
+                ("BOX", (0, 0), (-1, -1), 0.5, BORDER_CLR),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]))
+            elements.append(strip_tbl)
+            elements.append(Spacer(1, 8))
+        return elements
+
+    async def _load_print_settings(self, strModule="QUOTATION"):
+        """Fetch user print-model settings for the given module and set colours."""
+        strModule = (strModule or "QUOTATION").upper()
+        if self._print_settings is not None and self._print_settings.get("__module") == strModule:
+            return
+        async with self.objPool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT vchr_primary_color, vchr_accent_color, vchr_header_title, "
+                "bln_show_company_name, bln_show_phone, bln_show_email, bln_show_address, "
+                "vchr_logo_url, int_logo_width, int_logo_height, txt_header_custom_html, "
+                "bln_show_subtotal, bln_show_tax, bln_show_discount, bln_show_grand_total, "
+                "bln_show_signature, vchr_signature_url, int_signature_width, int_signature_height, "
+                "txt_terms_text, txt_footer_note, txt_footer_custom_html, "
+                "bln_qr_enabled, vchr_qr_link, vchr_qr_label, "
+                "jsonb_columns "
+                "FROM tbl_print_model_settings WHERE fk_bint_user_id = $1 AND vchr_module = $2",
+                self.intUserId, strModule,
+            )
+        if row:
+            self._print_settings = dict(row)
+            self._print_settings["__module"] = strModule
+            # Parse column config
+            cols_raw = row["jsonb_columns"]
+            if isinstance(cols_raw, str):
+                cols_raw = json.loads(cols_raw)
+            self._column_config = cols_raw or []
+            try:
+                self.BRAND_DARK   = colors.HexColor(row["vchr_primary_color"] or DEF_BRAND_DARK)
+                self.BRAND_ACCENT = colors.HexColor(row["vchr_accent_color"] or DEF_BRAND_ACCENT)
+                self.TABLE_HEADER = self.BRAND_DARK
+            except Exception:
+                pass
+        else:
+            self._print_settings = {"__module": strModule}
+            self._column_config = []
+
+    # ── dynamic column helpers ──────────────────────────────────
+    def _build_dynamic_columns(self, strModule):
+        """Return (col_keys, header_labels, col_widths_pts) from saved settings + registry."""
+        registry = MODULE_COLUMN_REGISTRY.get(strModule, {})
+        if self._column_config:
+            visible = sorted(
+                [c for c in self._column_config if c.get("visible", True)],
+                key=lambda c: c.get("order", 0),
+            )
+        else:
+            visible = [{"key": k, "widthPct": 100 // max(len(registry), 1)} for k in registry]
+
+        total_w = 510  # A4 width minus margins in points
+        col_keys, labels, widths = [], [], []
+        for col in visible:
+            key = col["key"]
+            meta = registry.get(key)
+            if not meta:
+                continue
+            col_keys.append(key)
+            labels.append(meta["label"])
+            widths.append(total_w * col["widthPct"] / 100)
+        # Safety: keep at least one visible column.
+        if not col_keys and registry:
+            first_key = next(iter(registry.keys()))
+            col_keys = [first_key]
+            labels = [registry[first_key]["label"]]
+            widths = [total_w]
+        return col_keys, labels, widths
+
+    def _extract_cell(self, strModule, key, item):
+        """Extract + format a cell value for the given column key.
+        Handles both DB rows (vchr_item_name) and request dicts (strItemName)."""
+        registry = MODULE_COLUMN_REGISTRY.get(strModule, {})
+        meta = registry.get(key, {})
+        db_field = meta.get("db_field")
+
+        def _get(db_name, *fallbacks):
+            """Try DB field name, then pydantic-style names, then fallbacks."""
+            if db_name and db_name in item:
+                return item[db_name]
+            for fb in fallbacks:
+                if fb in item:
+                    return item[fb]
+            return None
+
+        # Computed columns
+        if key == "amount":
+            qty = float(_get("dbl_quantity", "dblQuantity", "qty") or 0)
+            price = float(_get("dbl_unit_price", "dblUnitPrice", "price") or 0)
+            return f"{RUPEE} {qty * price:,.0f}"
+        if key == "warranty_period":
+            y = int(_get("int_warranty_years", "intWarrantyYears") or 0)
+            m = int(_get("int_warranty_months", "intWarrantyMonths") or 0)
+            d = int(_get("int_warranty_days", "intWarrantyDays") or 0)
+            if y == 0 and m == 0 and d == 0:
+                return "-"
+            return f"{y}Y {m}M {d}D"
+        if key == "unit_price":
+            val = float(_get("dbl_unit_price", "dblUnitPrice", "price") or 0)
+            return f"{RUPEE} {val:,.0f}"
+        if key == "qty":
+            val = float(_get("dbl_quantity", "dblQuantity", "qty") or 0)
+            return f"{val:g}"
+        if key == "item_name":
+            val = _get("vchr_item_name", "strItemName", "name")
+            return str(val or "-")
+        if key == "item_code":
+            val = _get("vchr_item_code", "strItemCode", "code")
+            return str(val or "-")
+        if key == "unit":
+            val = _get("vchr_unit", "strUnit", "unit")
+            return str(val or "-")
+
+        # Generic: try db_field then key directly
+        val = _get(db_field, key) if db_field else item.get(key, "")
+        return str(val or "-")
 
     # ── canvas: footer on every page ────────────────────────────
-    def _draw_footer(self, canvas, doc, *, business_name, phone):
+    def _draw_footer(self, canvas, doc):
         canvas.saveState()
         w, _ = A4
 
@@ -82,9 +342,7 @@ class ClsPdfGenerator:
 
         canvas.setFont("Helvetica", 7)
         canvas.setFillColor(TEXT_MUTED)
-        canvas.drawString(40, 40, business_name or "")
-        if phone:
-            canvas.drawString(40, 30, f"Contact: {phone}")
+        # Keep footer minimal to match print-model preview output.
         canvas.drawRightString(w - 40, 40, f"Page {doc.page}")
 
         canvas.restoreState()
@@ -92,6 +350,7 @@ class ClsPdfGenerator:
     # ── main quotation builder ──────────────────────────────────
     async def fnGetQuotationPdf(self, mdlRequest):
         """Generate a clean, professional quotation PDF."""
+        await self._load_print_settings("QUOTATION")
 
         # ── 1. Resolve data ─────────────────────────────────────
         strBusinessName = strEmail = strShopPhoneNumber = strShopGstNumber = ""
@@ -121,21 +380,13 @@ class ClsPdfGenerator:
                     return {"error": "Quotation not found"}
 
                 strItemsQuery = """
-                    SELECT vchr_item_name, dbl_quantity, dbl_unit_price
+                    SELECT *
                     FROM tbl_quotation_item
                     WHERE fk_bint_quotation_id = $1
                     ORDER BY int_sort_order
                 """
                 rstItems = await conn.fetch(strItemsQuery, mdlRequest.intQuotationId)
-
-                dctItems = [
-                    {
-                        "name": r["vchr_item_name"],
-                        "qty": float(r["dbl_quantity"]),
-                        "price": float(r["dbl_unit_price"]),
-                    }
-                    for r in rstItems
-                ]
+                dctItems = [dict(r) for r in rstItems]
 
                 strCustomerName    = rstQuotationHeader["vchr_customer_name"]
                 strCustomerPhone   = rstQuotationHeader["vchr_customer_phone"]
@@ -165,18 +416,30 @@ class ClsPdfGenerator:
             pagesize=A4,
             rightMargin=40,
             leftMargin=40,
-            topMargin=105,    # room for canvas header
+            topMargin=40,
             bottomMargin=70,  # room for canvas footer
         )
 
         styles = getSampleStyleSheet()
         elements = []
+        doc_title = self._setting("vchr_header_title", "QUOTATION") or "QUOTATION"
+        terms_lines = self._footer_terms_lines()
+        footer_note = self._setting("txt_footer_note", "")
+        elements.extend(self._build_preview_style_header(
+            styles=styles,
+            business_name=strBusinessName,
+            phone=strShopPhoneNumber,
+            email=strEmail,
+            doc_title=doc_title,
+            doc_number=strQuotationNumber,
+            doc_date=strQuotationDate,
+        ))
 
         # ── reusable styles ─────────────────────────────────────
         stSectionLabel = ParagraphStyle(
             "secLabel", parent=styles["Normal"],
             fontSize=7.5, fontName="Helvetica-Bold",
-            textColor=BRAND_ACCENT, spaceAfter=3,
+            textColor=self.BRAND_ACCENT, spaceAfter=3,
         )
         stName = ParagraphStyle(
             "secName", parent=styles["Normal"],
@@ -197,7 +460,7 @@ class ClsPdfGenerator:
         stLabelRight = ParagraphStyle(
             "secLabelR", parent=styles["Normal"],
             fontSize=7.5, fontName="Helvetica-Bold",
-            textColor=BRAND_ACCENT, spaceAfter=3,
+            textColor=self.BRAND_ACCENT, spaceAfter=3,
             alignment=TA_RIGHT,
         )
         stNameRight = ParagraphStyle(
@@ -207,67 +470,23 @@ class ClsPdfGenerator:
             alignment=TA_RIGHT,
         )
 
-        # ── FROM / BILL TO — two-column layout ─────────────────
-        # Left column: "From" (business details)
-        from_col = []
-        from_col.append(Paragraph("FROM", stSectionLabel))
-        from_col.append(Paragraph(
-            (strBusinessName or "Your Business").upper(), stName
-        ))
-        if strShopPhoneNumber:
-            from_col.append(Paragraph(f"Phone: {strShopPhoneNumber}", stDetail))
-        if strEmail:
-            from_col.append(Paragraph(f"Email: {strEmail}", stDetail))
-        if strShopGstNumber:
-            from_col.append(Paragraph(f"GST: {strShopGstNumber}", stDetail))
-
-        # Right column: "Bill To" (customer details)
-        to_col = []
-        to_col.append(Paragraph("BILL TO", stLabelRight))
-        to_col.append(Paragraph(strCustomerName or "-", stNameRight))
-        if strCustomerPhone:
-            to_col.append(Paragraph(f"Phone: {strCustomerPhone}", stDetailRight))
-        if strCustomerAddress:
-            to_col.append(Paragraph(strCustomerAddress, stDetailRight))
-
-        addr_table = Table(
-            [[from_col, to_col]],
-            colWidths=[260, 250],
+        # ── Bill To block (preview-style) ───────────────────────
+        billto_lbl = ParagraphStyle(
+            "qBillLbl", parent=styles["Normal"],
+            fontSize=9, fontName="Helvetica-Bold",
+            textColor=self.BRAND_DARK, spaceAfter=4,
         )
-        addr_table.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ]))
-        elements.append(addr_table)
+        billto_txt = ParagraphStyle(
+            "qBillTxt", parent=styles["Normal"],
+            fontSize=9, fontName="Helvetica",
+            textColor=TEXT_DARK, leading=12, spaceAfter=1,
+        )
+        elements.append(Paragraph("Bill To", billto_lbl))
+        if strCustomerName:
+            elements.append(Paragraph(str(strCustomerName), billto_txt))
+        if self._setting_bool("bln_show_address", True) and strCustomerAddress:
+            elements.append(Paragraph(str(strCustomerAddress), billto_txt))
         elements.append(Spacer(1, 10))
-
-        # ── Quotation No + Date row ────────────────────────────
-        stMetaLabel = ParagraphStyle(
-            "metaLbl", parent=styles["Normal"],
-            fontSize=8, fontName="Helvetica",
-            textColor=TEXT_MUTED,
-        )
-        stMetaVal = ParagraphStyle(
-            "metaVal", parent=styles["Normal"],
-            fontSize=9.5, fontName="Helvetica-Bold",
-            textColor=TEXT_DARK,
-        )
-
-        meta_data = [[
-            Paragraph("Quotation No.", stMetaLabel),
-            Paragraph(str(strQuotationNumber or "-"), stMetaVal),
-            Paragraph("Date", stMetaLabel),
-            Paragraph(str(strQuotationDate or "-"), stMetaVal),
-        ]]
-        meta_tbl = Table(meta_data, colWidths=[80, 180, 40, 210])
-        meta_tbl.setStyle(TableStyle([
-            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING",    (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ("BACKGROUND",    (0, 0), (-1, -1), LIGHT_BG),
-            ("ROUNDEDCORNERS", [4, 4, 4, 4]),
-        ]))
-        elements.append(meta_tbl)
-        elements.append(Spacer(1, 16))
 
         # ── divider ─────────────────────────────────────────────
         elements.append(HRFlowable(
@@ -275,51 +494,28 @@ class ClsPdfGenerator:
             spaceBefore=0, spaceAfter=14,
         ))
 
-        # ── ITEMS TABLE ─────────────────────────────────────────
-        col_widths = [30, 228, 50, 100, 100]
-        header_row = ["#", "Description", "Qty", "Unit Price", "Amount"]
+        # ── ITEMS TABLE (dynamic from print model settings) ─────
+        col_keys, col_labels, col_widths = self._build_dynamic_columns("QUOTATION")
 
-        tbl_data = [header_row]
+        tbl_data = [col_labels]
         grand_total = 0.0
 
-        stItemDesc = ParagraphStyle(
-            "itemDesc", parent=styles["Normal"],
-            fontSize=9, fontName="Helvetica", leading=12,
-        )
+        for item in dctItems:
+            row = [self._extract_cell("QUOTATION", k, item) for k in col_keys]
+            qty = float(item.get("dbl_quantity", 0))
+            price = float(item.get("dbl_unit_price", 0))
+            grand_total += qty * price
+            tbl_data.append(row)
 
-        for idx, item in enumerate(dctItems, start=1):
-            qty   = item["qty"]
-            price = item["price"]
-            total = qty * price
-            grand_total += total
-            tbl_data.append([
-                str(idx),
-                Paragraph(item["name"], stItemDesc),
-                f"{qty:g}",
-                f"{RUPEE} {price:,.2f}",
-                f"{RUPEE} {total:,.2f}",
-            ])
+        num_items = len(dctItems)
 
-        # grand total row
-        tbl_data.append([
-            "", "", "",
-            Paragraph("<b>Grand Total</b>", ParagraphStyle(
-                "gtLabel", parent=styles["Normal"],
-                fontSize=10, fontName="Helvetica-Bold",
-                textColor=TEXT_DARK, alignment=TA_RIGHT,
-            )),
-            Paragraph(f"<b>{RUPEE} {grand_total:,.2f}</b>", ParagraphStyle(
-                "gtVal", parent=styles["Normal"],
-                fontSize=10, fontName="Helvetica-Bold",
-                textColor=BRAND_DARK, alignment=TA_RIGHT,
-            )),
-        ])
+        show_grand_total = self._setting_bool("bln_show_grand_total", True)
 
         tbl = Table(tbl_data, colWidths=col_widths, repeatRows=1)
 
         tbl_style_rules = [
             # header
-            ("BACKGROUND",    (0, 0), (-1, 0), TABLE_HEADER),
+            ("BACKGROUND",    (0, 0), (-1, 0), self.TABLE_HEADER),
             ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
             ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE",      (0, 0), (-1, 0), 9),
@@ -327,65 +523,99 @@ class ClsPdfGenerator:
             ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
 
             # data rows
-            ("FONTNAME",      (0, 1), (-1, -2), "Helvetica"),
-            ("FONTSIZE",      (0, 1), (-1, -2), 9),
-            ("TOPPADDING",    (0, 1), (-1, -2), 7),
-            ("BOTTOMPADDING", (0, 1), (-1, -2), 7),
+            ("FONTNAME",      (0, 1), (-1, num_items), "Helvetica"),
+            ("FONTSIZE",      (0, 1), (-1, num_items), 9),
+            ("TOPPADDING",    (0, 1), (-1, num_items), 7),
+            ("BOTTOMPADDING", (0, 1), (-1, num_items), 7),
             ("VALIGN",        (0, 1), (-1, -1), "MIDDLE"),
 
-            # alignment
-            ("ALIGN", (0, 0), (0, -1), "CENTER"),   # #
-            ("ALIGN", (2, 0), (2, -1), "CENTER"),    # qty
-            ("ALIGN", (3, 0), (-1, -1), "RIGHT"),    # price + amount
+            # horizontal lines
+            ("LINEBELOW", (0, 0), (-1, 0), 0.8, self.TABLE_HEADER),
+            ("LINEBELOW", (0, 1), (-1, num_items), 0.3, BORDER_CLR),
 
-            # clean horizontal lines only
-            ("LINEBELOW", (0, 0), (-1, 0), 0.8, TABLE_HEADER),
-            ("LINEBELOW", (0, 1), (-1, -2), 0.3, BORDER_CLR),
-
-            # grand total row
-            ("LINEABOVE",     (0, -1), (-1, -1), 1.2, BRAND_DARK),
-            ("TOPPADDING",    (0, -1), (-1, -1), 10),
-            ("BOTTOMPADDING", (0, -1), (-1, -1), 10),
-            ("BACKGROUND",    (0, -1), (-1, -1), LIGHT_BG),
         ]
-
-        # alternating row colour
-        for i in range(1, len(tbl_data) - 1):
+        if len(col_keys) >= 2:
+            # right-align last 2 cols (price + amount)
+            tbl_style_rules.append(("ALIGN", (-2, 0), (-1, -1), "RIGHT"))
+        for i in range(1, num_items + 1):
             if i % 2 == 0:
-                tbl_style_rules.append(
-                    ("BACKGROUND", (0, i), (-1, i), ROW_ALT)
-                )
+                tbl_style_rules.append(("BACKGROUND", (0, i), (-1, i), ROW_ALT))
 
         tbl.setStyle(TableStyle(tbl_style_rules))
         elements.append(tbl)
-        elements.append(Spacer(1, 30))
+        elements.append(Spacer(1, 10))
 
-        # ── thank-you note ──────────────────────────────────────
-        stNote = ParagraphStyle(
-            "qNote", parent=styles["Normal"],
-            fontSize=9, fontName="Helvetica-Oblique",
-            textColor=TEXT_MUTED, spaceAfter=4,
+        # right-side grand total box (preview-style)
+        if show_grand_total:
+            gt_style = ParagraphStyle(
+                "qGt", parent=styles["Normal"],
+                fontSize=10, fontName="Helvetica-Bold", textColor=self.BRAND_DARK, alignment=TA_RIGHT,
+            )
+            gt_label_style = ParagraphStyle(
+                "qGtL", parent=styles["Normal"],
+                fontSize=10, fontName="Helvetica-Bold", textColor=TEXT_DARK, alignment=TA_LEFT,
+            )
+            gt_box = Table([[
+                Paragraph("Grand Total", gt_label_style),
+                Paragraph(f"{RUPEE} {grand_total:,.2f}", gt_style),
+            ]], colWidths=[120, 110])
+            gt_box.setStyle(TableStyle([
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("BOX", (0, 0), (-1, -1), 0.6, BORDER_CLR),
+                ("ROUNDEDCORNERS", [6, 6, 6, 6]),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]))
+            gt_wrap = Table([["", gt_box]], colWidths=[280, 230])
+            gt_wrap.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            elements.append(gt_wrap)
+            elements.append(Spacer(1, 22))
+        else:
+            elements.append(Spacer(1, 22))
+
+        # ── footer terms / note from DB settings ────────────────
+        stTermsHead = ParagraphStyle(
+            "qTermsHead", parent=styles["Normal"],
+            fontSize=8, fontName="Helvetica-Bold",
+            textColor=TEXT_DARK, spaceAfter=4,
         )
-        elements.append(Paragraph("Thank you for your business.", stNote))
-        elements.append(Paragraph(
-            "This quotation is valid for 15 days from the date of issue.",
-            stNote,
-        ))
+        stTermsItem = ParagraphStyle(
+            "qTermsItem", parent=styles["Normal"],
+            fontSize=8.5, fontName="Helvetica",
+            textColor=TEXT_MUTED, spaceAfter=2, leading=11,
+        )
+        if terms_lines:
+            elements.append(Paragraph("Terms & Conditions", stTermsHead))
+            for ln in terms_lines:
+                elements.append(Paragraph(f"• {ln}", stTermsItem))
+            elements.append(Spacer(1, 6))
+        if footer_note:
+            elements.append(Paragraph(str(footer_note), stTermsItem))
+
+        # signature block
+        if self._setting_bool("bln_show_signature", False):
+            sig = self._asset_path_or_url(self._setting("vchr_signature_url"))
+            if sig:
+                try:
+                    sig_w = float(self._setting("int_signature_width", 180) or 180)
+                    sig_h = float(self._setting("int_signature_height", 56) or 56)
+                    elements.append(Spacer(1, 10))
+                    elements.append(Paragraph("Authorized Signature", stTermsHead))
+                    elements.append(Image(sig, width=min(sig_w, 220), height=min(sig_h, 90)))
+                except Exception:
+                    pass
 
         # ── 3. Build with header/footer on every page ───────────
         def on_page(cvs, doc_ref):
-            self._draw_header(
-                cvs, doc_ref,
-                business_name=strBusinessName,
-                email=strEmail,
-                phone=strShopPhoneNumber,
-                gst=strShopGstNumber,
-            )
-            self._draw_footer(
-                cvs, doc_ref,
-                business_name=strBusinessName,
-                phone=strShopPhoneNumber,
-            )
+            self._draw_footer(cvs, doc_ref)
 
         doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)
         buffer.seek(0)
@@ -404,6 +634,7 @@ class ClsPdfGenerator:
     # ══════════════════════════════════════════════════════════════
     async def fnGetInvoicePdf(self, mdlRequest):
         """Generate a clean, professional invoice PDF."""
+        await self._load_print_settings("INVOICE")
 
         # ── 1. Resolve data ─────────────────────────────────────
         strBusinessName = strEmail = strShopPhoneNumber = strShopGstNumber = ""
@@ -443,21 +674,13 @@ class ClsPdfGenerator:
                     return {"error": "Invoice not found"}
 
                 strItemsQuery = """
-                    SELECT vchr_item_name, dbl_quantity, dbl_unit_price
+                    SELECT *
                     FROM tbl_invoice_item
                     WHERE fk_bint_invoice_id = $1
                     ORDER BY int_sort_order
                 """
                 rstItems = await conn.fetch(strItemsQuery, mdlRequest.intInvoiceId)
-
-                dctItems = [
-                    {
-                        "name": r["vchr_item_name"],
-                        "qty": float(r["dbl_quantity"]),
-                        "price": float(r["dbl_unit_price"]),
-                    }
-                    for r in rstItems
-                ]
+                dctItems = [dict(r) for r in rstItems]
 
                 strCustomerName    = rstHeader["vchr_customer_name"]
                 strCustomerPhone   = rstHeader["vchr_customer_phone"]
@@ -494,18 +717,30 @@ class ClsPdfGenerator:
             pagesize=A4,
             rightMargin=40,
             leftMargin=40,
-            topMargin=105,
+            topMargin=40,
             bottomMargin=70,
         )
 
         styles = getSampleStyleSheet()
         elements = []
+        doc_title = self._setting("vchr_header_title", "INVOICE") or "INVOICE"
+        terms_lines = self._footer_terms_lines()
+        footer_note = self._setting("txt_footer_note", "")
+        elements.extend(self._build_preview_style_header(
+            styles=styles,
+            business_name=strBusinessName,
+            phone=strShopPhoneNumber,
+            email=strEmail,
+            doc_title=doc_title,
+            doc_number=strInvoiceNumber,
+            doc_date=strInvoiceDate,
+        ))
 
         # ── reusable styles ─────────────────────────────────────
         stSectionLabel = ParagraphStyle(
             "iSecLabel", parent=styles["Normal"],
             fontSize=7.5, fontName="Helvetica-Bold",
-            textColor=BRAND_ACCENT, spaceAfter=3,
+            textColor=self.BRAND_ACCENT, spaceAfter=3,
         )
         stName = ParagraphStyle(
             "iSecName", parent=styles["Normal"],
@@ -526,7 +761,7 @@ class ClsPdfGenerator:
         stLabelRight = ParagraphStyle(
             "iSecLabelR", parent=styles["Normal"],
             fontSize=7.5, fontName="Helvetica-Bold",
-            textColor=BRAND_ACCENT, spaceAfter=3,
+            textColor=self.BRAND_ACCENT, spaceAfter=3,
             alignment=TA_RIGHT,
         )
         stNameRight = ParagraphStyle(
@@ -539,12 +774,13 @@ class ClsPdfGenerator:
         # ── FROM / BILL TO ─────────────────────────────────────
         from_col = []
         from_col.append(Paragraph("FROM", stSectionLabel))
-        from_col.append(Paragraph(
-            (strBusinessName or "Your Business").upper(), stName
-        ))
-        if strShopPhoneNumber:
+        if self._setting_bool("bln_show_company_name", True):
+            biz_text = self._clean_text(strBusinessName)
+            if biz_text:
+                from_col.append(Paragraph(biz_text.upper(), stName))
+        if self._setting_bool("bln_show_phone", True) and strShopPhoneNumber:
             from_col.append(Paragraph(f"Phone: {strShopPhoneNumber}", stDetail))
-        if strEmail:
+        if self._setting_bool("bln_show_email", True) and strEmail:
             from_col.append(Paragraph(f"Email: {strEmail}", stDetail))
         if strShopGstNumber:
             from_col.append(Paragraph(f"GST: {strShopGstNumber}", stDetail))
@@ -552,9 +788,9 @@ class ClsPdfGenerator:
         to_col = []
         to_col.append(Paragraph("BILL TO", stLabelRight))
         to_col.append(Paragraph(strCustomerName or "-", stNameRight))
-        if strCustomerPhone:
+        if self._setting_bool("bln_show_phone", True) and strCustomerPhone:
             to_col.append(Paragraph(f"Phone: {strCustomerPhone}", stDetailRight))
-        if strCustomerAddress:
+        if self._setting_bool("bln_show_address", True) and strCustomerAddress:
             to_col.append(Paragraph(strCustomerAddress, stDetailRight))
 
         addr_table = Table(
@@ -622,30 +858,20 @@ class ClsPdfGenerator:
             spaceBefore=0, spaceAfter=14,
         ))
 
-        # ── ITEMS TABLE ─────────────────────────────────────────
-        col_widths = [30, 228, 50, 100, 100]
-        header_row = ["#", "Description", "Qty", "Unit Price", "Amount"]
+        # ── ITEMS TABLE (dynamic from print model settings) ─────
+        col_keys, col_labels, col_widths = self._build_dynamic_columns("INVOICE")
 
-        tbl_data = [header_row]
+        tbl_data = [col_labels]
         subtotal = 0.0
 
-        stItemDesc = ParagraphStyle(
-            "iItemDesc", parent=styles["Normal"],
-            fontSize=9, fontName="Helvetica", leading=12,
-        )
+        for item in dctItems:
+            row = [self._extract_cell("INVOICE", k, item) for k in col_keys]
+            qty = float(item.get("dbl_quantity", 0))
+            price = float(item.get("dbl_unit_price", 0))
+            subtotal += qty * price
+            tbl_data.append(row)
 
-        for idx, item in enumerate(dctItems, start=1):
-            qty   = item["qty"]
-            price = item["price"]
-            total = qty * price
-            subtotal += total
-            tbl_data.append([
-                str(idx),
-                Paragraph(item["name"], stItemDesc),
-                f"{qty:g}",
-                f"{RUPEE} {price:,.2f}",
-                f"{RUPEE} {total:,.2f}",
-            ])
+        num_items = len(dctItems)
 
         # ── summary rows (subtotal, tax, discount, total) ──────
         stSumLabel = ParagraphStyle(
@@ -666,54 +892,65 @@ class ClsPdfGenerator:
         stTotalVal = ParagraphStyle(
             "iTotVal", parent=styles["Normal"],
             fontSize=10, fontName="Helvetica-Bold",
-            textColor=BRAND_DARK, alignment=TA_RIGHT,
+            textColor=self.BRAND_DARK, alignment=TA_RIGHT,
         )
 
+        # helper to build a summary row with label+value in last 2 columns
+        nc = len(col_keys)
+        def _sum_row(label_para, val_para):
+            if nc < 2:
+                return [Paragraph(f"{label_para.getPlainText()}: {val_para.getPlainText()}", stSumVal)]
+            r = [""] * nc
+            r[-2] = label_para
+            r[-1] = val_para
+            return r
+
+        show_subtotal = self._setting_bool("bln_show_subtotal", True)
+        show_tax = self._setting_bool("bln_show_tax", True)
+        show_discount = self._setting_bool("bln_show_discount", True)
+        show_grand_total = self._setting_bool("bln_show_grand_total", True)
+
         # subtotal row
-        tbl_data.append([
-            "", "", "",
-            Paragraph("Subtotal", stSumLabel),
-            Paragraph(f"{RUPEE} {subtotal:,.2f}", stSumVal),
-        ])
+        if show_subtotal:
+            tbl_data.append(_sum_row(
+                Paragraph("Subtotal", stSumLabel),
+                Paragraph(f"{RUPEE} {subtotal:,.2f}", stSumVal),
+            ))
 
         # tax row (if any)
-        if dblTaxPercent > 0 or dblTaxAmount > 0:
+        if show_tax and (dblTaxPercent > 0 or dblTaxAmount > 0):
             tax_label = f"Tax ({dblTaxPercent:g}%)" if dblTaxPercent else "Tax"
             tax_val = dblTaxAmount if dblTaxAmount else subtotal * dblTaxPercent / 100
-            tbl_data.append([
-                "", "", "",
+            tbl_data.append(_sum_row(
                 Paragraph(tax_label, stSumLabel),
                 Paragraph(f"{RUPEE} {tax_val:,.2f}", stSumVal),
-            ])
+            ))
         else:
             tax_val = 0.0
 
         # discount row (if any)
-        if dblDiscount > 0:
-            tbl_data.append([
-                "", "", "",
+        if show_discount and dblDiscount > 0:
+            tbl_data.append(_sum_row(
                 Paragraph("Discount", stSumLabel),
                 Paragraph(f"- {RUPEE} {dblDiscount:,.2f}", stSumVal),
-            ])
+            ))
 
         # grand total
         grand_total = subtotal + tax_val - dblDiscount
-        tbl_data.append([
-            "", "", "",
-            Paragraph("<b>Total</b>", stTotalLabel),
-            Paragraph(f"<b>{RUPEE} {grand_total:,.2f}</b>", stTotalVal),
-        ])
+        if show_grand_total:
+            tbl_data.append(_sum_row(
+                Paragraph("<b>Total</b>", stTotalLabel),
+                Paragraph(f"<b>{RUPEE} {grand_total:,.2f}</b>", stTotalVal),
+            ))
 
         tbl = Table(tbl_data, colWidths=col_widths, repeatRows=1)
 
-        # count of item rows (excluding summary rows)
-        num_items = len(dctItems)
-        # summary rows start after header + item rows
         summary_start = 1 + num_items
+        summary_row_count = len(tbl_data) - (1 + num_items)
 
         tbl_style_rules = [
             # header
-            ("BACKGROUND",    (0, 0), (-1, 0), TABLE_HEADER),
+            ("BACKGROUND",    (0, 0), (-1, 0), self.TABLE_HEADER),
             ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
             ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE",      (0, 0), (-1, 0), 9),
@@ -727,33 +964,32 @@ class ClsPdfGenerator:
             ("BOTTOMPADDING", (0, 1), (-1, num_items), 7),
             ("VALIGN",        (0, 1), (-1, -1), "MIDDLE"),
 
-            # alignment
-            ("ALIGN", (0, 0), (0, -1), "CENTER"),
-            ("ALIGN", (2, 0), (2, -1), "CENTER"),
-            ("ALIGN", (3, 0), (-1, -1), "RIGHT"),
-
-            # horizontal lines for items
-            ("LINEBELOW", (0, 0), (-1, 0), 0.8, TABLE_HEADER),
+            # horizontal lines
+            ("LINEBELOW", (0, 0), (-1, 0), 0.8, self.TABLE_HEADER),
             ("LINEBELOW", (0, 1), (-1, num_items), 0.3, BORDER_CLR),
 
-            # summary section separator
-            ("LINEABOVE", (3, summary_start), (-1, summary_start), 0.5, BORDER_CLR),
-            ("TOPPADDING",    (0, summary_start), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, summary_start), (-1, -1), 5),
-
-            # grand total row
-            ("LINEABOVE",     (3, -1), (-1, -1), 1.2, BRAND_DARK),
-            ("TOPPADDING",    (0, -1), (-1, -1), 10),
-            ("BOTTOMPADDING", (0, -1), (-1, -1), 10),
-            ("BACKGROUND",    (0, -1), (-1, -1), LIGHT_BG),
         ]
+        if len(col_keys) >= 2:
+            tbl_style_rules.append(("ALIGN", (-2, 0), (-1, -1), "RIGHT"))
+        if summary_row_count > 0:
+            tbl_style_rules.extend([
+                ("TOPPADDING",    (0, summary_start), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, summary_start), (-1, -1), 5),
+            ])
+            if len(col_keys) >= 2:
+                tbl_style_rules.append(("LINEABOVE", (-2, summary_start), (-1, summary_start), 0.5, BORDER_CLR))
+        if show_grand_total:
+            if len(col_keys) >= 2:
+                tbl_style_rules.extend([
+                    ("LINEABOVE",     (-2, -1), (-1, -1), 1.2, self.BRAND_DARK),
+                    ("TOPPADDING",    (0, -1), (-1, -1), 10),
+                    ("BOTTOMPADDING", (0, -1), (-1, -1), 10),
+                    ("BACKGROUND",    (0, -1), (-1, -1), LIGHT_BG),
+                ])
 
-        # alternating row colour for items only
         for i in range(1, num_items + 1):
             if i % 2 == 0:
-                tbl_style_rules.append(
-                    ("BACKGROUND", (0, i), (-1, i), ROW_ALT)
-                )
+                tbl_style_rules.append(("BACKGROUND", (0, i), (-1, i), ROW_ALT))
 
         tbl.setStyle(TableStyle(tbl_style_rules))
         elements.append(tbl)
@@ -775,29 +1011,41 @@ class ClsPdfGenerator:
             elements.append(Paragraph(strNotes, stNotesBody))
             elements.append(Spacer(1, 10))
 
-        # ── thank-you note ──────────────────────────────────────
+        # ── footer terms / note from DB settings ────────────────
         stNote = ParagraphStyle(
             "iNote", parent=styles["Normal"],
-            fontSize=9, fontName="Helvetica-Oblique",
-            textColor=TEXT_MUTED, spaceAfter=4,
+            fontSize=9, fontName="Helvetica",
+            textColor=TEXT_MUTED, spaceAfter=3, leading=12,
         )
-        elements.append(Paragraph("Thank you for your business.", stNote))
+        if terms_lines:
+            elements.append(Paragraph("Terms & Conditions", ParagraphStyle(
+                "iTermsHead", parent=styles["Normal"],
+                fontSize=8, fontName="Helvetica-Bold", textColor=TEXT_DARK, spaceAfter=4,
+            )))
+            for ln in terms_lines:
+                elements.append(Paragraph(f"• {ln}", stNote))
+            elements.append(Spacer(1, 6))
+        if footer_note:
+            elements.append(Paragraph(str(footer_note), stNote))
+
+        if self._setting_bool("bln_show_signature", False):
+            sig = self._asset_path_or_url(self._setting("vchr_signature_url"))
+            if sig:
+                try:
+                    sig_w = float(self._setting("int_signature_width", 180) or 180)
+                    sig_h = float(self._setting("int_signature_height", 56) or 56)
+                    elements.append(Spacer(1, 10))
+                    elements.append(Paragraph("Authorized Signature", ParagraphStyle(
+                        "iSignLbl", parent=styles["Normal"],
+                        fontSize=8, fontName="Helvetica-Bold", textColor=TEXT_DARK, spaceAfter=3,
+                    )))
+                    elements.append(Image(sig, width=min(sig_w, 220), height=min(sig_h, 90)))
+                except Exception:
+                    pass
 
         # ── 3. Build with header/footer ─────────────────────────
         def on_page(cvs, doc_ref):
-            self._draw_header(
-                cvs, doc_ref,
-                business_name=strBusinessName,
-                email=strEmail,
-                phone=strShopPhoneNumber,
-                gst=strShopGstNumber,
-                doc_title="INVOICE",
-            )
-            self._draw_footer(
-                cvs, doc_ref,
-                business_name=strBusinessName,
-                phone=strShopPhoneNumber,
-            )
+            self._draw_footer(cvs, doc_ref)
 
         doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)
         buffer.seek(0)
@@ -813,7 +1061,9 @@ class ClsPdfGenerator:
 
     async def fnGetWarrantyCertificatePdf(self, mdlRequest):
         """Generate warranty certificate PDF directly from quotation items."""
+        await self._load_print_settings("WARRANTY")
         strBusinessName = strEmail = strShopPhoneNumber = strShopGstNumber = ""
+        doc_title = self._setting("vchr_header_title", "WARRANTY CERTIFICATE") or "WARRANTY CERTIFICATE"
 
         async with self.objPool.acquire() as conn:
             intQuotationId = mdlRequest.intQuotationId
@@ -884,24 +1134,12 @@ class ClsPdfGenerator:
             """
             rstItems = await conn.fetch(strItemsQuery, intQuotationId)
 
-            dctItems = [
-                {
-                    "name": row["vchr_item_name"],
-                    "quantity": float(row["dbl_quantity"] or 0),
-                    "unit": row["vchr_unit"] or "piece",
-                    "implementation_date": row["dat_implementation_date"],
-                    "years": int(row["int_warranty_years"] or 0),
-                    "months": int(row["int_warranty_months"] or 0),
-                    "days": int(row["int_warranty_days"] or 0),
-                    "expiry_date": row["dat_expiry_date"],
-                }
-                for row in rstItems
-            ]
+            dctItems = [dict(row) for row in rstItems]
 
             # Get common implementation date (first item's date)
             strImplementationDate = None
             if dctItems:
-                strImplementationDate = dctItems[0].get("implementation_date")
+                strImplementationDate = dctItems[0].get("dat_implementation_date")
 
             strCustomerName = rstHeader["vchr_customer_name"]
             strCustomerPhone = rstHeader["vchr_customer_phone"]
@@ -920,17 +1158,26 @@ class ClsPdfGenerator:
             pagesize=A4,
             rightMargin=40,
             leftMargin=40,
-            topMargin=105,
+            topMargin=40,
             bottomMargin=70,
         )
 
         styles = getSampleStyleSheet()
         elements = []
+        elements.extend(self._build_preview_style_header(
+            styles=styles,
+            business_name=strBusinessName,
+            phone=strShopPhoneNumber,
+            email=strEmail,
+            doc_title=doc_title,
+            doc_number=(strInvoiceNumber or strQuotationNumber),
+            doc_date=strImplementationDate,
+        ))
 
         stSectionLabel = ParagraphStyle(
             "wSecLabel", parent=styles["Normal"],
             fontSize=7.5, fontName="Helvetica-Bold",
-            textColor=BRAND_ACCENT, spaceAfter=3,
+            textColor=self.BRAND_ACCENT, spaceAfter=3,
         )
         stName = ParagraphStyle(
             "wSecName", parent=styles["Normal"],
@@ -951,7 +1198,7 @@ class ClsPdfGenerator:
         stLabelRight = ParagraphStyle(
             "wSecLabelR", parent=styles["Normal"],
             fontSize=7.5, fontName="Helvetica-Bold",
-            textColor=BRAND_ACCENT, spaceAfter=3,
+            textColor=self.BRAND_ACCENT, spaceAfter=3,
             alignment=TA_RIGHT,
         )
         stNameRight = ParagraphStyle(
@@ -963,10 +1210,13 @@ class ClsPdfGenerator:
 
         from_col = []
         from_col.append(Paragraph("FROM", stSectionLabel))
-        from_col.append(Paragraph((strBusinessName or "Your Business").upper(), stName))
-        if strShopPhoneNumber:
+        if self._setting_bool("bln_show_company_name", True):
+            biz_text = self._clean_text(strBusinessName)
+            if biz_text:
+                from_col.append(Paragraph(biz_text.upper(), stName))
+        if self._setting_bool("bln_show_phone", True) and strShopPhoneNumber:
             from_col.append(Paragraph(f"Phone: {strShopPhoneNumber}", stDetail))
-        if strEmail:
+        if self._setting_bool("bln_show_email", True) and strEmail:
             from_col.append(Paragraph(f"Email: {strEmail}", stDetail))
         if strShopGstNumber:
             from_col.append(Paragraph(f"GST: {strShopGstNumber}", stDetail))
@@ -974,9 +1224,9 @@ class ClsPdfGenerator:
         to_col = []
         to_col.append(Paragraph("CUSTOMER", stLabelRight))
         to_col.append(Paragraph(strCustomerName or "-", stNameRight))
-        if strCustomerPhone:
+        if self._setting_bool("bln_show_phone", True) and strCustomerPhone:
             to_col.append(Paragraph(f"Phone: {strCustomerPhone}", stDetailRight))
-        if strCustomerAddress:
+        if self._setting_bool("bln_show_address", True) and strCustomerAddress:
             to_col.append(Paragraph(strCustomerAddress, stDetailRight))
 
         addr_table = Table([[from_col, to_col]], colWidths=[260, 250])
@@ -1039,29 +1289,21 @@ class ClsPdfGenerator:
             spaceBefore=0, spaceAfter=12,
         ))
 
-        header_row = ["#", "Item", "Qty", "Expiry"]
-        tbl_data = [header_row]
-        stItemDesc = ParagraphStyle(
-            "wItemDesc", parent=styles["Normal"],
-            fontSize=9, fontName="Helvetica", leading=12,
-        )
+        # ── ITEMS TABLE (dynamic from print model settings) ─────
+        col_keys, col_labels, col_widths = self._build_dynamic_columns("WARRANTY")
+        tbl_data = [col_labels]
 
-        for idx, item in enumerate(dctItems, start=1):
-            dblQty = item["quantity"]
-            strQty = f"{int(dblQty)}" if dblQty == int(dblQty) else f"{dblQty}"
-            tbl_data.append([
-                str(idx),
-                Paragraph(item["name"], stItemDesc),
-                strQty,
-                str(item["expiry_date"] or "-"),
-            ])
+        for item in dctItems:
+            row = [self._extract_cell("WARRANTY", k, item) for k in col_keys]
+            tbl_data.append(row)
 
         if len(tbl_data) == 1:
-            tbl_data.append(["", Paragraph("No items", stItemDesc), "-", "-"])
+            tbl_data.append(["No items with warranty"] + [""] * (len(col_keys) - 1))
 
-        tbl = Table(tbl_data, colWidths=[30, 310, 60, 110], repeatRows=1)
+        num_items = len(tbl_data) - 1
+        tbl = Table(tbl_data, colWidths=col_widths, repeatRows=1)
         tbl_style_rules = [
-            ("BACKGROUND",    (0, 0), (-1, 0), TABLE_HEADER),
+            ("BACKGROUND",    (0, 0), (-1, 0), self.TABLE_HEADER),
             ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
             ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE",      (0, 0), (-1, 0), 9),
@@ -1072,12 +1314,10 @@ class ClsPdfGenerator:
             ("TOPPADDING",    (0, 1), (-1, -1), 7),
             ("BOTTOMPADDING", (0, 1), (-1, -1), 7),
             ("VALIGN",        (0, 1), (-1, -1), "MIDDLE"),
-            ("ALIGN",         (0, 0), (0, -1), "CENTER"),
-            ("ALIGN",         (2, 0), (-1, -1), "CENTER"),
-            ("LINEBELOW",     (0, 0), (-1, 0), 0.8, TABLE_HEADER),
+            ("LINEBELOW",     (0, 0), (-1, 0), 0.8, self.TABLE_HEADER),
             ("LINEBELOW",     (0, 1), (-1, -1), 0.3, BORDER_CLR),
         ]
-        for i in range(1, len(tbl_data)):
+        for i in range(1, num_items + 1):
             if i % 2 == 0:
                 tbl_style_rules.append(("BACKGROUND", (0, i), (-1, i), ROW_ALT))
 
@@ -1087,25 +1327,42 @@ class ClsPdfGenerator:
 
         stNote = ParagraphStyle(
             "wNote", parent=styles["Normal"],
-            fontSize=9, fontName="Helvetica-Oblique",
-            textColor=TEXT_MUTED, spaceAfter=4,
+            fontSize=9, fontName="Helvetica",
+            textColor=TEXT_MUTED, spaceAfter=3, leading=12,
         )
-        elements.append(Paragraph("This certificate is generated based on recorded implementation details.", stNote))
+        terms_lines = self._footer_terms_lines()
+        footer_note = self._setting("txt_footer_note", "")
+        if terms_lines:
+            elements.append(Paragraph("Warranty Terms", ParagraphStyle(
+                "wTermsHead", parent=styles["Normal"],
+                fontSize=8, fontName="Helvetica-Bold", textColor=TEXT_DARK, spaceAfter=4,
+            )))
+            for ln in terms_lines:
+                elements.append(Paragraph(f"• {ln}", stNote))
+            elements.append(Spacer(1, 6))
+
+        if footer_note:
+            elements.append(Paragraph(str(footer_note), stNote))
+        else:
+            elements.append(Paragraph("This certificate is generated based on recorded implementation details.", stNote))
+
+        if self._setting_bool("bln_show_signature", False):
+            sig = self._asset_path_or_url(self._setting("vchr_signature_url"))
+            if sig:
+                try:
+                    sig_w = float(self._setting("int_signature_width", 180) or 180)
+                    sig_h = float(self._setting("int_signature_height", 56) or 56)
+                    elements.append(Spacer(1, 10))
+                    elements.append(Paragraph("Authorized Signature", ParagraphStyle(
+                        "wSignLbl", parent=styles["Normal"],
+                        fontSize=8, fontName="Helvetica-Bold", textColor=TEXT_DARK, spaceAfter=3,
+                    )))
+                    elements.append(Image(sig, width=min(sig_w, 220), height=min(sig_h, 90)))
+                except Exception:
+                    pass
 
         def on_page(cvs, doc_ref):
-            self._draw_header(
-                cvs, doc_ref,
-                business_name=strBusinessName,
-                email=strEmail,
-                phone=strShopPhoneNumber,
-                gst=strShopGstNumber,
-                doc_title="WARRANTY CERTIFICATE",
-            )
-            self._draw_footer(
-                cvs, doc_ref,
-                business_name=strBusinessName,
-                phone=strShopPhoneNumber,
-            )
+            self._draw_footer(cvs, doc_ref)
 
         doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)
         buffer.seek(0)

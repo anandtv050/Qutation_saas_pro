@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, FilePlus, Package, BarChart3, User, LogOut, Users } from "lucide-react";
+import { Home, FilePlus, Package, BarChart3, User, LogOut, Users, Printer } from "lucide-react";
 
 const navItems = [
   { path: "/dashboard", label: "Home", icon: Home },
@@ -79,6 +79,19 @@ export default function Sidebar() {
           >
             <Users className={`w-[18px] h-[18px] ${location.pathname === "/users" ? "text-white" : "text-purple-500"}`} />
             <span>Users</span>
+          </Link>
+        )}
+        {isAdmin && (
+          <Link
+            to="/print-settings"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+              location.pathname === "/print-settings"
+                ? "bg-purple-600 text-white"
+                : "text-purple-600 hover:bg-purple-50 hover:text-purple-700"
+            }`}
+          >
+            <Printer className={`w-[18px] h-[18px] ${location.pathname === "/print-settings" ? "text-white" : "text-purple-500"}`} />
+            <span>Print Settings</span>
           </Link>
         )}
         <Link

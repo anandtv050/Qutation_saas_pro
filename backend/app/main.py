@@ -6,9 +6,17 @@ __author__ = "Anand"
 
 from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent / ".env")
+
+# Load env in a stable order:
+# 1) legacy app-local env (if present)
+# 2) project backend/.env (wins and should be the source of truth)
+_APP_ENV_PATH = Path(__file__).parent / ".env"
+_BACKEND_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(_APP_ENV_PATH)
+load_dotenv(_BACKEND_ENV_PATH, override=True)
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import importlib
@@ -35,6 +43,7 @@ LST_ROUTERS = [
     "app.api.pdf.router",
     "app.api.ai.router",
     "app.api.user.router",          # User management (Admin only)
+    "app.api.print_settings.router", # Print model settings per user
 ]
 
 
@@ -145,6 +154,11 @@ def fnCreateApp() -> FastAPI:
         except Exception as e:
             logger.error(f"Failed to load router {strModulePath}: {e}")
             raise
+
+    # Serve uploaded files (logos, signatures) at /uploads/
+    uploads_dir = Path(__file__).resolve().parents[1] / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
     return app
 
