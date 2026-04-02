@@ -110,6 +110,32 @@ class ClsPdfGenerator:
         txt = str(val or "").strip()
         return txt
 
+    def _build_footer_box(self, elements):
+        """Render txt_footer_custom_html as a filled color box with white text."""
+        footer_extra = self._clean_text(self._setting("txt_footer_custom_html"))
+        if not footer_extra:
+            return
+        stBoxText = ParagraphStyle(
+            "footerBoxText", fontName="Helvetica", fontSize=8,
+            leading=11, textColor=colors.white, alignment=TA_LEFT,
+        )
+        lines = [Paragraph(ln.strip(), stBoxText)
+                 for ln in footer_extra.splitlines() if ln.strip()]
+        if not lines:
+            return
+        elements.append(Spacer(1, 12))
+        box_tbl = Table([[lines]], colWidths=[510])
+        box_tbl.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), self.BRAND_DARK),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
+            ("TOPPADDING",    (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ("ROUNDEDCORNERS", [4, 4, 4, 4]),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ]))
+        elements.append(box_tbl)
+
     def _build_preview_style_header(
         self,
         *,
@@ -154,11 +180,6 @@ class ClsPdfGenerator:
             "pmMetaR", parent=styles["Normal"],
             fontSize=8, fontName="Helvetica", textColor=TEXT_MUTED, alignment=TA_RIGHT, leading=10.5,
         )
-        stMetaL = ParagraphStyle(
-            "pmMetaL", parent=styles["Normal"],
-            fontSize=8, fontName="Helvetica", textColor=TEXT_MUTED, alignment=TA_LEFT, leading=10.5,
-        )
-
         left_parts = []
         logo_path = self._asset_path_or_url(self._setting("vchr_logo_url"))
         if logo_path:
@@ -174,7 +195,7 @@ class ClsPdfGenerator:
                 pass
         biz_txt = self._clean_text(business_name)
         if self._setting_bool("bln_show_company_name", True) and biz_txt:
-            left_parts.append(Paragraph(biz_txt.lower(), stBiz))
+            left_parts.append(Paragraph(biz_txt.upper(), stBiz))
 
         contacts = []
         if self._setting_bool("bln_show_phone", True) and phone:
@@ -183,6 +204,13 @@ class ClsPdfGenerator:
             contacts.append(str(email))
         if contacts:
             left_parts.append(Paragraph("   |   ".join(contacts), stMini))
+
+        header_extra = self._clean_text(self._setting("txt_header_custom_html"))
+        if header_extra:
+            for ln in header_extra.splitlines():
+                ln = ln.strip()
+                if ln:
+                    left_parts.append(Paragraph(ln, stMini))
 
         right_parts = [
             Paragraph(title_text, stTitle),
@@ -199,21 +227,7 @@ class ClsPdfGenerator:
             ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
         ]))
         elements.append(header_tbl)
-
-        # subtle contact strip
-        strip_txt = "   ".join([c for c in contacts if c])
-        if strip_txt:
-            strip_tbl = Table([[Paragraph(strip_txt, stMetaL)]], colWidths=[510])
-            strip_tbl.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FFFFFF")),
-                ("BOX", (0, 0), (-1, -1), 0.5, BORDER_CLR),
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-            ]))
-            elements.append(strip_tbl)
-            elements.append(Spacer(1, 8))
+        elements.append(Spacer(1, 8))
         return elements
 
     async def _load_print_settings(self, strModule="QUOTATION"):
@@ -282,9 +296,17 @@ class ClsPdfGenerator:
             widths = [total_w]
         return col_keys, labels, widths
 
+    def _cell_style(self, key):
+        """Return a ParagraphStyle for table cells — wraps long text."""
+        align = TA_RIGHT if key in ("amount", "unit_price") else TA_LEFT
+        return ParagraphStyle(
+            f"cell_{key}", fontName="Helvetica", fontSize=9,
+            leading=11, textColor=TEXT_DARK, alignment=align,
+        )
+
     def _extract_cell(self, strModule, key, item):
         """Extract + format a cell value for the given column key.
-        Handles both DB rows (vchr_item_name) and request dicts (strItemName)."""
+        Returns a Paragraph so long text wraps inside the column."""
         registry = MODULE_COLUMN_REGISTRY.get(strModule, {})
         meta = registry.get(key, {})
         db_field = meta.get("db_field")
@@ -302,33 +324,33 @@ class ClsPdfGenerator:
         if key == "amount":
             qty = float(_get("dbl_quantity", "dblQuantity", "qty") or 0)
             price = float(_get("dbl_unit_price", "dblUnitPrice", "price") or 0)
-            return f"{RUPEE} {qty * price:,.0f}"
-        if key == "warranty_period":
+            text = f"{RUPEE} {qty * price:,.0f}"
+        elif key == "warranty_period":
             y = int(_get("int_warranty_years", "intWarrantyYears") or 0)
             m = int(_get("int_warranty_months", "intWarrantyMonths") or 0)
             d = int(_get("int_warranty_days", "intWarrantyDays") or 0)
-            if y == 0 and m == 0 and d == 0:
-                return "-"
-            return f"{y}Y {m}M {d}D"
-        if key == "unit_price":
+            text = "-" if y == 0 and m == 0 and d == 0 else f"{y}Y {m}M {d}D"
+        elif key == "unit_price":
             val = float(_get("dbl_unit_price", "dblUnitPrice", "price") or 0)
-            return f"{RUPEE} {val:,.0f}"
-        if key == "qty":
+            text = f"{RUPEE} {val:,.0f}"
+        elif key == "qty":
             val = float(_get("dbl_quantity", "dblQuantity", "qty") or 0)
-            return f"{val:g}"
-        if key == "item_name":
+            text = f"{val:g}"
+        elif key == "item_name":
             val = _get("vchr_item_name", "strItemName", "name")
-            return str(val or "-")
-        if key == "item_code":
+            text = str(val or "-")
+        elif key == "item_code":
             val = _get("vchr_item_code", "strItemCode", "code")
-            return str(val or "-")
-        if key == "unit":
+            text = str(val or "-")
+        elif key == "unit":
             val = _get("vchr_unit", "strUnit", "unit")
-            return str(val or "-")
+            text = str(val or "-")
+        else:
+            # Generic: try db_field then key directly
+            val = _get(db_field, key) if db_field else item.get(key, "")
+            text = str(val or "-")
 
-        # Generic: try db_field then key directly
-        val = _get(db_field, key) if db_field else item.get(key, "")
-        return str(val or "-")
+        return Paragraph(text, self._cell_style(key))
 
     # ── canvas: footer on every page ────────────────────────────
     def _draw_footer(self, canvas, doc):
@@ -342,7 +364,6 @@ class ClsPdfGenerator:
 
         canvas.setFont("Helvetica", 7)
         canvas.setFillColor(TEXT_MUTED)
-        # Keep footer minimal to match print-model preview output.
         canvas.drawRightString(w - 40, 40, f"Page {doc.page}")
 
         canvas.restoreState()
@@ -424,7 +445,6 @@ class ClsPdfGenerator:
         elements = []
         doc_title = self._setting("vchr_header_title", "QUOTATION") or "QUOTATION"
         terms_lines = self._footer_terms_lines()
-        footer_note = self._setting("txt_footer_note", "")
         elements.extend(self._build_preview_style_header(
             styles=styles,
             business_name=strBusinessName,
@@ -597,6 +617,8 @@ class ClsPdfGenerator:
             for ln in terms_lines:
                 elements.append(Paragraph(f"• {ln}", stTermsItem))
             elements.append(Spacer(1, 6))
+
+        footer_note = self._setting("txt_footer_note", "")
         if footer_note:
             elements.append(Paragraph(str(footer_note), stTermsItem))
 
@@ -612,6 +634,8 @@ class ClsPdfGenerator:
                     elements.append(Image(sig, width=min(sig_w, 220), height=min(sig_h, 90)))
                 except Exception:
                     pass
+
+        self._build_footer_box(elements)
 
         # ── 3. Build with header/footer on every page ───────────
         def on_page(cvs, doc_ref):
@@ -725,7 +749,6 @@ class ClsPdfGenerator:
         elements = []
         doc_title = self._setting("vchr_header_title", "INVOICE") or "INVOICE"
         terms_lines = self._footer_terms_lines()
-        footer_note = self._setting("txt_footer_note", "")
         elements.extend(self._build_preview_style_header(
             styles=styles,
             business_name=strBusinessName,
@@ -1025,6 +1048,8 @@ class ClsPdfGenerator:
             for ln in terms_lines:
                 elements.append(Paragraph(f"• {ln}", stNote))
             elements.append(Spacer(1, 6))
+
+        footer_note = self._setting("txt_footer_note", "")
         if footer_note:
             elements.append(Paragraph(str(footer_note), stNote))
 
@@ -1042,6 +1067,8 @@ class ClsPdfGenerator:
                     elements.append(Image(sig, width=min(sig_w, 220), height=min(sig_h, 90)))
                 except Exception:
                     pass
+
+        self._build_footer_box(elements)
 
         # ── 3. Build with header/footer ─────────────────────────
         def on_page(cvs, doc_ref):
@@ -1208,32 +1235,22 @@ class ClsPdfGenerator:
             alignment=TA_RIGHT,
         )
 
-        from_col = []
-        from_col.append(Paragraph("FROM", stSectionLabel))
-        if self._setting_bool("bln_show_company_name", True):
-            biz_text = self._clean_text(strBusinessName)
-            if biz_text:
-                from_col.append(Paragraph(biz_text.upper(), stName))
-        if self._setting_bool("bln_show_phone", True) and strShopPhoneNumber:
-            from_col.append(Paragraph(f"Phone: {strShopPhoneNumber}", stDetail))
-        if self._setting_bool("bln_show_email", True) and strEmail:
-            from_col.append(Paragraph(f"Email: {strEmail}", stDetail))
-        if strShopGstNumber:
-            from_col.append(Paragraph(f"GST: {strShopGstNumber}", stDetail))
-
-        to_col = []
-        to_col.append(Paragraph("CUSTOMER", stLabelRight))
-        to_col.append(Paragraph(strCustomerName or "-", stNameRight))
-        if self._setting_bool("bln_show_phone", True) and strCustomerPhone:
-            to_col.append(Paragraph(f"Phone: {strCustomerPhone}", stDetailRight))
+        # ── Bill To block (same style as quotation) ──────────────
+        billto_lbl = ParagraphStyle(
+            "wBillLbl", parent=styles["Normal"],
+            fontSize=9, fontName="Helvetica-Bold",
+            textColor=self.BRAND_DARK, spaceAfter=4,
+        )
+        billto_txt = ParagraphStyle(
+            "wBillTxt", parent=styles["Normal"],
+            fontSize=9, fontName="Helvetica",
+            textColor=TEXT_DARK, leading=12, spaceAfter=1,
+        )
+        elements.append(Paragraph("Bill To", billto_lbl))
+        if strCustomerName:
+            elements.append(Paragraph(str(strCustomerName), billto_txt))
         if self._setting_bool("bln_show_address", True) and strCustomerAddress:
-            to_col.append(Paragraph(strCustomerAddress, stDetailRight))
-
-        addr_table = Table([[from_col, to_col]], colWidths=[260, 250])
-        addr_table.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ]))
-        elements.append(addr_table)
+            elements.append(Paragraph(str(strCustomerAddress), billto_txt))
         elements.append(Spacer(1, 10))
 
         stMetaLabel = ParagraphStyle(
@@ -1251,7 +1268,7 @@ class ClsPdfGenerator:
             [[
                 Paragraph("Certificate No.", stMetaLabel),
                 Paragraph(str(strCertificateNumber or "-"), stMetaVal),
-                Paragraph("Implementation Date", stMetaLabel),
+                Paragraph("Installation Date", stMetaLabel),
                 Paragraph(str(strImplementationDate or "-"), stMetaVal),
             ]],
             colWidths=[90, 170, 110, 140],
@@ -1331,7 +1348,6 @@ class ClsPdfGenerator:
             textColor=TEXT_MUTED, spaceAfter=3, leading=12,
         )
         terms_lines = self._footer_terms_lines()
-        footer_note = self._setting("txt_footer_note", "")
         if terms_lines:
             elements.append(Paragraph("Warranty Terms", ParagraphStyle(
                 "wTermsHead", parent=styles["Normal"],
@@ -1341,10 +1357,9 @@ class ClsPdfGenerator:
                 elements.append(Paragraph(f"• {ln}", stNote))
             elements.append(Spacer(1, 6))
 
+        footer_note = self._setting("txt_footer_note", "")
         if footer_note:
             elements.append(Paragraph(str(footer_note), stNote))
-        else:
-            elements.append(Paragraph("This certificate is generated based on recorded implementation details.", stNote))
 
         if self._setting_bool("bln_show_signature", False):
             sig = self._asset_path_or_url(self._setting("vchr_signature_url"))
@@ -1360,6 +1375,8 @@ class ClsPdfGenerator:
                     elements.append(Image(sig, width=min(sig_w, 220), height=min(sig_h, 90)))
                 except Exception:
                     pass
+
+        self._build_footer_box(elements)
 
         def on_page(cvs, doc_ref):
             self._draw_footer(cvs, doc_ref)

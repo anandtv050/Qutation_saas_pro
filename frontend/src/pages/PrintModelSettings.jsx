@@ -95,20 +95,6 @@ function placeholderValue(key, row) {
 }
 
 /* ── helpers ─────────────────────────────────────────────────── */
-function sanitizeHtml(input) {
-  if (!input?.trim()) return "";
-  const doc = new DOMParser().parseFromString(input, "text/html");
-  doc.querySelectorAll("script,style,iframe,object,embed,link,meta").forEach((n) => n.remove());
-  doc.querySelectorAll("*").forEach((el) => {
-    [...el.attributes].forEach((attr) => {
-      const n = attr.name.toLowerCase();
-      const v = String(attr.value || "").toLowerCase();
-      if (n.startsWith("on")) el.removeAttribute(attr.name);
-      if ((n === "src" || n === "href") && v.startsWith("javascript:")) el.removeAttribute(attr.name);
-    });
-  });
-  return doc.body.innerHTML;
-}
 
 function normalizeSettings(raw, module = "QUOTATION") {
   const defs = getDefaultSettings(module);
@@ -290,8 +276,7 @@ export default function PrintModelSettings() {
 
   const eff = useMemo(() => normalizeSettings(settings, activeModule), [settings, activeModule]);
   const validation = useMemo(() => validateSettings(eff), [eff]);
-  const sanitizedHeaderHtml = useMemo(() => sanitizeHtml(eff.header.customHtml), [eff.header.customHtml]);
-  const sanitizedFooterHtml = useMemo(() => sanitizeHtml(eff.footer.customHtml), [eff.footer.customHtml]);
+
 
   const totals = { subtotal: 21000, taxAmount: 2100, discountAmount: 500, grandTotal: 22600 };
 
@@ -517,6 +502,14 @@ export default function PrintModelSettings() {
                     <Toggle label="Email" checked={eff.header.showEmail} onChange={(v) => updateHeader("showEmail", v)} />
                     <Toggle label="Address" checked={eff.header.showAddress} onChange={(v) => updateHeader("showAddress", v)} />
                   </div>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1 mt-3">Extra Info (website, etc.)</label>
+                  <textarea
+                    value={eff.header.customHtml}
+                    onChange={(e) => updateHeader("customHtml", e.target.value)}
+                    placeholder="www.example.com&#10;Any extra details..."
+                    rows={2}
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </Panel>
 
                 {/* Logo */}
@@ -649,13 +642,13 @@ export default function PrintModelSettings() {
                   <Input value={eff.footer.qr.label} onChange={(e) => updateFooterQr("label", e.target.value)} className="text-sm" />
                 </Panel>
 
-                <Panel title="Custom Footer HTML" icon={Code}>
+                <Panel title="Extra Footer Info" icon={Code}>
                   <Textarea
                     rows={4}
                     value={eff.footer.customHtml}
                     onChange={(e) => updateFooter("customHtml", e.target.value)}
-                    placeholder='<div><em>Custom footer details</em></div>'
-                    className="text-xs font-mono"
+                    placeholder="Services: CCTV, Networking, IT Solutions&#10;www.example.com"
+                    className="text-xs"
                   />
                 </Panel>
               </>
@@ -704,12 +697,8 @@ export default function PrintModelSettings() {
                 {eff.header.showPhone && <span>{selectedUser?.strPhone || "+91 XXXXX XXXXX"}</span>}
                 {eff.header.showEmail && <span>{selectedUser?.strEmail || "email@example.com"}</span>}
                 {eff.header.showAddress && <span>{selectedUser?.strAddress || "Business Address"}</span>}
+                {eff.header.customHtml && <span>{eff.header.customHtml}</span>}
               </div>
-
-              {/* custom header html */}
-              {sanitizedHeaderHtml && (
-                <div className="mt-3 border border-dashed border-neutral-300 rounded-lg p-2.5 text-xs text-neutral-800" dangerouslySetInnerHTML={{ __html: sanitizedHeaderHtml }} />
-              )}
 
               {/* bill-to */}
               <div className="mt-4 border-b border-neutral-200 pb-3">
@@ -757,7 +746,7 @@ export default function PrintModelSettings() {
               </div>
 
               {/* footer */}
-              <footer className="mt-6 border-t border-neutral-200 pt-3 grid grid-cols-[1fr_240px] gap-3">
+              <footer className="mt-10 border-t border-neutral-200 pt-5 grid grid-cols-[1fr_240px] gap-3">
                 <div>
                   <h4 className="font-semibold text-sm mb-2" style={{ color: "var(--primary)" }}>Terms & Conditions</h4>
                   <ul className="list-disc pl-4 space-y-0.5">
@@ -790,8 +779,8 @@ export default function PrintModelSettings() {
               </footer>
 
               {/* custom footer html */}
-              {sanitizedFooterHtml && (
-                <div className="mt-2.5 border border-dashed border-neutral-300 rounded-lg p-2.5 text-xs text-neutral-800" dangerouslySetInnerHTML={{ __html: sanitizedFooterHtml }} />
+              {eff.footer.customHtml && (
+                <div className="mt-8 rounded px-4 py-3 text-xs text-white whitespace-pre-line" style={{ backgroundColor: "var(--primary)" }}>{eff.footer.customHtml}</div>
               )}
             </article>
           </div>
