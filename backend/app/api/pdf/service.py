@@ -504,6 +504,8 @@ class ClsPdfGenerator:
         elements.append(Paragraph("Bill To", billto_lbl))
         if strCustomerName:
             elements.append(Paragraph(str(strCustomerName), billto_txt))
+        if self._setting_bool("bln_show_phone", True) and strCustomerPhone:
+            elements.append(Paragraph(f"Phone: {strCustomerPhone}", billto_txt))
         if self._setting_bool("bln_show_address", True) and strCustomerAddress:
             elements.append(Paragraph(str(strCustomerAddress), billto_txt))
         elements.append(Spacer(1, 10))
@@ -1249,6 +1251,8 @@ class ClsPdfGenerator:
         elements.append(Paragraph("Bill To", billto_lbl))
         if strCustomerName:
             elements.append(Paragraph(str(strCustomerName), billto_txt))
+        if self._setting_bool("bln_show_phone", True) and strCustomerPhone:
+            elements.append(Paragraph(f"Phone: {strCustomerPhone}", billto_txt))
         if self._setting_bool("bln_show_address", True) and strCustomerAddress:
             elements.append(Paragraph(str(strCustomerAddress), billto_txt))
         elements.append(Spacer(1, 10))
