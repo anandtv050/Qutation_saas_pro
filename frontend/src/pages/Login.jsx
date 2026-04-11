@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Loader2, Sparkles, Zap, FileText } from "lucide-react";
 import authService from "@/services/authServices";
 
@@ -184,9 +185,9 @@ export default function Login() {
                 >
                   Password
                 </label>
-                <button type="button" className="text-xs font-medium text-neutral-500 hover:text-black transition-colors">
+                <Link to="/forgot-password" className="text-xs font-medium text-neutral-500 hover:text-black transition-colors">
                   Forgot?
-                </button>
+                </Link>
               </div>
               <div className="relative">
                 <input
@@ -252,8 +253,18 @@ export default function Login() {
             </button>
           </form>
 
+          {/* Sign up link */}
+          <div className="mt-6 text-center">
+            <p className="text-neutral-600 text-sm">
+              Don't have an account?{" "}
+              <Link to="/signup" className="font-semibold text-black hover:underline">
+                Start free trial
+              </Link>
+            </p>
+          </div>
+
           {/* Security Badge */}
-          <div className="mt-8 flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-50/80 rounded-lg border border-neutral-200">
+          <div className="mt-5 flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-50/80 rounded-lg border border-neutral-200">
             <svg className="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
             </svg>
@@ -261,7 +272,7 @@ export default function Login() {
           </div>
 
           {/* Footer */}
-          <div className="mt-6 text-center">
+          <div className="mt-4 text-center">
             <p className="text-neutral-400 text-xs">
               &copy; {new Date().getFullYear()} Quotely. All rights reserved.
             </p>

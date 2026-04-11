@@ -24,6 +24,23 @@ const authService = {
         }
     },
 
+    // Signup function
+    signup: async (formData) => {
+        try {
+            const response = await api.post('/auth/signup', {
+                email: formData.email,
+                password: formData.password,
+                username: formData.username,
+                businessName: formData.businessName || null,
+                phone: formData.phone || null,
+            });
+            return response.data;
+        } catch (error) {
+            const strMessage = error.response?.data?.detail || 'Signup failed';
+            throw new Error(strMessage);
+        }
+    },
+
     // Logout function
     logout: () => {
         localStorage.removeItem('access_token');

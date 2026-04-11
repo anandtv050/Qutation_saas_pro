@@ -54,7 +54,119 @@ const userService = {
             const strMessage = error.response?.data?.detail || 'Failed to delete user';
             throw new Error(strMessage);
         }
-    }
+    },
+
+    // Toggle user active/inactive (Admin only)
+    toggleActive: async (intUserId) => {
+        const response = await api.post('/user/toggle-active', { intUserId });
+        return response.data;
+    },
+
+    // Get user permissions (Admin only)
+    getPermissions: async (intTargetUserId) => {
+        const response = await api.post('/user/permissions/get', { intTargetUserId });
+        return response.data;
+    },
+
+    // Set user permissions (Admin only)
+    setPermissions: async (intTargetUserId, lstPermissions) => {
+        const response = await api.post('/user/permissions/set', {
+            intTargetUserId, lstPermissions
+        });
+        return response.data;
+    },
+
+    // Get my profile (current user)
+    getMyProfile: async () => {
+        const response = await api.post('/user/me');
+        return response.data;
+    },
+
+    // Update profile (current user or admin)
+    updateProfile: async (data) => {
+        const response = await api.post('/user/update', data);
+        return response.data;
+    },
+
+    // Get all users usage stats (Admin only)
+    getUsageStats: async () => {
+        const response = await api.get('/user/usage-stats');
+        return response.data;
+    },
+
+    // Get my permissions (current user)
+    getMyPermissions: async () => {
+        const response = await api.get('/user/my-permissions');
+        return response.data;
+    },
+
+    // Module CRUD (admin)
+    addModule: async (data) => {
+        const response = await api.post('/user/module/add', data);
+        return response.data;
+    },
+    updateModule: async (data) => {
+        const response = await api.post('/user/module/update', data);
+        return response.data;
+    },
+    deleteModule: async (intModuleId) => {
+        const response = await api.post('/user/module/delete', { intModuleId });
+        return response.data;
+    },
+
+    // Get permission grid (admin)
+    getPermissionGrid: async () => {
+        const response = await api.get('/user/permissions/grid');
+        return response.data;
+    },
+
+    // Toggle single module permission (admin)
+    togglePermission: async (intTargetUserId, strModuleKey, blnEnabled) => {
+        const response = await api.post('/user/permissions/toggle', {
+            intTargetUserId, strModuleKey, blnEnabled
+        });
+        return response.data;
+    },
+
+    // Get all module settings (admin)
+    getAllSettings: async () => {
+        const response = await api.get('/user/settings/all');
+        return response.data;
+    },
+
+    // Update module settings (admin)
+    updateSettings: async (strModule, lstSettings) => {
+        const response = await api.post('/user/settings/update', {
+            strModule, lstSettings
+        });
+        return response.data;
+    },
+
+    // Add new setting (admin)
+    addSetting: async (data) => {
+        const response = await api.post('/user/settings/add', data);
+        return response.data;
+    },
+
+    // Delete setting (admin)
+    deleteSetting: async (strModule, strKey) => {
+        const response = await api.post('/user/settings/delete', { strModule, strKey });
+        return response.data;
+    },
+
+    // Get user setting overrides (admin)
+    getUserOverrides: async (intTargetUserId) => {
+        const response = await api.post('/user/settings/user-overrides', { intTargetUserId });
+        return response.data;
+    },
+
+    // Set user setting override (admin)
+    setUserOverride: async (intTargetUserId, strKey, strValue) => {
+        const response = await api.post('/user/settings/user-override', {
+            intTargetUserId, strKey, strValue
+        });
+        return response.data;
+    },
 };
 
 export default userService;

@@ -378,6 +378,13 @@ export default function NewQuotation() {
     ));
   };
 
+  const setQty = (id, value) => {
+    const num = parseInt(value) || 0;
+    setItems(items.map(item =>
+      item.id === id ? { ...item, qty: Math.max(1, num) } : item
+    ));
+  };
+
   const updateRate = (id, rate) => {
     const sanitized = rate.replace(/[^0-9.]/g, '');
     const parts = sanitized.split('.');
@@ -821,7 +828,14 @@ Example:
                             >
                               <Minus className="w-3 h-3 text-neutral-600" />
                             </button>
-                            <span className="w-8 text-center text-sm font-semibold">{item.qty}</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.qty}
+                              onChange={(e) => setQty(item.id, e.target.value)}
+                              onKeyDown={(e) => ['e', 'E', '+', '-', '.'].includes(e.key) && e.preventDefault()}
+                              className="w-10 text-center text-sm font-semibold border-0 outline-none bg-transparent [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
                             <button
                               onClick={() => updateQty(item.id, 1)}
                               className="w-8 h-8 flex items-center justify-center hover:bg-neutral-100 rounded-r-lg"
@@ -867,7 +881,14 @@ Example:
                           >
                             <Minus className="w-3 h-3 text-neutral-600" />
                           </button>
-                          <span className="w-8 text-center text-sm font-semibold">{item.qty}</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.qty}
+                            onChange={(e) => setQty(item.id, e.target.value)}
+                            onKeyDown={(e) => ['e', 'E', '+', '-', '.'].includes(e.key) && e.preventDefault()}
+                            className="w-10 text-center text-sm font-semibold border-0 outline-none bg-transparent [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          />
                           <button
                             onClick={() => updateQty(item.id, 1)}
                             className="w-8 h-8 flex items-center justify-center hover:bg-neutral-100 rounded-r-lg"

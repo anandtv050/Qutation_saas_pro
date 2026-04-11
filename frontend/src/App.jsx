@@ -1,5 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Landing from "./pages/Landing";
 import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import Subscribe from "./pages/Subscribe";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import NewQuotation from "./pages/NewQuotation";
 import NewInvoice from "./pages/NewInvoice";
@@ -10,6 +15,9 @@ import UserManagement from "./pages/UserManagement";
 import AdminDashboard from "./pages/AdminDashboard";
 import WarrantyCertificate from "./pages/WarrantyCertificate";
 import PrintModelSettings from "./pages/PrintModelSettings";
+import PlanManagement from "./pages/PlanManagement";
+import ServiceManagement from "./pages/ServiceManagement";
+import ModuleManagement from "./pages/ModuleManagement";
 import MainLayout from "./components/layout/MainLayout";
 
 function App() {
@@ -21,17 +29,34 @@ function App() {
   // Protected Route wrapper
   const ProtectedRoute = ({ children }) => {
     if (!isAuthenticated()) {
-      return <Navigate to="/" replace />;
+      return <Navigate to="/login" replace />;
     }
     return children;
   };
-  //  when broser path change , then corresponding move to each page dynamically here
-  //  the path => taken from browser 
+
+  // Admin Route wrapper
+  const AdminRoute = ({ children }) => {
+    try {
+      const userInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
+      if (userInfo.intUserId !== 1) {
+        return <Navigate to="/dashboard" replace />;
+      }
+    } catch {
+      return <Navigate to="/dashboard" replace />;
+    }
+    return children;
+  };
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Route */}
-        <Route path="/" element={<Login />} />
+        {/* Public Routes */}
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/subscribe" element={<Subscribe />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Protected Routes with Layout */}
         <Route
@@ -50,9 +75,12 @@ function App() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/users" element={<UserManagement />} />
-          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/print-settings" element={<PrintModelSettings />} />
+          <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+          <Route path="/plans" element={<AdminRoute><PlanManagement /></AdminRoute>} />
+          <Route path="/services" element={<AdminRoute><ServiceManagement /></AdminRoute>} />
+          <Route path="/modules" element={<AdminRoute><ModuleManagement /></AdminRoute>} />
         </Route>
 
         {/* Redirect unknown routes */}

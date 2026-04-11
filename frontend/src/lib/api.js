@@ -44,6 +44,13 @@ api.interceptors.response.use(
             localStorage.removeItem('user'); // Clean up legacy key
             window.location.href = '/login';
         }
+
+        // Subscription expired — redirect to subscribe page
+        const isSubscriptionEndpoint = error.config?.url?.includes('/subscription/');
+        if (error.response?.status === 402 && !isSubscriptionEndpoint) {
+            window.location.href = '/subscribe';
+        }
+
         return Promise.reject(error)
     }
 );
