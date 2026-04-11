@@ -1,7 +1,7 @@
-from fastapi import APIRouter,HTTPException,status,Depends
+from fastapi import APIRouter, HTTPException, status, Depends
 import asyncpg
 
-from app.api.login.schema import MdlLoginRequest,MdlLoginResponse
+from app.api.login.schema import MdlLoginRequest, MdlLoginResponse, MdlSignupRequest, MdlForgotPasswordRequest, MdlResetPasswordRequest
 from app.api.login.service import ClsLoginService
 from app.core.database import ClsDatabasepool
 from app.core.logger import getLogger
@@ -10,10 +10,11 @@ from app.core.presence import ClsPresenceTracker
 
 logger = getLogger()
 
-router = APIRouter(prefix="/auth",tags=["Authentication"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-@router.post("/login",response_model=MdlLoginResponse)
-async def fnLogin(mdlLoginRequest:MdlLoginRequest):
+
+@router.post("/login", response_model=MdlLoginResponse)
+async def fnLogin(mdlLoginRequest: MdlLoginRequest):
     try:
         logger.info(f"Login attempt: {mdlLoginRequest.email}")
 
@@ -38,6 +39,69 @@ async def fnLogin(mdlLoginRequest:MdlLoginRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.post("/signup", response_model=MdlLoginResponse)
+async def fnSignup(mdlSignupRequest: MdlSignupRequest):
+    """Self-service signup: create account, auto-login, add sample data"""
+    try:
+        logger.info(f"Signup attempt: {mdlSignupRequest.email}")
+
+        objDatabase = ClsDatabasepool()
+        objPool = await objDatabase.fnGetPool()
+        insLoginService = ClsLoginService(objPool)
+        mdlResponse = await insLoginService.fnSignupService(mdlSignupRequest)
+        logger.info(f"Signup successful: {mdlSignupRequest.email}")
+        return mdlResponse
+
+    except HTTPException as e:
+        logger.warning(f"Signup failed: {mdlSignupRequest.email} - {e.detail}")
+        raise
+    except asyncpg.PostgresError as e:
+        logger.error(f"Database error during signup: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error. Please try again."
+        )
+    except Exception as e:
+        logger.error(f"Signup error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Something went wrong. Please try again."
+        )
+
+
+@router.post("/forgot-password")
+async def fnForgotPassword(mdlRequest: MdlForgotPasswordRequest):
+    """Request password reset link"""
+    try:
+        objDatabase = ClsDatabasepool()
+        objPool = await objDatabase.fnGetPool()
+        insLoginService = ClsLoginService(objPool)
+        return await insLoginService.fnForgotPassword(mdlRequest.email)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Forgot password error: {str(e)}", exc_info=True)
+        return {"strMessage": "If an account with this email exists, a reset link has been sent."}
+
+
+@router.post("/reset-password")
+async def fnResetPassword(mdlRequest: MdlResetPasswordRequest):
+    """Reset password using token"""
+    try:
+        objDatabase = ClsDatabasepool()
+        objPool = await objDatabase.fnGetPool()
+        insLoginService = ClsLoginService(objPool)
+        return await insLoginService.fnResetPassword(mdlRequest.token, mdlRequest.password)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Reset password error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Something went wrong. Please try again."
         )
 
 
