@@ -15,14 +15,15 @@ from app.api.quotation.schema import (
 from app.api.quotation.service import ClsQuotationService
 from app.core.database import ClsDatabasepool
 from app.core.baseSchema import ResponseStatus
-from app.core.dependency import fnGetContext
+from app.core.dependency import fnGetContext, fnRequireModule
+from app.core.feature import fnCheckModuleOperation, fnIncrementModuleUsage
 from app.core.logger import getUserLogger
 
 router = APIRouter(prefix="/quotation", tags=["Quotation"])
 
 
 @router.post("/list", response_model=MdlQuotationListResponse)
-async def fnGetQutationList(objContext = Depends(fnGetContext)):
+async def fnGetQutationList(objContext = Depends(fnRequireModule("quotation"))):
     logger = getUserLogger(objContext.intUserId)
     try:
 
@@ -51,7 +52,7 @@ async def fnGetQutationList(objContext = Depends(fnGetContext)):
 @router.post("/get", response_model=MdlQuotationResponse)
 async def fnGetQuotation(
     mdlGetQuotationRequest: MdlGetQuotationRequest,
-    objContext = Depends(fnGetContext)
+    objContext = Depends(fnRequireModule("quotation"))
 ):
     logger = getUserLogger(objContext.intUserId)
     try:
@@ -79,15 +80,24 @@ async def fnGetQuotation(
 @router.post("/add", response_model=MdlQuotationResponse)
 async def fnAddQuotation(
     mdlCreateQuotationRequest: MdlCreateQuotationRequest,
-    objContext = Depends(fnGetContext)
+    objContext = Depends(fnRequireModule("quotation"))
 ):
     logger = getUserLogger(objContext.intUserId)
     try:
+        # Check quotation create limit
+        await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "quotation", "create")
+
         insPool = ClsDatabasepool()
         pool = await insPool.fnGetPool()
 
         insQuotationService = ClsQuotationService(pool, objContext.intUserId)
-        return await insQuotationService.fnAddQuotationService(mdlCreateQuotationRequest)
+        objResponse = await insQuotationService.fnAddQuotationService(mdlCreateQuotationRequest)
+
+        # Increment usage after successful creation
+        if objResponse.intStatus == ResponseStatus.SUCCESS:
+            await fnIncrementModuleUsage(objContext.objPool, objContext.intUserId, "quotation", "create")
+
+        return objResponse
 
     except asyncpg.PostgresError as e:
         logger.error(f"Database error creating quotation: {str(e)}")
@@ -112,10 +122,12 @@ async def fnAddQuotation(
 @router.post("/update", response_model=MdlQuotationResponse)
 async def fnUpdateQuotation(
     mdlUpdateQuotationRequest: MdlUpdateQuotationRequest,
-    objContext = Depends(fnGetContext),
+    objContext = Depends(fnRequireModule("quotation")),
 ):
     logger = getUserLogger(objContext.intUserId)
     try:
+        # Check quotation update permission
+        await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "quotation", "update")
 
         insQuotationService = ClsQuotationService(objContext.objPool, objContext.intUserId)
         return await insQuotationService.fnUpdateQuotationService(mdlUpdateQuotationRequest)
@@ -143,10 +155,13 @@ async def fnUpdateQuotation(
 @router.post("/update-warranty", response_model=MdlQuotationResponse)
 async def fnUpdateWarranty(
     mdlUpdateWarrantyRequest: MdlUpdateWarrantyRequest,
-    objContext = Depends(fnGetContext),
+    objContext = Depends(fnRequireModule("quotation")),
 ):
     logger = getUserLogger(objContext.intUserId)
     try:
+        # Check warranty feature permission
+        await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "warranty", "update")
+
         insQuotationService = ClsQuotationService(objContext.objPool, objContext.intUserId)
         return await insQuotationService.fnUpdateWarrantyService(mdlUpdateWarrantyRequest)
     except asyncpg.PostgresError as e:
@@ -172,10 +187,12 @@ async def fnUpdateWarranty(
 @router.post("/delete", response_model=MdlDeleteQuotationResponse)
 async def fnDeleteQuotation(
     mdlDeleteQuotationRequest: MdlDeleteQuotationRequest,
-    objContext = Depends(fnGetContext)
+    objContext = Depends(fnRequireModule("quotation"))
 ):
     logger = getUserLogger(objContext.intUserId)
     try:
+        # Check quotation delete permission
+        await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "quotation", "delete")
 
         insQuotationService = ClsQuotationService(objContext.objPool, objContext.intUserId)
         return await insQuotationService.fnDeleteQuotationService(mdlDeleteQuotationRequest.intQuotationId)
