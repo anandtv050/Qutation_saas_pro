@@ -1,3 +1,4 @@
+import os
 from typing import Optional, Dict, Annotated
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
@@ -45,72 +46,31 @@ def fnDecodeAccessToken(token: str) -> Optional[Dict]:
 
 async def fnGetCurrentUser(
     authorization: Annotated[Optional[str], Header(description="Bearer token")] = None,
-    x_user_id: Annotated[Optional[str], Header(alias="x-user-id")] = None
 ) -> int:
     """
-    Dependency to get current user from JWT token and/or x-user-id header.
-
-    Logic:
-    1. If both provided: JWT user_id must match x-user-id (mismatch = error)
-    2. If only JWT: use JWT user_id
-    3. If only x-user-id: use x-user-id (for testing/development)
-    4. If neither: 401 error
+    Dependency to get current user from JWT token.
 
     Returns: intUserId (int)
-    Raises: HTTPException 401/400 if authentication fails
+    Raises: HTTPException 401 if authentication fails
     """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
 
-    intJwtUserId = None
-    intHeaderUserId = None
+    token = authorization.replace("Bearer ", "")
+    payload = fnDecodeAccessToken(token)
 
-    # Extract user_id from JWT token
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.replace("Bearer ", "")
-        payload = fnDecodeAccessToken(token)
+    if not payload or "user_id" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
 
-        if payload and "user_id" in payload:
-            intJwtUserId = int(payload["user_id"])
-        else:
-            # Token invalid or expired
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-
-    # Extract user_id from x-user-id header
-    if x_user_id:
-        try:
-            intHeaderUserId = int(x_user_id)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid x-user-id header"
-            )
-
-    # Both provided - must match
-    if intJwtUserId is not None and intHeaderUserId is not None:
-        if intJwtUserId != intHeaderUserId:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"User ID mismatch: token user_id ({intJwtUserId}) != x-user-id ({intHeaderUserId})"
-            )
-        return intJwtUserId
-
-    # Only JWT provided
-    if intJwtUserId is not None:
-        return intJwtUserId
-
-    # Only x-user-id provided (fallback for testing)
-    if intHeaderUserId is not None:
-        return intHeaderUserId
-
-    # No authentication provided
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Authentication required",
-        headers={"WWW-Authenticate": "Bearer"}
-    )
+    return int(payload["user_id"])
 
 
 async def fnGetAdminUser(
@@ -131,15 +91,27 @@ async def fnGetAdminUser(
     return intUserId
 
 
-# TODO: Future - Module permission check (commented for now)
-# async def fnCheckModulePermission(
-#     intUserId: int,
-#     strModuleName: str,
-#     insPool: Pool
-# ) -> bool:
-#     """
-#     Check if user has permission to access a specific module.
-#     Will be implemented later with tbl_user_permission table.
-#     """
-#     # For now, all authenticated users have access to all modules
-#     return True
+async def fnCheckModulePermission(intUserId: int, strModuleKey: str, insPool) -> bool:
+    """
+    Check if user has permission to access a specific module.
+    Admin (user_id=1) always has access.
+    If no permission row exists for the user, access is GRANTED (default allow).
+    Only blocked if explicitly set to bln_enabled = false.
+    """
+    if intUserId == ADMIN_USER_ID:
+        return True
+
+    async with insPool.acquire() as conn:
+        rstPerm = await conn.fetchrow(
+            """SELECT p.bln_enabled
+               FROM tbl_user_module_permission p
+               JOIN tbl_module m ON p.fk_bint_module_id = m.pk_bint_module_id
+               WHERE p.fk_bint_user_id = $1 AND m.vchr_module_key = $2""",
+            intUserId, strModuleKey
+        )
+
+    # If no permission row exists, default to ALLOWED
+    if rstPerm is None:
+        return True
+
+    return rstPerm['bln_enabled']
