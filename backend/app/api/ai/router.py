@@ -9,7 +9,7 @@ from app.api.ai.schema import (
     MdlProcessQuotationRequest,
     MdlProcessQuotationResponse
 )
-from app.core.dependency import fnGetContext
+from app.core.dependency import fnGetContext, fnRequireModule
 
 router = APIRouter(prefix="/ai", tags=["AI Quotation"])
 
@@ -21,7 +21,7 @@ async def fnGetPool() -> Pool:
 @router.post("/process", response_model=MdlProcessQuotationResponse)
 async def fnProcessQuotation(
     mdlRequest: MdlProcessQuotationRequest,
-    objContext = Depends(fnGetContext)
+    objContext = Depends(fnRequireModule("ai"))
 ):
     """
     Process raw text using AI to generate quotation items.

@@ -11,6 +11,8 @@ from app.api.ai.schema import (
 )
 from app.core.baseSchema import ResponseStatus
 from app.core.logger import getUserLogger
+from fastapi import HTTPException
+from app.core.feature import fnCheckModuleOperation, fnIncrementModuleUsage
 
 
 class ClsAIQuotationService:
@@ -23,15 +25,30 @@ class ClsAIQuotationService:
         self.strModelName = "llama-3.3-70b-versatile"
         self.strPromptVersion = "v1.0"
 
-    def fnLoadSystemPrompt(self) -> str:
-        """Load system prompt from file"""
+    async def fnLoadSystemPrompt(self) -> str:
+        """Load system prompt from user's service in DB, fallback to file"""
+        # Try to load from user's assigned service
+        async with self.insPool.acquire() as conn:
+            rstPrompt = await conn.fetchrow(
+                """SELECT s.txt_ai_prompt, s.bln_ai_ready, s.vchr_display_name
+                   FROM tbl_user u
+                   JOIN tbl_service s ON u.fk_bint_service_id = s.pk_bint_service_id
+                   WHERE u.pk_bint_user_id = $1""",
+                self.intUserId
+            )
+
+        if rstPrompt and rstPrompt['txt_ai_prompt'] and rstPrompt['bln_ai_ready']:
+            self.logger.info(f"Using DB prompt for service: {rstPrompt['vchr_display_name']}")
+            return rstPrompt['txt_ai_prompt']
+
+        # Fallback to file-based prompt (for backward compatibility)
         strPromptPath = Path(__file__).parent / "system_prompt.txt"
         try:
             with open(strPromptPath, "r", encoding="utf-8") as f:
                 return f.read()
         except Exception as e:
-            print(f"Error loading system prompt: {e}")
-            return "You are a helpful assistant for creating CCTV quotations."
+            self.logger.error(f"Error loading system prompt: {e}")
+            return "You are a helpful assistant for creating quotations based on the provided inventory."
 
     async def fnGetInventoryList(self) -> str:
         """Fetch inventory items for AI context"""
@@ -133,12 +150,24 @@ class ClsAIQuotationService:
                 lstItems=[]
             )
 
+        # Check AI daily usage limit via unified module system
+        try:
+            await fnCheckModuleOperation(self.insPool, self.intUserId, "ai", "create")
+        except HTTPException as e:
+            return MdlProcessQuotationResponse(
+                intStatus=ResponseStatus.ERROR,
+                strStatus=ResponseStatus.ERROR_STR,
+                intStatusCode=ResponseStatus.HTTP_BAD_REQUEST,
+                strMessage=e.detail,
+                lstItems=[]
+            )
+
         try:
             # Step 1: Save raw input to database
             intRawInputId = await self.fnSaveRawInput(strRawText)
 
             # Load system prompt and inventory
-            strSystemPrompt = self.fnLoadSystemPrompt()
+            strSystemPrompt = await self.fnLoadSystemPrompt()
             strInventoryList = await self.fnGetInventoryList()
 
             # Build user message
@@ -225,6 +254,9 @@ Return ONLY valid JSON, no markdown formatting.
                         dblUnitPrice=float(dctItem.get("unit_price", 0)),
                         strUnit=dctItem.get("unit", "piece")
                     ))
+
+                # Increment daily AI usage counter via module system
+                await fnIncrementModuleUsage(self.insPool, self.intUserId, "ai", "create")
 
                 self.logger.info(f"AI quotation generated successfully | Items: {len(lstItems)} | Tokens: {intTokensInput}/{intTokensOutput}")
 
