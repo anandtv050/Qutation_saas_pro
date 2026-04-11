@@ -8,6 +8,7 @@ from app.api.pdf.schema import (
 )
 from app.api.pdf.service import ClsPdfGenerator
 from app.core.dependency import fnGetContext
+from app.core.feature import fnCheckModuleOperation
 
 router = APIRouter(prefix="/pdf", tags=["PDF"])
 
@@ -17,8 +18,9 @@ async def fnGenerateQuotationPDF(
     objContext=Depends(fnGetContext)
 ):
     "generate the quotation print"
-    
+
     try:
+        await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "print_settings", "print")
         insPdfService =   ClsPdfGenerator(objContext.objPool,objContext.intUserId)  
         mdlResponse = await insPdfService.fnGetQuotationPdf(mdlRequest)   
         return mdlResponse       
@@ -39,6 +41,7 @@ async def fnGenerateInvoicePDF(
     "generate the invoice print"
 
     try:
+        await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "print_settings", "print")
         insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
         mdlResponse = await insPdfService.fnGetInvoicePdf(mdlRequest)
         return mdlResponse
@@ -59,6 +62,8 @@ async def fnGenerateWarrantyCertificatePDF(
     "generate warranty certificate print"
 
     try:
+        await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "print_settings", "print")
+        await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "warranty", "print")
         insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
         mdlResponse = await insPdfService.fnGetWarrantyCertificatePdf(mdlRequest)
         return mdlResponse

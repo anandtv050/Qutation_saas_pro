@@ -25,10 +25,18 @@ class ClsPlanService:
 
         async with self.insPool.acquire() as conn:
             rstModules = await conn.fetch(
-                """SELECT pm.fk_bint_plan_id, pm.fk_bint_module_id,
-                          pm.int_create, pm.int_read, pm.int_update, pm.int_delete, pm.int_print,
-                          pm.int_monthly_limit, pm.int_daily_limit,
-                          m.vchr_module_key, m.vchr_display_name, m.vchr_icon
+                """SELECT pm.fk_bint_plan_id,
+                          pm.fk_bint_module_id,
+                          pm.int_create,
+                          pm.int_read,
+                          pm.int_update,
+                          pm.int_delete,
+                          pm.int_print,
+                          pm.int_monthly_limit,
+                          pm.int_daily_limit,
+                          m.vchr_module_key,
+                          m.vchr_display_name,
+                          m.vchr_icon
                    FROM tbl_plan_module pm
                    JOIN tbl_module m ON pm.fk_bint_module_id = m.pk_bint_module_id
                    WHERE pm.fk_bint_plan_id = ANY($1::bigint[])

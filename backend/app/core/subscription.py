@@ -28,7 +28,7 @@ async def fnCheckSubscription(objPool, intUserId: int) -> dict:
     async with objPool.acquire() as conn:
         rstSub = await conn.fetchrow(
             """SELECT s.vchr_status, s.dat_end_date, s.fk_bint_plan_id,
-                      p.vchr_plan_name, p.int_max_quotations_per_month, p.bln_ai_enabled
+                      p.vchr_plan_name
                FROM tbl_subscription s
                JOIN tbl_subscription_plan p ON s.fk_bint_plan_id = p.pk_bint_plan_id
                WHERE s.fk_bint_user_id = $1
