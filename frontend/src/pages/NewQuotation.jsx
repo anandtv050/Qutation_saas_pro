@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Minus, X, Loader2, ChevronRight, Search, Printer, FilePlus, Calendar, Check, FileText, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Plus, Minus, X, Loader2, ChevronRight, Search, Printer, FilePlus, Calendar, Check, FileText, ShieldCheck, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -398,6 +398,38 @@ export default function NewQuotation() {
 
   const removeItem = (id) => setItems(items.filter(item => item.id !== id));
 
+  // Drag & drop reorder
+  const [dragIndex, setDragIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+
+  const handleDragStart = (index) => {
+    setDragIndex(index);
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (dragOverIndex !== index) setDragOverIndex(index);
+  };
+
+  const handleDrop = (index) => {
+    if (dragIndex === null || dragIndex === index) {
+      setDragIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+    const newItems = [...items];
+    const [moved] = newItems.splice(dragIndex, 1);
+    newItems.splice(index, 0, moved);
+    setItems(newItems);
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
   const resetForm = () => {
     setCustomerName("");
     setCustomerPhone("");
@@ -770,7 +802,7 @@ Example:
                         className="h-9 bg-neutral-900 hover:bg-neutral-800 disabled:bg-neutral-200"
                       >
                         <Plus className="w-4 h-4 mr-1" />
-                        Add "{searchQuery}"
+                        Add
                       </Button>
                     </div>
                   </div>
@@ -798,19 +830,37 @@ Example:
 
               {/* Items */}
               <div className="divide-y divide-neutral-100">
-                {items.map((item) => (
-                  <div key={item.id} className="p-3 md:p-0 hover:bg-neutral-50 transition-colors">
+                {items.map((item, index) => (
+                  <div
+                    key={item.id}
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDrop={() => handleDrop(index)}
+                    onDragEnd={handleDragEnd}
+                    className={`p-3 md:p-0 transition-all ${
+                      dragIndex === index ? "opacity-40" : ""
+                    } ${dragOverIndex === index && dragIndex !== index ? "border-t-2 border-black" : ""}`}
+                  >
                     {/* Mobile Layout */}
                     <div className="md:hidden">
                       <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1 min-w-0 pr-2">
-                          <p className="text-sm font-medium text-neutral-900 truncate">{item.name}</p>
+                        <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
+                          {/* Drag handle */}
+                          {items.length > 1 && (
+                            <div className="cursor-grab active:cursor-grabbing touch-none p-1 text-neutral-300 hover:text-neutral-500">
+                              <GripVertical className="w-4 h-4" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-neutral-900 truncate">{item.name}</p>
                           {item.rate === 0 && (
                             <span className="text-xs text-red-500 font-medium">⚠ Enter rate</span>
                           )}
                           {!item.fromInventory && item.rate !== 0 && (
                             <span className="text-xs text-amber-600">Custom item</span>
                           )}
+                          </div>
                         </div>
                         <button
                           onClick={() => removeItem(item.id)}
@@ -864,14 +914,22 @@ Example:
 
                     {/* Desktop Layout */}
                     <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-3 items-center">
-                      <div className="col-span-5">
-                        <p className="text-sm font-medium text-neutral-900">{item.name}</p>
+                      <div className="col-span-5 flex items-center gap-2">
+                        {/* Drag handle */}
+                        {items.length > 1 && (
+                          <div className="cursor-grab active:cursor-grabbing p-1 text-neutral-300 hover:text-neutral-500 transition-colors">
+                            <GripVertical className="w-4 h-4" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm font-medium text-neutral-900">{item.name}</p>
                         {item.rate === 0 && (
                           <span className="text-xs text-red-500 font-medium">⚠ Enter rate</span>
                         )}
                         {!item.fromInventory && item.rate !== 0 && (
                           <span className="text-xs text-amber-600">Custom item</span>
                         )}
+                        </div>
                       </div>
                       <div className="col-span-2 flex justify-center">
                         <div className="inline-flex items-center border border-neutral-200 rounded-lg bg-white">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { MessageSquareText, ListPlus, ArrowRight, Loader2, LayoutDashboard, Clock, AlertTriangle, Sparkles } from "lucide-react";
+import { MessageSquareText, ListPlus, ArrowRight, Loader2, LayoutDashboard, Clock, AlertTriangle } from "lucide-react";
 import dashboardService from "@/services/dashboardService";
 import subscriptionService from "@/services/subscriptionService";
 
@@ -77,32 +77,33 @@ export default function Dashboard() {
         {subscription && !isAdmin && (
           <>
             {subscription.strStatus === "trial" && (
-              <div className={`relative overflow-hidden rounded-2xl p-5 mb-5 ${
+              <div className={`rounded-2xl p-4 mb-5 ${
                 subscription.intDaysRemaining <= 2
-                  ? "bg-gradient-to-br from-red-600 via-red-500 to-orange-500"
-                  : "bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900"
+                  ? "bg-red-50 border border-red-100"
+                  : "bg-orange-50/50 border border-orange-100"
               }`}>
-                {/* Subtle glow */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl" />
-
-                <div className="relative flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    subscription.intDaysRemaining <= 2 ? "bg-white/20" : "bg-white/10"
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    subscription.intDaysRemaining <= 2 ? "bg-red-100" : "bg-orange-100"
                   }`}>
                     {subscription.intDaysRemaining <= 2 ? (
-                      <AlertTriangle className="w-5 h-5 text-white" />
+                      <AlertTriangle className="w-4 h-4 text-red-500" />
                     ) : (
-                      <Sparkles className="w-5 h-5 text-white/80" />
+                      <Clock className="w-4 h-4 text-orange-600" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white">
+                    <p className={`text-sm font-medium ${
+                      subscription.intDaysRemaining <= 2 ? "text-red-700" : "text-neutral-800"
+                    }`}>
                       {subscription.intDaysRemaining <= 2
                         ? `Only ${subscription.intDaysRemaining} days left!`
                         : `${subscription.intDaysRemaining} days left in free trial`
                       }
                     </p>
-                    <p className="text-xs text-white/50 mt-0.5">
+                    <p className={`text-xs mt-0.5 ${
+                      subscription.intDaysRemaining <= 2 ? "text-red-400" : "text-orange-400"
+                    }`}>
                       {subscription.intDaysRemaining <= 2
                         ? "Upgrade now to keep your data"
                         : "Unlock all features with a plan"
@@ -111,44 +112,31 @@ export default function Dashboard() {
                   </div>
                   <Link
                     to="/subscribe"
-                    className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all flex-shrink-0 ${
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all flex-shrink-0 ${
                       subscription.intDaysRemaining <= 2
-                        ? "bg-white text-red-600 hover:bg-red-50 shadow-lg shadow-red-900/20"
-                        : "bg-white text-black hover:bg-neutral-100 shadow-lg shadow-black/20"
+                        ? "bg-red-500 text-white hover:bg-red-600"
+                        : "bg-orange-500 text-white hover:bg-orange-600"
                     }`}
                   >
                     Upgrade
                   </Link>
                 </div>
-
-                {/* Progress bar */}
-                <div className="relative mt-4 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      subscription.intDaysRemaining <= 2 ? "bg-white/60" : "bg-white/30"
-                    }`}
-                    style={{ width: `${Math.max(5, ((7 - subscription.intDaysRemaining) / 7) * 100)}%` }}
-                  />
-                </div>
               </div>
             )}
 
             {subscription.strStatus === "active" && subscription.intDaysRemaining <= 7 && (
-              <div className="relative overflow-hidden rounded-2xl p-5 mb-5 bg-gradient-to-br from-amber-500 via-amber-400 to-orange-400">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
-                <div className="relative flex items-center gap-4">
-                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Clock className="w-5 h-5 text-white" />
-                  </div>
+              <div className="rounded-xl p-4 mb-5 bg-amber-50 border border-amber-200">
+                <div className="flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-amber-500 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-sm font-medium text-amber-700">
                       Subscription expires in {subscription.intDaysRemaining} days
                     </p>
-                    <p className="text-xs text-white/60 mt-0.5">Renew to continue uninterrupted</p>
+                    <p className="text-xs text-amber-500 mt-0.5">Renew to continue uninterrupted</p>
                   </div>
                   <Link
                     to="/subscribe"
-                    className="px-4 py-2 text-xs font-semibold bg-white text-amber-700 rounded-lg hover:bg-amber-50 shadow-lg shadow-amber-900/20 flex-shrink-0"
+                    className="px-4 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 flex-shrink-0"
                   >
                     Renew
                   </Link>
