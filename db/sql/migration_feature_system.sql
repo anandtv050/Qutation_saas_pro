@@ -197,6 +197,7 @@ CREATE TABLE IF NOT EXISTS tbl_user_settings (
 CREATE INDEX IF NOT EXISTS idx_user_settings_user ON tbl_user_settings(fk_bint_user_id);
 
 -- tbl_user: email verification + password reset
+ALTER TABLE tbl_user ADD COLUMN IF NOT EXISTS bln_is_active BOOLEAN DEFAULT TRUE;
 ALTER TABLE tbl_user ADD COLUMN IF NOT EXISTS bln_email_verified BOOLEAN DEFAULT FALSE;
 ALTER TABLE tbl_user ADD COLUMN IF NOT EXISTS vchr_reset_token VARCHAR(255);
 ALTER TABLE tbl_user ADD COLUMN IF NOT EXISTS tim_reset_token_expiry TIMESTAMP;
