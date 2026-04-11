@@ -13,7 +13,7 @@ from app.api.inventory.schema import (
 from app.api.inventory.service import ClsInventoryService
 from app.core.database import ClsDatabasepool
 from app.core.baseSchema import ResponseStatus
-from app.core.dependency import fnGetContext
+from app.core.dependency import fnGetContext, fnRequireModule
 from app.core.logger import getUserLogger
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
 # List - Get all inventory
 @router.post("/list", response_model=MdlInventoryListResponse)
-async def fnGetInventoryList(objContext=Depends(fnGetContext)):
+async def fnGetInventoryList(objContext=Depends(fnRequireModule("inventory"))):
     logger = getUserLogger(objContext.intUserId)
     try:
 
@@ -52,7 +52,7 @@ async def fnGetInventoryList(objContext=Depends(fnGetContext)):
 @router.post("/add", response_model=MdlInventoryResponse)
 async def fnAddInventory(
     mdlCreateInventoryRequest: MdlCreateInventoryRequest,
-    objContext=Depends(fnGetContext)
+    objContext=Depends(fnRequireModule("inventory"))
 ):
     logger = getUserLogger(objContext.intUserId)
     try:
@@ -86,7 +86,7 @@ async def fnAddInventory(
 @router.post("/update", response_model=MdlInventoryResponse)
 async def fnUpdateInventory(
     mdlUpdateInventoryRequest: MdlUpdateInventoryRequest,
-    objContext=Depends(fnGetContext),
+    objContext=Depends(fnRequireModule("inventory")),
 ):
     logger = getUserLogger(objContext.intUserId)
     try:
@@ -118,7 +118,7 @@ async def fnUpdateInventory(
 @router.post("/delete", response_model=MdlDeleteInventoryResponse)
 async def fnDeleteInventory(
     mdlDeleteInventoryRequest: MdlDeleteInventoryRequest,
-    objContext=Depends(fnGetContext),
+    objContext=Depends(fnRequireModule("inventory")),
 ):
     logger = getUserLogger(objContext.intUserId)
     try:
