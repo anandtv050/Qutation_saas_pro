@@ -102,7 +102,10 @@ export default function PlanManagement() {
 
   const handleModuleChange = (index, field, value) => {
     const updated = [...formData.lstModules];
-    updated[index] = { ...updated[index], [field]: parseInt(value) || 0 };
+    updated[index] = {
+      ...updated[index],
+      [field]: field === "strDisplayName" ? value : parseInt(value) || 0,
+    };
     setFormData({ ...formData, lstModules: updated });
   };
 
@@ -431,7 +434,14 @@ export default function PlanManagement() {
                         <tbody className="divide-y divide-neutral-100">
                           {formData.lstModules.map((mod, idx) => (
                             <tr key={mod.intModuleId}>
-                              <td className="px-3 py-2 font-medium text-neutral-700">{mod.strDisplayName}</td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text" value={mod.strDisplayName}
+                                  onChange={(e) => handleModuleChange(idx, "strDisplayName", e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-neutral-200 rounded-lg"
+                                />
+                                <p className="text-[10px] text-neutral-400 mt-1">{mod.strModuleKey}</p>
+                              </td>
                               {OP_KEYS.map(key => (
                                 <td key={key} className="px-1 py-1.5 text-center">
                                   <input

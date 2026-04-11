@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Sparkles, Zap, FileText, Shield, Receipt, Package, Check, X as XIcon, ArrowRight, Loader2 } from "lucide-react";
+import { Sparkles, Zap, FileText, Shield, Receipt, Package, ChevronRight, ArrowRight, Loader2 } from "lucide-react";
 import planService from "@/services/planService";
 
 const features = [
@@ -216,33 +216,22 @@ export default function Landing() {
                     </div>
 
                     <ul className="space-y-2.5 mb-6">
-                      {plan.lstModules && plan.lstModules.length > 0 ? (
-                        plan.lstModules.map((m) => {
-                          const strValue = formatModuleAccess(m);
-                          const blnBlocked = m.intCreate === 0 && m.intRead === 0;
-                          return (
-                            <li key={m.strModuleKey} className="flex items-start gap-2">
-                              {blnBlocked ? (
-                                <XIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${blnHighlighted ? "text-neutral-600" : "text-neutral-300"}`} />
-                              ) : (
-                                <Check className={`w-4 h-4 mt-0.5 flex-shrink-0 ${blnHighlighted ? "text-green-400" : "text-green-600"}`} />
-                              )}
-                              <span className={`text-sm ${
-                                blnBlocked
-                                  ? (blnHighlighted ? "text-neutral-500 line-through" : "text-neutral-400 line-through")
-                                  : (blnHighlighted ? "text-neutral-200" : "text-neutral-600")
-                              }`}>
-                                {strValue ? `${strValue} ` : ""}{m.strDisplayName}
-                              </span>
-                            </li>
-                          );
-                        })
+                      {plan.lstModules && plan.lstModules.some((m) => !!m.strDisplayName) ? (
+                        plan.lstModules
+                          .filter((m) => !!m.strDisplayName)
+                          .map((m) => {
+                            const strValue = formatModuleAccess(m);
+                            return (
+                              <li key={m.strModuleKey} className="flex items-center gap-2 text-sm text-neutral-600">
+                                <ChevronRight className={`w-4 h-4 ${blnHighlighted ? "text-neutral-300" : "text-neutral-400"}`} />
+                                <span>{strValue ? `${strValue} ` : ""}{m.strDisplayName}</span>
+                              </li>
+                            );
+                          })
                       ) : (
-                        <li className="flex items-start gap-2">
-                          <Check className={`w-4 h-4 mt-0.5 flex-shrink-0 ${blnHighlighted ? "text-green-400" : "text-green-600"}`} />
-                          <span className={`text-sm ${blnHighlighted ? "text-neutral-200" : "text-neutral-600"}`}>
-                            All features included
-                          </span>
+                        <li className={`flex items-center gap-2 text-sm ${blnHighlighted ? "text-neutral-200" : "text-neutral-600"}`}>
+                          <ChevronRight className={`w-4 h-4 ${blnHighlighted ? "text-neutral-300" : "text-neutral-400"}`} />
+                          <span>All features included</span>
                         </li>
                       )}
                     </ul>

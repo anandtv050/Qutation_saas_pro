@@ -529,6 +529,7 @@ CREATE TABLE tbl_plan_module (
     int_print INTEGER NOT NULL DEFAULT 0,
     int_monthly_limit INTEGER NOT NULL DEFAULT -1,
     int_daily_limit INTEGER NOT NULL DEFAULT -1,
+    vchr_display_name VARCHAR(255),
     UNIQUE(fk_bint_plan_id, fk_bint_module_id)
 );
 

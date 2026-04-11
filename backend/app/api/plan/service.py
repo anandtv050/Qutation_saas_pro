@@ -34,8 +34,8 @@ class ClsPlanService:
                           pm.int_print,
                           pm.int_monthly_limit,
                           pm.int_daily_limit,
+                          COALESCE(pm.vchr_display_name, m.vchr_display_name) AS vchr_display_name,
                           m.vchr_module_key,
-                          m.vchr_display_name,
                           m.vchr_icon
                    FROM tbl_plan_module pm
                    JOIN tbl_module m ON pm.fk_bint_module_id = m.pk_bint_module_id
@@ -74,8 +74,8 @@ class ClsPlanService:
         for mod in lstModules:
             await conn.execute(
                 """INSERT INTO tbl_plan_module
-                   (fk_bint_plan_id, fk_bint_module_id, int_create, int_read, int_update, int_delete, int_print, int_monthly_limit, int_daily_limit)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)""",
+                   (fk_bint_plan_id, fk_bint_module_id, int_create, int_read, int_update, int_delete, int_print, int_monthly_limit, int_daily_limit, vchr_display_name)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)""",
                 intPlanId,
                 mod.intModuleId,
                 mod.intCreate,
@@ -85,6 +85,7 @@ class ClsPlanService:
                 mod.intPrint,
                 mod.intMonthlyLimit,
                 mod.intDailyLimit,
+                mod.strDisplayName,
             )
 
     async def fnGetAllPlans(self):
