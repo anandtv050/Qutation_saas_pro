@@ -44,6 +44,9 @@ LST_ROUTERS = [
     "app.api.ai.router",
     "app.api.user.router",          # User management (Admin only)
     "app.api.print_settings.router", # Print model settings per user
+    "app.api.subscription.router",   # Subscription & payment
+    "app.api.plan.router",            # Plan management (Admin only)
+    "app.api.service.router",         # Service management (Admin only)
 ]
 
 

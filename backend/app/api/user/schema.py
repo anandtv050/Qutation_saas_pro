@@ -48,6 +48,29 @@ class MdlGetUserRequest(MdlBaseRequest):
     intUserId: int
 
 
+class MdlUpdateUserRequest(MdlBaseRequest):
+    """
+    REQUEST: Update user details (Admin only)
+
+    ENDPOINT: POST /user/update
+
+    EXAMPLE:
+    {
+        "intUserId": 2,
+        "strUsername": "Updated Name",
+        "strBusinessName": "New Business",
+        "strPhone": "9876543210",
+        "strAddress": "456 New St"
+    }
+    """
+    intUserId: int
+    strUsername: Optional[str] = None
+    strBusinessName: Optional[str] = None
+    strPhone: Optional[str] = None
+    strAddress: Optional[str] = None
+    strPassword: Optional[str] = None
+
+
 class MdlDeleteUserRequest(MdlBaseRequest):
     """
     REQUEST: Delete user (Admin only)
@@ -76,6 +99,7 @@ class MdlUserInfo(BaseModel):
     strBusinessName: Optional[str] = None
     strPhone: Optional[str] = None
     strAddress: Optional[str] = None
+    blnIsActive: bool = True
 
 
 class MdlUserResponse(MdlBaseResponse):
@@ -115,6 +139,99 @@ class MdlUserListResponse(MdlBaseResponse):
     }
     """
     lstUsers: List[MdlUserInfo] = []
+
+
+class MdlUserPermissionInfo(BaseModel):
+    """Module permission info"""
+    intModuleId: int
+    strModuleKey: str
+    strDisplayName: str
+    strDescription: Optional[str] = None
+    strIcon: Optional[str] = None
+    blnEnabled: bool = True
+
+
+class MdlGetPermissionsRequest(MdlBaseRequest):
+    intTargetUserId: int
+
+
+class MdlSetPermissionsRequest(MdlBaseRequest):
+    intTargetUserId: int
+    lstPermissions: list  # [{intModuleId: int, blnEnabled: bool}]
+
+
+# =====================================================
+# MODULE CRUD REQUESTS
+# =====================================================
+
+class MdlAddModuleRequest(MdlBaseRequest):
+    strModuleKey: str
+    strDisplayName: str
+    strIcon: str = "Package"
+    strPath: str = ""
+    strLabel: str = ""
+    blnShowInSidebar: bool = True
+    blnIsAdminOnly: bool = False
+    intSortOrder: int = 50
+
+
+class MdlUpdateModuleRequest(MdlBaseRequest):
+    intModuleId: int
+    strDisplayName: Optional[str] = None
+    strIcon: Optional[str] = None
+    strPath: Optional[str] = None
+    strLabel: Optional[str] = None
+    blnShowInSidebar: Optional[bool] = None
+    blnIsAdminOnly: Optional[bool] = None
+    blnActive: Optional[bool] = None
+    intSortOrder: Optional[int] = None
+
+
+class MdlDeleteModuleRequest(MdlBaseRequest):
+    intModuleId: int
+
+
+# =====================================================
+# PERMISSION REQUESTS
+# =====================================================
+
+class MdlTogglePermissionRequest(MdlBaseRequest):
+    intTargetUserId: int
+    strModuleKey: str
+    blnEnabled: bool
+
+
+# =====================================================
+# SETTINGS REQUESTS
+# =====================================================
+
+class MdlUpdateSettingsRequest(MdlBaseRequest):
+    strModule: str
+    lstSettings: list  # [{strKey, strValue}]
+
+
+class MdlAddSettingRequest(MdlBaseRequest):
+    strModule: str
+    strKey: str
+    strValue: str = ""
+    strType: str = "string"
+    strLabel: str = ""
+    strDescription: str = ""
+
+
+class MdlDeleteSettingRequest(MdlBaseRequest):
+    strModule: str
+    strKey: str
+
+
+class MdlGetUserOverridesRequest(MdlBaseRequest):
+    intTargetUserId: int
+
+
+class MdlSetUserOverrideRequest(MdlBaseRequest):
+    intTargetUserId: int
+    strKey: str
+    strValue: Optional[str] = None  # None = clear override
 
 
 class MdlDeleteUserResponse(MdlBaseResponse):
