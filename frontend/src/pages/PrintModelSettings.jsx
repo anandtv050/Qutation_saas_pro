@@ -710,11 +710,11 @@ export default function PrintModelSettings() {
               </div>
 
               {/* items table */}
-              <table className="w-full border-collapse mt-4">
+              <table className="w-full border-collapse mt-4" style={{ tableLayout: "fixed" }}>
                 <thead>
                   <tr>
                     {visibleColumns.map((c) => (
-                      <th key={c.key} style={{ width: `${c.widthPct}%`, background: "var(--primary)" }} className="text-left text-white text-xs font-semibold px-2.5 py-2.5 tracking-wide">
+                      <th key={c.key} style={{ width: `${c.widthPct}%`, background: "var(--primary)", wordBreak: "break-word" }} className="text-left text-white text-xs font-semibold px-2.5 py-2.5 tracking-wide overflow-hidden">
                         {getColumnMeta(activeModule)[c.key]?.label || c.key}
                       </th>
                     ))}
@@ -724,7 +724,7 @@ export default function PrintModelSettings() {
                   {[0, 1, 2].map((ri) => (
                     <tr key={ri} className={ri % 2 === 1 ? "bg-neutral-50" : ""}>
                       {visibleColumns.map((c) => (
-                        <td key={c.key} className="text-xs border-b border-neutral-200 px-2.5 py-2 text-neutral-800">
+                        <td key={c.key} className="text-xs border-b border-neutral-200 px-2.5 py-2 text-neutral-800 overflow-hidden" style={{ wordBreak: "break-word" }}>
                           {placeholderValue(c.key, ri)}
                         </td>
                       ))}
