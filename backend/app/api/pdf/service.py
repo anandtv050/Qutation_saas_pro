@@ -286,13 +286,28 @@ class ClsPdfGenerator:
             if not meta:
                 continue
             col_keys.append(key)
-            labels.append(meta["label"])
+            # Header label as Paragraph with same alignment as data cells
+            if key in ("amount", "unit_price"):
+                h_align = TA_RIGHT
+            elif key in ("qty",):
+                h_align = TA_CENTER
+            else:
+                h_align = TA_LEFT
+            h_style = ParagraphStyle(
+                f"hdr_{key}", fontName="Helvetica-Bold", fontSize=9,
+                leading=11, textColor=colors.white, alignment=h_align,
+            )
+            labels.append(Paragraph(meta["label"], h_style))
             widths.append(total_w * col["widthPct"] / 100)
         # Safety: keep at least one visible column.
         if not col_keys and registry:
             first_key = next(iter(registry.keys()))
             col_keys = [first_key]
-            labels = [registry[first_key]["label"]]
+            h_style = ParagraphStyle(
+                "hdr_fallback", fontName="Helvetica-Bold", fontSize=9,
+                leading=11, textColor=colors.white, alignment=TA_LEFT,
+            )
+            labels = [Paragraph(registry[first_key]["label"], h_style)]
             widths = [total_w]
         return col_keys, labels, widths
 
