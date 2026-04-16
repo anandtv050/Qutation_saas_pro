@@ -16,6 +16,7 @@ const ADMIN_PAGES = [
   { path: "/plans", label: "Plans", icon: CreditCard },
   { path: "/services", label: "Services", icon: Wrench },
   { path: "/modules", label: "Modules", icon: Shield },
+  { path: "/print-settings", label: "Print Settings", icon: Printer },
 ];
 
 export default function MobileNav() {
