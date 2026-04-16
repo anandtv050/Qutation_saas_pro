@@ -1,7 +1,7 @@
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
+from reportlab.lib.enums import TA_LEFT, TA_RIGHT
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -287,10 +287,8 @@ class ClsPdfGenerator:
                 continue
             col_keys.append(key)
             # Header label as Paragraph with same alignment as data cells
-            if key in ("amount", "unit_price"):
+            if key in ("amount", "unit_price", "qty"):
                 h_align = TA_RIGHT
-            elif key in ("qty",):
-                h_align = TA_CENTER
             else:
                 h_align = TA_LEFT
             h_style = ParagraphStyle(
@@ -313,10 +311,8 @@ class ClsPdfGenerator:
 
     def _cell_style(self, key):
         """Return a ParagraphStyle for table cells — wraps long text."""
-        if key in ("amount", "unit_price"):
+        if key in ("amount", "unit_price", "qty"):
             align = TA_RIGHT
-        elif key in ("qty",):
-            align = TA_CENTER
         else:
             align = TA_LEFT
         return ParagraphStyle(
