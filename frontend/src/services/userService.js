@@ -62,17 +62,29 @@ const userService = {
         return response.data;
     },
 
-    // Get user permissions (Admin only)
+    // Get user permissions (Admin only) — shows effective plan + override permissions
     getPermissions: async (intTargetUserId) => {
         const response = await api.post('/user/permissions/get', { intTargetUserId });
         return response.data;
     },
 
-    // Set user permissions (Admin only)
-    setPermissions: async (intTargetUserId, lstPermissions) => {
-        const response = await api.post('/user/permissions/set', {
-            intTargetUserId, lstPermissions
+    // ── Module Overrides (per-user grant/revoke beyond plan) ──
+    setModuleOverride: async ({ intTargetUserId, intModuleId, intCreate = 0, intRead = 0, intUpdate = 0, intDelete = 0, intPrint = 0, strQuotaPeriod = null, datExpiresAt = null, strReason = null }) => {
+        const response = await api.post('/user/override/set', {
+            intTargetUserId, intModuleId,
+            intCreate, intRead, intUpdate, intDelete, intPrint,
+            strQuotaPeriod, datExpiresAt, strReason,
         });
+        return response.data;
+    },
+
+    deleteModuleOverride: async (intTargetUserId, intModuleId) => {
+        const response = await api.post('/user/override/delete', { intTargetUserId, intModuleId });
+        return response.data;
+    },
+
+    listModuleOverrides: async (intTargetUserId) => {
+        const response = await api.post('/user/override/list', { intTargetUserId });
         return response.data;
     },
 
@@ -85,12 +97,6 @@ const userService = {
     // Update profile (current user or admin)
     updateProfile: async (data) => {
         const response = await api.post('/user/update', data);
-        return response.data;
-    },
-
-    // Get all users usage stats (Admin only)
-    getUsageStats: async () => {
-        const response = await api.get('/user/usage-stats');
         return response.data;
     },
 
@@ -117,14 +123,6 @@ const userService = {
     // Get permission grid (admin)
     getPermissionGrid: async () => {
         const response = await api.get('/user/permissions/grid');
-        return response.data;
-    },
-
-    // Toggle single module permission (admin)
-    togglePermission: async (intTargetUserId, strModuleKey, blnEnabled) => {
-        const response = await api.post('/user/permissions/toggle', {
-            intTargetUserId, strModuleKey, blnEnabled
-        });
         return response.data;
     },
 

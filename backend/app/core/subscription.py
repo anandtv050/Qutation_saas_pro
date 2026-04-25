@@ -13,55 +13,49 @@ async def fnCheckSubscription(objPool, intUserId: int) -> dict:
     if intUserId == 1:
         return {"strStatus": "active", "strPlanName": "admin"}
 
-    # Check if user is active
+    # Check account status + plan from tbl_user (plan lives on user after B2B refactor)
     async with objPool.acquire() as conn:
         rstUser = await conn.fetchrow(
-            "SELECT bln_is_active FROM tbl_user WHERE pk_bint_user_id = $1",
-            intUserId
-        )
-        if rstUser and not rstUser.get('bln_is_active', True):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your account has been deactivated. Please contact support."
-            )
-
-    async with objPool.acquire() as conn:
-        rstSub = await conn.fetchrow(
-            """SELECT s.vchr_status, s.dat_end_date, s.fk_bint_plan_id,
-                      p.vchr_plan_name
-               FROM tbl_subscription s
-               JOIN tbl_subscription_plan p ON s.fk_bint_plan_id = p.pk_bint_plan_id
-               WHERE s.fk_bint_user_id = $1
-               ORDER BY s.pk_bint_subscription_id DESC
-               LIMIT 1""",
+            """SELECT u.bln_is_active, u.vchr_plan_status, u.dat_plan_end_date,
+                      u.fk_bint_plan_id, p.vchr_plan_name
+               FROM tbl_user u
+               LEFT JOIN tbl_subscription_plan p ON u.fk_bint_plan_id = p.pk_bint_plan_id
+               WHERE u.pk_bint_user_id = $1""",
             intUserId
         )
 
-    if not rstSub:
+    if not rstUser:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+
+    if not rstUser.get('bln_is_active', True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been deactivated. Please contact support."
+        )
+
+    if rstUser['fk_bint_plan_id'] is None or rstUser['dat_plan_end_date'] is None:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="No subscription found. Please subscribe to continue."
+            detail="No plan assigned. Please contact support."
         )
 
-    strStatus = rstSub['vchr_status']
-    intDaysRemaining = (rstSub['dat_end_date'] - date.today()).days
+    strStatus = rstUser['vchr_plan_status']
+    intDaysRemaining = (rstUser['dat_plan_end_date'] - date.today()).days
 
-    # Auto-expire
+    # Live expiry check — no cron needed
     if intDaysRemaining < 0 and strStatus in ('trial', 'active'):
         strStatus = 'expired'
-        async with objPool.acquire() as conn:
-            await conn.execute(
-                "UPDATE tbl_subscription SET vchr_status = 'expired' WHERE fk_bint_user_id = $1 AND vchr_status IN ('trial', 'active')",
-                intUserId
-            )
 
-    if strStatus in ('expired', 'cancelled'):
+    if strStatus in ('expired', 'canceled'):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Your subscription has expired. Please renew to continue."
         )
 
-    if strStatus == 'suspended':
+    if strStatus in ('paused', 'past_due'):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Your account has been suspended. Please contact support."
@@ -69,6 +63,6 @@ async def fnCheckSubscription(objPool, intUserId: int) -> dict:
 
     return {
         "strStatus": strStatus,
-        "strPlanName": rstSub['vchr_plan_name'],
+        "strPlanName": rstUser['vchr_plan_name'],
         "intDaysRemaining": max(intDaysRemaining, 0),
     }

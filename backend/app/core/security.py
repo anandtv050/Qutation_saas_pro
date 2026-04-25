@@ -91,27 +91,3 @@ async def fnGetAdminUser(
     return intUserId
 
 
-async def fnCheckModulePermission(intUserId: int, strModuleKey: str, insPool) -> bool:
-    """
-    Check if user has permission to access a specific module.
-    Admin (user_id=1) always has access.
-    If no permission row exists for the user, access is GRANTED (default allow).
-    Only blocked if explicitly set to bln_enabled = false.
-    """
-    if intUserId == ADMIN_USER_ID:
-        return True
-
-    async with insPool.acquire() as conn:
-        rstPerm = await conn.fetchrow(
-            """SELECT p.bln_enabled
-               FROM tbl_user_module_permission p
-               JOIN tbl_module m ON p.fk_bint_module_id = m.pk_bint_module_id
-               WHERE p.fk_bint_user_id = $1 AND m.vchr_module_key = $2""",
-            intUserId, strModuleKey
-        )
-
-    # If no permission row exists, default to ALLOWED
-    if rstPerm is None:
-        return True
-
-    return rstPerm['bln_enabled']

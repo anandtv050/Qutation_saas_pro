@@ -8,7 +8,7 @@ from app.api.print_settings.schema import (
 )
 from app.api.print_settings.service import ClsPrintSettingsService
 from app.core.baseSchema import ResponseStatus
-from app.core.dependency import fnGetContext
+from app.core.dependency import fnGetContext, fnRequireModule
 from app.core.security import ADMIN_USER_ID
 from app.core.logger import getUserLogger
 
@@ -25,7 +25,7 @@ def _resolve_target_user(objContext, intTargetUserId):
 @router.post("/get", response_model=MdlPrintSettingsResponse)
 async def fnGetPrintSettings(
     mdlRequest: MdlGetPrintSettingsRequest,
-    objContext=Depends(fnGetContext),
+    objContext=Depends(fnRequireModule("print_settings")),
 ):
     logger = getUserLogger(objContext.intUserId)
     try:
@@ -56,7 +56,7 @@ async def fnGetPrintSettings(
 @router.post("/save", response_model=MdlPrintSettingsResponse)
 async def fnSavePrintSettings(
     mdlRequest: MdlSavePrintSettingsRequest,
-    objContext=Depends(fnGetContext),
+    objContext=Depends(fnRequireModule("print_settings")),
 ):
     logger = getUserLogger(objContext.intUserId)
     try:

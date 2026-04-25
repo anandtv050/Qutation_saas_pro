@@ -34,75 +34,13 @@ async def fnGetAllPlans(
 
 
 @router.get("/active")
-async def fnGetActivePlans(
-    insPool: Pool = Depends(fnGetPool),
-    include_free: bool = False,
-):
-    """Get active plans with module permissions (public - for subscribe/landing page)"""
-    if include_free:
-        strFilter = "WHERE bln_active = true"
-    else:
-        strFilter = "WHERE bln_active = true AND dbl_price_yearly > 0"
-
-    async with insPool.acquire() as conn:
-        rstPlans = await conn.fetch(
-            f"""SELECT pk_bint_plan_id, vchr_plan_name, vchr_display_name,
-                      dbl_price_monthly, dbl_price_yearly,
-                      int_max_quotations_per_month, int_max_users, bln_ai_enabled
-               FROM tbl_subscription_plan
-               {strFilter}
-               ORDER BY dbl_price_yearly"""
-        )
-
-        # Fetch module permissions for all active plans
-        lstPlanIds = [row['pk_bint_plan_id'] for row in rstPlans]
-        rstModules = await conn.fetch(
-            """SELECT pm.fk_bint_plan_id, pm.int_create, pm.int_read, pm.int_update,
-                      pm.int_delete, pm.int_print, pm.int_monthly_limit, pm.int_daily_limit,
-                      COALESCE(pm.vchr_display_name, m.vchr_display_name) AS vchr_display_name,
-                      m.vchr_module_key, m.vchr_icon
-               FROM tbl_plan_module pm
-               JOIN tbl_module m ON pm.fk_bint_module_id = m.pk_bint_module_id
-               WHERE pm.fk_bint_plan_id = ANY($1::bigint[])
-               ORDER BY m.int_sort_order""",
-            lstPlanIds
-        ) if lstPlanIds else []
-
-    # Group modules by plan
-    dctModules = {}
-    for row in rstModules:
-        intPlanId = row['fk_bint_plan_id']
-        if intPlanId not in dctModules:
-            dctModules[intPlanId] = []
-        dctModules[intPlanId].append({
-            "strModuleKey": row['vchr_module_key'],
-            "strDisplayName": row['vchr_display_name'],
-            "strIcon": row['vchr_icon'],
-            "intCreate": row['int_create'],
-            "intRead": row['int_read'],
-            "intUpdate": row['int_update'],
-            "intDelete": row['int_delete'],
-            "intPrint": row['int_print'],
-            "intMonthlyLimit": row['int_monthly_limit'],
-            "intDailyLimit": row['int_daily_limit'],
-        })
-
-    return {
-        "lstPlans": [
-            {
-                "intPlanId": row['pk_bint_plan_id'],
-                "strPlanName": row['vchr_plan_name'],
-                "strDisplayName": row['vchr_display_name'],
-                "dblPriceMonthly": float(row['dbl_price_monthly']),
-                "dblPriceYearly": float(row['dbl_price_yearly']),
-                "intMaxQuotationsPerMonth": row['int_max_quotations_per_month'],
-                "intMaxUsers": row['int_max_users'],
-                "blnAiEnabled": row['bln_ai_enabled'],
-                "lstModules": dctModules.get(row['pk_bint_plan_id'], []),
-            }
-            for row in rstPlans
-        ]
-    }
+async def fnGetActivePlans(insPool: Pool = Depends(fnGetPool)):
+    """Get active paid plans with module permissions.
+    Used by the in-app Subscribe/Upgrade page (logged-in users).
+    The marketing landing page is hardcoded and does NOT call this endpoint.
+    """
+    insService = ClsPlanService(insPool, intUserId=0)
+    return await insService.fnGetActivePublicPlans()
 
 
 @router.post("/add", response_model=MdlPlanResponse)

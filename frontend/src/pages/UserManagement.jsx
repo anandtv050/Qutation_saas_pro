@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, Users, Trash2, X, Loader2, AlertCircle, CheckCircle, Shield, Mail, Phone, Building, Settings, Power, Pencil, BarChart3 } from "lucide-react";
+import { Search, Plus, Users, Trash2, X, Loader2, AlertCircle, CheckCircle, Shield, Mail, Phone, Building, Power, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import userService from "@/services/userService";
@@ -20,15 +20,10 @@ export default function UserManagement() {
   }, [isAdmin, navigate]);
 
   // State
-  const [activeTab, setActiveTab] = useState("users"); // "users" | "usage"
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Usage stats
-  const [usageData, setUsageData] = useState([]);
-  const [usageLoading, setUsageLoading] = useState(false);
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -38,9 +33,6 @@ export default function UserManagement() {
   const [modalError, setModalError] = useState("");
 
   // Permissions modal
-  const [permModal, setPermModal] = useState(null); // user object
-  const [permissions, setPermissions] = useState([]);
-  const [permLoading, setPermLoading] = useState(false);
 
   // Edit modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -96,18 +88,6 @@ export default function UserManagement() {
       setError(err.message);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchUsageStats = async () => {
-    setUsageLoading(true);
-    try {
-      const res = await userService.getUsageStats();
-      setUsageData(res.lstUsers || []);
-    } catch (err) {
-      showToast("error", "Failed to load usage stats");
-    } finally {
-      setUsageLoading(false);
     }
   };
 
@@ -222,42 +202,6 @@ export default function UserManagement() {
     }
   };
 
-  // Handle Permissions
-  const handleOpenPermissions = async (user) => {
-    setPermModal(user);
-    setPermLoading(true);
-    try {
-      const res = await userService.getPermissions(user.intPkUserId);
-      setPermissions(res.lstPermissions || []);
-    } catch (err) {
-      showToast("error", "Failed to load permissions");
-    } finally {
-      setPermLoading(false);
-    }
-  };
-
-  const handleTogglePermission = (intModuleId) => {
-    setPermissions(prev =>
-      prev.map(p => p.intModuleId === intModuleId ? { ...p, blnEnabled: !p.blnEnabled } : p)
-    );
-  };
-
-  const handleSavePermissions = async () => {
-    try {
-      setPermLoading(true);
-      await userService.setPermissions(
-        permModal.intPkUserId,
-        permissions.map(p => ({ intModuleId: p.intModuleId, blnEnabled: p.blnEnabled }))
-      );
-      setPermModal(null);
-      showToast("success", "Permissions updated!");
-    } catch (err) {
-      showToast("error", "Failed to save permissions");
-    } finally {
-      setPermLoading(false);
-    }
-  };
-
   // Handle Edit
   const handleOpenEdit = (user) => {
     setEditData({
@@ -354,30 +298,6 @@ export default function UserManagement() {
         </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-neutral-100 rounded-lg p-1 max-w-xs">
-        <button
-          onClick={() => setActiveTab("users")}
-          className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-1.5 ${
-            activeTab === "users" ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-black"
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" />
-          Users
-        </button>
-        <button
-          onClick={() => { setActiveTab("usage"); if (usageData.length === 0) fetchUsageStats(); }}
-          className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-1.5 ${
-            activeTab === "usage" ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-black"
-          }`}
-        >
-          <BarChart3 className="w-3.5 h-3.5" />
-          Usage
-        </button>
-      </div>
-
-      {activeTab === "users" && (
-      <>
       {/* Search */}
       <div className="mb-4">
         <div className="relative max-w-md">
@@ -459,15 +379,6 @@ export default function UserManagement() {
                       )}
                       {!isAdminUser && (
                         <button
-                          onClick={() => handleOpenPermissions(user)}
-                          className="p-2 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                          title="Permissions"
-                        >
-                          <Settings className="w-4 h-4" />
-                        </button>
-                      )}
-                      {!isAdminUser && (
-                        <button
                           onClick={() => handleDeleteClick(user)}
                           className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                         >
@@ -533,13 +444,6 @@ export default function UserManagement() {
                         <Power className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleOpenPermissions(user)}
-                        className="p-2 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                        title="Permissions"
-                      >
-                        <Settings className="w-4 h-4" />
-                      </button>
-                      <button
                         onClick={() => handleDeleteClick(user)}
                         className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                       >
@@ -563,93 +467,6 @@ export default function UserManagement() {
         <p className="text-sm text-neutral-500 mt-3">
           Showing {filteredUsers.length} of {users.length} users
         </p>
-      )}
-      </>
-      )}
-
-      {/* Usage Stats Tab */}
-      {activeTab === "usage" && (
-        <div>
-          {usageLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-neutral-400" />
-            </div>
-          ) : usageData.length === 0 ? (
-            <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
-              <BarChart3 className="w-12 h-12 mx-auto text-neutral-300 mb-4" />
-              <p className="text-neutral-500">No usage data yet</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {usageData.map((user) => (
-                <div key={user.intUserId} className="bg-white border border-neutral-200 rounded-xl p-5">
-                  {/* User header */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-neutral-900">{user.strUsername}</p>
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                          user.strSubStatus === "active" ? "bg-green-100 text-green-700" :
-                          user.strSubStatus === "trial" ? "bg-blue-100 text-blue-700" :
-                          user.strSubStatus === "expired" ? "bg-red-100 text-red-600" :
-                          "bg-neutral-100 text-neutral-500"
-                        }`}>
-                          {user.strPlanName} - {user.strSubStatus}
-                        </span>
-                      </div>
-                      <p className="text-xs text-neutral-500">{user.strEmail}</p>
-                    </div>
-                    {user.intDaysRemaining > 0 && (
-                      <span className="text-xs text-neutral-400">{user.intDaysRemaining} days left</span>
-                    )}
-                  </div>
-
-                  {/* Module usage grid */}
-                  {user.lstModules.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                      {user.lstModules.map((mod) => (
-                        <div
-                          key={mod.strModuleKey}
-                          className={`px-3 py-2.5 rounded-lg border text-center ${
-                            mod.blnBlocked
-                              ? "bg-neutral-50 border-neutral-100 opacity-40"
-                              : "bg-white border-neutral-200"
-                          }`}
-                        >
-                          <p className="text-xs text-neutral-500 mb-0.5">{mod.strDisplayName}</p>
-                          {mod.blnBlocked ? (
-                            <p className="text-sm font-medium text-neutral-400">Blocked</p>
-                          ) : (
-                            <>
-                              <p className="text-lg font-bold text-neutral-900">{mod.intTotalCreated}</p>
-                              {mod.intDailyLimit > 0 && (
-                                <div className="mt-1">
-                                  <div className="h-1 bg-neutral-100 rounded-full overflow-hidden">
-                                    <div
-                                      className={`h-full rounded-full ${
-                                        mod.intTodayUsed >= mod.intDailyLimit ? "bg-red-500" : "bg-green-500"
-                                      }`}
-                                      style={{ width: `${Math.min((mod.intTodayUsed / mod.intDailyLimit) * 100, 100)}%` }}
-                                    />
-                                  </div>
-                                  <p className="text-[10px] text-neutral-400 mt-0.5">
-                                    {mod.intTodayUsed}/{mod.intDailyLimit} today
-                                  </p>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-neutral-400">No module data</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       )}
 
       {/* Add User Modal */}
@@ -813,70 +630,8 @@ export default function UserManagement() {
         </div>
       )}
 
-      {/* Permissions Modal */}
-      {permModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl w-full max-w-sm">
-            <div className="flex items-center justify-between p-4 border-b">
-              <div>
-                <h2 className="font-semibold">Module Permissions</h2>
-                <p className="text-xs text-neutral-500">{permModal.strUsername} ({permModal.strEmail})</p>
-              </div>
-              <button onClick={() => setPermModal(null)} className="p-1 hover:bg-neutral-100 rounded">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4">
-              {permLoading ? (
-                <div className="flex justify-center py-6">
-                  <Loader2 className="w-6 h-6 animate-spin text-neutral-400" />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {permissions.map((perm) => (
-                    <label
-                      key={perm.intModuleId}
-                      className="flex items-center justify-between p-3 rounded-lg border border-neutral-200 cursor-pointer hover:bg-neutral-50"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-neutral-900">{perm.strDisplayName}</p>
-                        {perm.strDescription && (
-                          <p className="text-xs text-neutral-400">{perm.strDescription}</p>
-                        )}
-                      </div>
-                      <div
-                        onClick={() => handleTogglePermission(perm.intModuleId)}
-                        className={`relative w-10 h-6 rounded-full transition-colors cursor-pointer ${
-                          perm.blnEnabled ? "bg-emerald-500" : "bg-neutral-300"
-                        }`}
-                      >
-                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                          perm.blnEnabled ? "translate-x-4" : "translate-x-0.5"
-                        }`} />
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3 p-4 border-t bg-neutral-50">
-              <Button variant="outline" onClick={() => setPermModal(null)} className="flex-1">
-                Cancel
-              </Button>
-              <Button
-                className="flex-1 bg-neutral-900 hover:bg-neutral-800"
-                onClick={handleSavePermissions}
-                disabled={permLoading}
-              >
-                {permLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                Save
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Per-user module permission toggles moved to the Modules → Permissions page
+          (single source of truth). The gear icon on each user row was removed. */}
 
       {/* Edit User Modal */}
       {showEditModal && (

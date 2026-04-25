@@ -18,13 +18,12 @@ async def fnGenerateQuotationPDF(
     objContext=Depends(fnGetContext)
 ):
     "generate the quotation print"
-
+    await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "print_settings", "print")
     try:
-        await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "print_settings", "print")
-        insPdfService =   ClsPdfGenerator(objContext.objPool,objContext.intUserId)  
-        mdlResponse = await insPdfService.fnGetQuotationPdf(mdlRequest)   
-        return mdlResponse       
-    
+        insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
+        return await insPdfService.fnGetQuotationPdf(mdlRequest)
+    except HTTPException:
+        raise
     except Exception as e:
         print(str(e))
         raise HTTPException(
@@ -39,13 +38,12 @@ async def fnGenerateInvoicePDF(
     objContext=Depends(fnGetContext)
 ):
     "generate the invoice print"
-
+    await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "print_settings", "print")
     try:
-        await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "print_settings", "print")
         insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
-        mdlResponse = await insPdfService.fnGetInvoicePdf(mdlRequest)
-        return mdlResponse
-
+        return await insPdfService.fnGetInvoicePdf(mdlRequest)
+    except HTTPException:
+        raise
     except Exception as e:
         print(str(e))
         raise HTTPException(
@@ -60,14 +58,12 @@ async def fnGenerateWarrantyCertificatePDF(
     objContext=Depends(fnGetContext)
 ):
     "generate warranty certificate print"
-
+    await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "warranty", "print")
     try:
-        await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "print_settings", "print")
-        await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "warranty", "print")
         insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
-        mdlResponse = await insPdfService.fnGetWarrantyCertificatePdf(mdlRequest)
-        return mdlResponse
-
+        return await insPdfService.fnGetWarrantyCertificatePdf(mdlRequest)
+    except HTTPException:
+        raise
     except Exception as e:
         print(str(e))
         raise HTTPException(

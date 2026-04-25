@@ -11,11 +11,12 @@ from app.api.user.schema import (
     MdlGetUserRequest,
     MdlDeleteUserRequest,
     MdlGetPermissionsRequest,
-    MdlSetPermissionsRequest,
     MdlAddModuleRequest,
     MdlUpdateModuleRequest,
     MdlDeleteModuleRequest,
-    MdlTogglePermissionRequest,
+    MdlSetModuleOverrideRequest,
+    MdlDeleteModuleOverrideRequest,
+    MdlListModuleOverridesRequest,
     MdlUpdateSettingsRequest,
     MdlAddSettingRequest,
     MdlDeleteSettingRequest,
@@ -101,16 +102,6 @@ async def fnGetMyProfile(
     return await insService.fnGetSingleUser(intUserId)
 
 
-@router.get("/usage-stats")
-async def fnGetUsageStats(
-    insPool: Pool = Depends(fnGetPool),
-    intUserId: int = Depends(fnGetAdminUser)
-):
-    """Get all users with plan usage stats (Admin only)"""
-    insService = ClsUserService(insPool, intUserId)
-    return await insService.fnGetAllUsersUsageStats()
-
-
 @router.post("/delete", response_model=MdlDeleteUserResponse)
 async def fnDeleteUser(
     mdlRequest: MdlDeleteUserRequest,
@@ -152,10 +143,11 @@ async def fnAddModule(
     """Add a new module (Admin only)"""
     insService = ClsUserService(insPool, intUserId)
     return await insService.fnAddModule(
-        mdlRequest.strModuleKey, mdlRequest.strDisplayName,
-        mdlRequest.strIcon, mdlRequest.strPath,
-        mdlRequest.strLabel, mdlRequest.blnShowInSidebar,
-        mdlRequest.blnIsAdminOnly, mdlRequest.intSortOrder
+        mdlRequest.strModuleKey, mdlRequest.strModuleCode,
+        mdlRequest.strDisplayName, mdlRequest.strIcon,
+        mdlRequest.strPath, mdlRequest.strLabel,
+        mdlRequest.blnShowInSidebar, mdlRequest.blnIsAdminOnly,
+        mdlRequest.intSortOrder
     )
 
 
@@ -206,20 +198,6 @@ async def fnGetUserPermissions(
     return await insService.fnGetUserPermissions(mdlRequest.intTargetUserId)
 
 
-@router.post("/permissions/set")
-async def fnSetUserPermissions(
-    mdlRequest: MdlSetPermissionsRequest,
-    insPool: Pool = Depends(fnGetPool),
-    intUserId: int = Depends(fnGetAdminUser)
-):
-    """Set module permissions for a user (Admin only)"""
-    insService = ClsUserService(insPool, intUserId)
-    return await insService.fnSetUserPermissions(
-        mdlRequest.intTargetUserId,
-        mdlRequest.lstPermissions
-    )
-
-
 @router.get("/my-permissions")
 async def fnGetMyPermissions(
     insPool: Pool = Depends(fnGetPool),
@@ -244,19 +222,43 @@ async def fnGetPermissionGrid(
     return await insService.fnGetPermissionGrid()
 
 
-@router.post("/permissions/toggle")
-async def fnToggleModulePermission(
-    mdlRequest: MdlTogglePermissionRequest,
+# =====================================================
+# MODULE PERMISSION OVERRIDES (per-user grant/revoke)
+# =====================================================
+
+@router.post("/override/set")
+async def fnSetUserModuleOverride(
+    mdlRequest: MdlSetModuleOverrideRequest,
     insPool: Pool = Depends(fnGetPool),
     intUserId: int = Depends(fnGetAdminUser)
 ):
-    """Toggle a single module permission for a user (Admin only)"""
+    """Admin: grant or revoke module access for a specific user (overrides plan)"""
     insService = ClsUserService(insPool, intUserId)
-    return await insService.fnToggleModulePermission(
-        mdlRequest.intTargetUserId,
-        mdlRequest.strModuleKey,
-        mdlRequest.blnEnabled
+    return await insService.fnSetUserModuleOverride(mdlRequest)
+
+
+@router.post("/override/delete")
+async def fnDeleteUserModuleOverride(
+    mdlRequest: MdlDeleteModuleOverrideRequest,
+    insPool: Pool = Depends(fnGetPool),
+    intUserId: int = Depends(fnGetAdminUser)
+):
+    """Admin: remove a per-user module permission override (revert to plan default)"""
+    insService = ClsUserService(insPool, intUserId)
+    return await insService.fnDeleteUserModuleOverride(
+        mdlRequest.intTargetUserId, mdlRequest.intModuleId
     )
+
+
+@router.post("/override/list")
+async def fnListUserModuleOverrides(
+    mdlRequest: MdlListModuleOverridesRequest,
+    insPool: Pool = Depends(fnGetPool),
+    intUserId: int = Depends(fnGetAdminUser)
+):
+    """Admin: list all active (non-expired) module overrides for a user"""
+    insService = ClsUserService(insPool, intUserId)
+    return await insService.fnListUserModuleOverrides(mdlRequest.intTargetUserId)
 
 
 # =====================================================

@@ -61,46 +61,37 @@ def fnRequireModule(strModuleKey: str):
             return MdlDepndencyContext(
                 objPool=objPool, intUserId=intUserId,
                 dctSubscription=dctSubscription,
-                dctModulePerms={"intCreate": -1, "intRead": -1, "intUpdate": -1, "intDelete": -1, "intPrint": -1, "intMonthlyLimit": -1, "intDailyLimit": -1}
+                dctModulePerms={"intCreate": -1, "intRead": -1, "intUpdate": -1, "intDelete": -1, "intPrint": -1, "strQuotaPeriod": None}
             )
 
-        # Check plan-level module access
+        # Check plan-level module access, with per-user override taking precedence
         async with objPool.acquire() as conn:
             rstPerm = await conn.fetchrow(
-                """SELECT pm.int_create, pm.int_read, pm.int_update, pm.int_delete, pm.int_print,
-                          pm.int_monthly_limit, pm.int_daily_limit
-                   FROM tbl_plan_module pm
+                """SELECT COALESCE(o.int_create, pm.int_create) AS int_create,
+                          COALESCE(o.int_read,   pm.int_read)   AS int_read,
+                          COALESCE(o.int_update, pm.int_update) AS int_update,
+                          COALESCE(o.int_delete, pm.int_delete) AS int_delete,
+                          COALESCE(o.int_print,  pm.int_print)  AS int_print,
+                          COALESCE(o.vchr_quota_period, pm.vchr_quota_period) AS vchr_quota_period
+                   FROM tbl_user u
+                   JOIN tbl_plan_module pm ON pm.fk_bint_plan_id = u.fk_bint_plan_id
                    JOIN tbl_module m ON pm.fk_bint_module_id = m.pk_bint_module_id
-                   JOIN tbl_subscription s ON pm.fk_bint_plan_id = s.fk_bint_plan_id
-                   WHERE s.fk_bint_user_id = $1
-                     AND s.vchr_status IN ('trial', 'active')
+                   LEFT JOIN tbl_user_module_override o
+                          ON o.fk_bint_user_id = u.pk_bint_user_id
+                         AND o.fk_bint_module_id = m.pk_bint_module_id
+                         AND (o.dat_expires_at IS NULL OR o.dat_expires_at >= CURRENT_DATE)
+                   WHERE u.pk_bint_user_id = $1
+                     AND u.vchr_plan_status IN ('trial', 'active')
+                     AND u.dat_plan_end_date >= CURRENT_DATE
                      AND m.vchr_module_key = $2
-                   ORDER BY s.pk_bint_subscription_id DESC
                    LIMIT 1""",
                 intUserId, strModuleKey
             )
 
-        # If no plan_module row exists, check legacy tbl_user_module_permission
         if not rstPerm:
-            # Fallback to old permission system during transition
-            async with objPool.acquire() as conn:
-                rstLegacy = await conn.fetchrow(
-                    """SELECT p.bln_enabled
-                       FROM tbl_user_module_permission p
-                       JOIN tbl_module m ON p.fk_bint_module_id = m.pk_bint_module_id
-                       WHERE p.fk_bint_user_id = $1 AND m.vchr_module_key = $2""",
-                    intUserId, strModuleKey
-                )
-            # Legacy: no row = allowed, row with false = blocked
-            if rstLegacy and not rstLegacy['bln_enabled']:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You don't have access to this module. Please contact admin."
-                )
-            return MdlDepndencyContext(
-                objPool=objPool, intUserId=intUserId,
-                dctSubscription=dctSubscription,
-                dctModulePerms={"intCreate": -1, "intRead": -1, "intUpdate": -1, "intDelete": -1, "intPrint": -1, "intMonthlyLimit": -1, "intDailyLimit": -1}
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This module is not available in your plan. Please upgrade."
             )
 
         # Check if module read is blocked (can't access at all)
@@ -116,8 +107,7 @@ def fnRequireModule(strModuleKey: str):
             "intUpdate": rstPerm['int_update'],
             "intDelete": rstPerm['int_delete'],
             "intPrint": rstPerm['int_print'],
-            "intMonthlyLimit": rstPerm['int_monthly_limit'],
-            "intDailyLimit": rstPerm['int_daily_limit'],
+            "strQuotaPeriod": rstPerm['vchr_quota_period'],
         }
 
         return MdlDepndencyContext(

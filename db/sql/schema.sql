@@ -30,28 +30,40 @@ DROP TABLE IF EXISTS tbl_user CASCADE;
 -- Table 1: tbl_user
 -- =====================================================
 CREATE TABLE tbl_user (
-    pk_bint_user_id BIGSERIAL PRIMARY KEY,
-    vchr_email VARCHAR(255) UNIQUE NOT NULL,
-    vchr_username VARCHAR(100) NOT NULL,
-    vchr_password_hash VARCHAR(255) NOT NULL,
-    vchr_business_name VARCHAR(200),
-    vchr_phone VARCHAR(20),
-    txt_address TEXT,
-    vchr_currency_code VARCHAR(10) DEFAULT 'INR',
-    vchr_gst_number VARCHAR(50),
-    tim_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    tim_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    bln_is_active BOOLEAN DEFAULT TRUE,
-    bln_email_verified BOOLEAN DEFAULT FALSE,
-    vchr_reset_token VARCHAR(255),
-    tim_reset_token_expiry TIMESTAMP,
-    fk_bint_service_id BIGINT,
-    tim_last_heartbeat TIMESTAMP DEFAULT NULL,
-    tim_last_login TIMESTAMP DEFAULT NULL
+    pk_bint_user_id             BIGSERIAL PRIMARY KEY,
+    vchr_email                  VARCHAR(255) UNIQUE NOT NULL,
+    vchr_username               VARCHAR(100) NOT NULL,
+    vchr_password_hash          VARCHAR(255) NOT NULL,
+    vchr_business_name          VARCHAR(200),
+    vchr_phone                  VARCHAR(20),
+    txt_address                 TEXT,
+    vchr_currency_code          VARCHAR(10) DEFAULT 'INR',
+    vchr_gst_number             VARCHAR(50),
+    tim_created_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    tim_updated_at              TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    bln_is_active               BOOLEAN      DEFAULT TRUE,
+    bln_email_verified          BOOLEAN      DEFAULT FALSE,
+    vchr_reset_token            VARCHAR(255),
+    tim_reset_token_expiry      TIMESTAMP,
+    fk_bint_service_id          BIGINT,                                     -- Business service type (CCTV, Electrical, etc.)
+    tim_last_heartbeat          TIMESTAMP    DEFAULT NULL,
+    tim_last_login              TIMESTAMP    DEFAULT NULL,
+    -- Plan assignment (replaces tbl_subscription; admin manages these)
+    fk_bint_plan_id             BIGINT,                                     -- Current subscription plan (FK added after tbl_subscription_plan is created)
+    vchr_plan_status            VARCHAR(20)  DEFAULT 'trial'
+                                CHECK (vchr_plan_status IN ('trial','active','past_due','canceled','expired','paused')),
+    dat_plan_start_date         DATE         DEFAULT CURRENT_DATE,          -- When this user first got a plan
+    dat_plan_end_date           DATE,                                       -- When current plan expires / needs renewal
+    bln_cancel_at_period_end    BOOLEAN      DEFAULT FALSE,                 -- Customer requested cancel but still has access
+    dat_canceled_at             DATE,                                       -- When cancel was requested
+    vchr_cancel_reason          TEXT,                                       -- Retention analytics
+    vchr_razorpay_customer_id   VARCHAR(100)                                -- Future: Razorpay customer reference
 );
 
 CREATE INDEX idx_email ON tbl_user(vchr_email);
 CREATE INDEX idx_username ON tbl_user(vchr_username);
+CREATE INDEX idx_user_plan ON tbl_user(fk_bint_plan_id);
+CREATE INDEX idx_user_plan_active ON tbl_user(fk_bint_plan_id, vchr_plan_status, dat_plan_end_date);
 
 -- Trigger for auto-updating tim_updated_at
 CREATE OR REPLACE FUNCTION update_timestamp()
@@ -340,19 +352,11 @@ CREATE TABLE tbl_print_model_settings (
     tim_updated_at                   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 );
 
--- Auto-update tim_updated_at on row change
-CREATE OR REPLACE FUNCTION fn_update_print_model_settings_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.tim_updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
+-- Auto-update tim_updated_at on row change (reuses generic update_timestamp())
 CREATE TRIGGER trg_update_print_model_settings_timestamp
     BEFORE UPDATE ON tbl_print_model_settings
     FOR EACH ROW
-    EXECUTE FUNCTION fn_update_print_model_settings_timestamp();
+    EXECUTE FUNCTION update_timestamp();
 
 
 -- =====================================================
@@ -396,223 +400,234 @@ ALTER TABLE tbl_user ADD CONSTRAINT fk_user_service FOREIGN KEY (fk_bint_service
 -- Table 12: tbl_subscription_plan
 -- =====================================================
 CREATE TABLE tbl_subscription_plan (
-    pk_bint_plan_id BIGSERIAL PRIMARY KEY,
-    vchr_plan_name VARCHAR(50) NOT NULL UNIQUE,
-    vchr_display_name VARCHAR(100) NOT NULL,
-    dbl_price_monthly DECIMAL(10,2) DEFAULT 0.00,
-    dbl_price_yearly DECIMAL(10,2) DEFAULT 0.00,
-    int_max_quotations_per_month INTEGER DEFAULT 10,
-    int_max_users INTEGER DEFAULT 1,
-    bln_ai_enabled BOOLEAN DEFAULT FALSE,
-    int_ai_calls_per_day INTEGER DEFAULT -1,
-    bln_active BOOLEAN DEFAULT TRUE,
-    tim_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    pk_bint_plan_id           BIGSERIAL PRIMARY KEY,                          -- Plan ID (auto)
+    vchr_plan_name            VARCHAR(50)    NOT NULL UNIQUE,                 -- Internal key: 'free_trial', 'standard', 'premium'
+    vchr_display_name         VARCHAR(100)   NOT NULL,                        -- User-facing name: 'Free', 'Standard', 'Premium'
+    txt_description           TEXT,                                           -- Short tagline shown on pricing page
+    dbl_price_monthly         DECIMAL(10,2)  DEFAULT 0.00,                    -- Monthly price (0 for free)
+    dbl_price_yearly          DECIMAL(10,2)  DEFAULT 0.00,                    -- Yearly price (usually discounted)
+    vchr_currency             VARCHAR(10)    DEFAULT 'INR',                   -- Currency code (INR, USD, etc.)
+    vchr_offer_label          VARCHAR(100),                                   -- Offer name: 'Early Bird Offer', 'Launch Special' (NULL = no offer)
+    dbl_offer_price_monthly   DECIMAL(10,2),                                  -- Discounted monthly price when offer active
+    dbl_offer_price_yearly    DECIMAL(10,2),                                  -- Discounted yearly price when offer active
+    bln_offer_active          BOOLEAN        DEFAULT FALSE,                   -- Toggle offer display/charging on/off
+    dat_offer_valid_until     DATE,                                           -- Offer expiry date (NULL = no expiry)
+    int_trial_days            INTEGER        DEFAULT 0,                       -- Free trial length (7 for free_trial plan)
+    int_grace_period_days     INTEGER        DEFAULT 0,                       -- Grace days after expiry before hard block
+    jsonb_features_display    JSONB          DEFAULT '[]',                    -- Feature bullets for pricing page UI
+    int_sort_order            INTEGER        DEFAULT 0,                       -- Display order on pricing page (1=first)
+    bln_is_public             BOOLEAN        DEFAULT TRUE,                    -- Show on public pricing page (false = hidden/enterprise)
+    bln_active                BOOLEAN        DEFAULT TRUE,                    -- Plan available for new signups
+    tim_created_at            TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,       -- Plan creation time
+    tim_updated_at            TIMESTAMP      DEFAULT CURRENT_TIMESTAMP        -- Last modified (auto via trigger)
 );
 
-INSERT INTO tbl_subscription_plan (vchr_plan_name, vchr_display_name, dbl_price_monthly, dbl_price_yearly, int_max_quotations_per_month, int_max_users, bln_ai_enabled, int_ai_calls_per_day)
+CREATE TRIGGER trg_subscription_plan_updated
+BEFORE UPDATE ON tbl_subscription_plan
+FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+INSERT INTO tbl_subscription_plan
+    (vchr_plan_name, vchr_display_name, txt_description, dbl_price_monthly, dbl_price_yearly, vchr_offer_label, dbl_offer_price_monthly, dbl_offer_price_yearly, bln_offer_active, dat_offer_valid_until, int_trial_days, int_grace_period_days, int_sort_order, jsonb_features_display)
 VALUES
-    ('free_trial', 'Free', 0.00, 0.00, -1, 1, true, 1),
-    ('standard', 'Standard', 1999.00, 19999.00, -1, 1, true, -1),
-    ('premium', 'Premium', 3999.00, 39999.00, -1, 3, true, -1);
+    ('free_trial', 'Free',     'Get started free',       0.00,    0.00,     NULL,                NULL,    NULL,     FALSE, NULL,         7, 0, 1, '[{"label":"Unlimited Quotations","included":true},{"label":"Unlimited Invoices","included":true},{"label":"AI Quick Create","included":true,"note":"1/day"},{"label":"Warranty","included":false},{"label":"Reports","included":false},{"label":"Print Customization","included":false}]'),
+    ('standard',   'Standard', 'For growing businesses', 1999.00, 19999.00, 'Early Bird Offer',  999.00,  9999.00,  TRUE,  '2026-06-30', 0, 3, 2, '[{"label":"Everything in Free","included":true},{"label":"Warranty Certificates","included":true},{"label":"Dashboard Analytics","included":true},{"label":"Reports (read-only)","included":true},{"label":"Print Customization","included":true,"note":"3/month"},{"label":"AI Quick Create","included":true,"note":"Unlimited"}]'),
+    ('premium',    'Premium',  'Full power, no limits',  3999.00, 39999.00, 'Early Bird Offer',  1999.00, 19999.00, TRUE,  '2026-06-30', 0, 7, 3, '[{"label":"Everything in Standard","included":true},{"label":"Full Reports with Export","included":true},{"label":"Unlimited Print Templates","included":true},{"label":"Priority Support","included":true}]');
 
 
 -- =====================================================
--- Table 13: tbl_subscription
+-- Link tbl_user.fk_bint_plan_id → tbl_subscription_plan (B2B: plan lives on user)
 -- =====================================================
-CREATE TABLE tbl_subscription (
-    pk_bint_subscription_id BIGSERIAL PRIMARY KEY,
-    fk_bint_user_id BIGINT NOT NULL REFERENCES tbl_user(pk_bint_user_id) ON DELETE CASCADE,
-    fk_bint_plan_id BIGINT NOT NULL REFERENCES tbl_subscription_plan(pk_bint_plan_id),
-    vchr_status VARCHAR(20) NOT NULL DEFAULT 'trial',
-    dat_start_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    dat_end_date DATE NOT NULL,
-    vchr_razorpay_subscription_id VARCHAR(100),
-    vchr_razorpay_customer_id VARCHAR(100),
-    tim_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    tim_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_subscription_user ON tbl_subscription(fk_bint_user_id);
-CREATE INDEX idx_subscription_status ON tbl_subscription(vchr_status);
-
-CREATE OR REPLACE FUNCTION fn_update_subscription_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.tim_updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_subscription_updated_at
-BEFORE UPDATE ON tbl_subscription
-FOR EACH ROW EXECUTE FUNCTION fn_update_subscription_timestamp();
+ALTER TABLE tbl_user ADD CONSTRAINT fk_user_plan
+    FOREIGN KEY (fk_bint_plan_id) REFERENCES tbl_subscription_plan(pk_bint_plan_id) ON DELETE SET NULL;
 
 
 -- =====================================================
 -- Table 14: tbl_payment
 -- =====================================================
 CREATE TABLE tbl_payment (
-    pk_bint_payment_id BIGSERIAL PRIMARY KEY,
-    fk_bint_user_id BIGINT NOT NULL REFERENCES tbl_user(pk_bint_user_id) ON DELETE CASCADE,
-    fk_bint_subscription_id BIGINT REFERENCES tbl_subscription(pk_bint_subscription_id),
-    vchr_payment_method VARCHAR(20) DEFAULT 'razorpay',
-    vchr_razorpay_payment_id VARCHAR(100),
-    vchr_razorpay_order_id VARCHAR(100),
-    vchr_razorpay_signature VARCHAR(255),
-    vchr_manual_reference VARCHAR(200),
-    txt_notes TEXT,
-    dbl_amount DECIMAL(10,2) NOT NULL,
-    vchr_currency VARCHAR(10) DEFAULT 'INR',
-    vchr_status VARCHAR(20) DEFAULT 'pending',
-    int_recorded_by BIGINT,
-    tim_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    pk_bint_payment_id            BIGSERIAL PRIMARY KEY,                                           -- Payment ID (auto)
+    fk_bint_user_id               BIGINT        NOT NULL REFERENCES tbl_user(pk_bint_user_id) ON DELETE CASCADE,  -- Who paid
+    vchr_payment_type             VARCHAR(20)   NOT NULL DEFAULT 'subscription'                   -- What the payment is for
+                                  CHECK (vchr_payment_type IN ('subscription','upgrade','downgrade','one_time','refund')),
+    dbl_amount                    DECIMAL(10,2) NOT NULL,                                          -- Amount paid
+    vchr_currency                 VARCHAR(10)   DEFAULT 'INR',                                     -- Currency code
+    vchr_status                   VARCHAR(20)   NOT NULL DEFAULT 'pending'                        -- Payment state
+                                  CHECK (vchr_status IN ('pending','captured','failed','refunded')),
+    vchr_payment_method           VARCHAR(20)   DEFAULT 'razorpay',                                -- How: razorpay, upi, bank_transfer, cash
+    vchr_razorpay_payment_id      VARCHAR(100)  UNIQUE,                                            -- Razorpay payment ID (online)
+    vchr_razorpay_order_id        VARCHAR(100)  UNIQUE,                                            -- Razorpay order ID (online)
+    vchr_razorpay_signature       VARCHAR(255),                                                    -- Razorpay signature for verification
+    jsonb_gateway_response        JSONB,                                                           -- Raw gateway response for debugging
+    vchr_manual_reference         VARCHAR(200),                                                    -- UPI txn ID / bank ref (for manual payments)
+    bln_is_refund                 BOOLEAN       DEFAULT FALSE,                                     -- TRUE if this row IS a refund entry
+    fk_bint_refunded_payment_id   BIGINT        REFERENCES tbl_payment(pk_bint_payment_id),        -- Link back to original payment (if refund)
+    dbl_amount_refunded           DECIMAL(10,2) DEFAULT 0.00,                                      -- How much refunded from this payment
+    txt_failure_reason            TEXT,                                                            -- Why payment failed (from gateway)
+    txt_notes                     TEXT,                                                            -- Admin notes on this payment
+    tim_paid_at                   TIMESTAMP,                                                       -- When payment was captured (NULL if pending)
+    tim_created_at                TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,                         -- Payment row created
+    tim_updated_at                TIMESTAMP     DEFAULT CURRENT_TIMESTAMP                          -- Last modified (auto via trigger)
 );
 
-CREATE INDEX idx_payment_user ON tbl_payment(fk_bint_user_id);
+CREATE INDEX idx_payment_user   ON tbl_payment(fk_bint_user_id);
+CREATE INDEX idx_payment_status ON tbl_payment(vchr_status);
+
+CREATE TRIGGER trg_payment_updated
+BEFORE UPDATE ON tbl_payment
+FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 
 
 -- =====================================================
 -- Table 15: tbl_module (RBAC module master)
 -- =====================================================
 CREATE TABLE tbl_module (
-    pk_bint_module_id BIGSERIAL PRIMARY KEY,
-    vchr_module_key VARCHAR(50) NOT NULL UNIQUE,
-    vchr_display_name VARCHAR(100) NOT NULL,
-    txt_description VARCHAR(255),
-    vchr_icon VARCHAR(50),
-    vchr_path VARCHAR(100) DEFAULT '',
-    vchr_label VARCHAR(100) DEFAULT '',
-    bln_show_in_sidebar BOOLEAN DEFAULT TRUE,
-    bln_is_admin_only BOOLEAN DEFAULT FALSE,
-    int_sort_order INTEGER DEFAULT 0,
-    bln_active BOOLEAN DEFAULT TRUE
+    pk_bint_module_id         BIGSERIAL PRIMARY KEY,                          -- Module ID (auto)
+    vchr_module_key           VARCHAR(50)    NOT NULL UNIQUE,                 -- Code key used in backend: 'quotation', 'ai', etc.
+    vchr_module_code          VARCHAR(10)    NOT NULL UNIQUE,                 -- Short code: QTN, INV, AIC (for docs/reports)
+    vchr_display_name         VARCHAR(100)   NOT NULL,                        -- Full name: 'Quotations', 'Quick Create'
+    txt_description           VARCHAR(255),                                   -- What this module does (tooltip/help)
+    vchr_icon                 VARCHAR(50),                                    -- Lucide icon name for UI
+    vchr_path                 VARCHAR(100)   DEFAULT '',                      -- Frontend route path: '/quotations/new'
+    vchr_label                VARCHAR(100)   DEFAULT '',                      -- Short sidebar label
+    bln_show_in_sidebar       BOOLEAN        DEFAULT TRUE,                    -- Display in main nav sidebar
+    bln_is_admin_only         BOOLEAN        DEFAULT FALSE,                   -- Only admin (user_id=1) can access
+    int_sort_order            INTEGER        DEFAULT 0,                       -- Display order in sidebar
+    bln_active                BOOLEAN        DEFAULT TRUE                     -- Module enabled globally
 );
 
-INSERT INTO tbl_module (vchr_module_key, vchr_display_name, txt_description, vchr_icon, vchr_path, vchr_label, bln_show_in_sidebar, bln_is_admin_only, int_sort_order)
+INSERT INTO tbl_module
+    (vchr_module_key, vchr_module_code, vchr_display_name, txt_description, vchr_icon, vchr_path, vchr_label, bln_show_in_sidebar, bln_is_admin_only, int_sort_order)
 VALUES
-    ('dashboard',       'Dashboard',        'Main dashboard with stats',        'Home',       '/dashboard',       'Home',            true,  false, 1),
-    ('quotation',       'Quotations',       'Create and manage quotations',     'FilePlus',   '/quotations/new',  'New Quote',       true,  false, 2),
-    ('invoice',         'Invoices',         'Create and manage invoices',       'Receipt',    '/invoices/new',    'Invoices',        false, false, 3),
-    ('inventory',       'Inventory',        'Manage product inventory',         'Package',    '/inventory',       'Inventory',       true,  false, 4),
-    ('ai',              'Quick Create',     'AI-powered quotation generation',  'Brain',      '',                 'Quick Create',    false, false, 5),
-    ('warranty',        'Warranty',         'Warranty certificate generation',  'Shield',     '/warranty',        'Warranty',        false, false, 6),
-    ('reports',         'Reports',          'Financial reports and analytics',  'BarChart3',  '/reports',         'Reports',         true,  false, 7),
-    ('print_settings',  'Print Settings',   'Custom print formats',            'Printer',    '/print-settings',  'Print Settings',  true,  true,  8);
+    ('dashboard',      'DSH', 'Dashboard',      'Main dashboard with stats',       'Home',      '/dashboard',      'Home',           true,  false, 1),
+    ('quotation',      'QTN', 'Quotations',     'Create and manage quotations',    'FilePlus',  '/quotations/new', 'New Quote',      true,  false, 2),
+    ('invoice',        'INV', 'Invoices',        'Create and manage invoices',      'Receipt',   '/invoices/new',   'Invoices',       false, false, 3),
+    ('inventory',      'ITM', 'Inventory',       'Manage product inventory',        'Package',   '/inventory',      'Inventory',      true,  false, 4),
+    ('ai',             'AIC', 'Quick Create',    'AI-powered quotation generation', 'Brain',     '',                'Quick Create',   false, false, 5),
+    ('warranty',       'WRN', 'Warranty',        'Warranty certificate generation', 'Shield',    '/warranty',       'Warranty',       false, false, 6),
+    ('reports',        'RPT', 'Reports',         'Financial reports and analytics', 'BarChart3', '/reports',         'Reports',        true,  false, 7),
+    ('print_settings', 'PRT', 'Print Settings',  'Custom print formats',           'Printer',   '/print-settings', 'Print Settings', true,  true,  8);
 
 
 -- =====================================================
--- Table 16: tbl_user_module_permission (RBAC per user)
--- =====================================================
-CREATE TABLE tbl_user_module_permission (
-    pk_bint_permission_id BIGSERIAL PRIMARY KEY,
-    fk_bint_user_id BIGINT NOT NULL REFERENCES tbl_user(pk_bint_user_id) ON DELETE CASCADE,
-    fk_bint_module_id BIGINT NOT NULL REFERENCES tbl_module(pk_bint_module_id) ON DELETE CASCADE,
-    bln_enabled BOOLEAN DEFAULT TRUE,
-    UNIQUE (fk_bint_user_id, fk_bint_module_id)
-);
-
-CREATE INDEX idx_user_module_perm_user ON tbl_user_module_permission(fk_bint_user_id);
-
-
--- =====================================================
--- Table 17: tbl_plan_module (Plan-level module permissions)
--- One row per plan x module. Rules: 0=blocked, -1=unlimited, >0=limit
+-- Table 16: tbl_plan_module (Plan-level module permissions)
+-- 0 = blocked | -1 = unlimited | >0 = limit per quota_period
 -- =====================================================
 CREATE TABLE tbl_plan_module (
-    pk_bint_id BIGSERIAL PRIMARY KEY,
-    fk_bint_plan_id BIGINT NOT NULL REFERENCES tbl_subscription_plan(pk_bint_plan_id) ON DELETE CASCADE,
-    fk_bint_module_id BIGINT NOT NULL REFERENCES tbl_module(pk_bint_module_id) ON DELETE CASCADE,
-    int_create INTEGER NOT NULL DEFAULT 0,
-    int_read INTEGER NOT NULL DEFAULT -1,
-    int_update INTEGER NOT NULL DEFAULT 0,
-    int_delete INTEGER NOT NULL DEFAULT 0,
-    int_print INTEGER NOT NULL DEFAULT 0,
-    int_monthly_limit INTEGER NOT NULL DEFAULT -1,
-    int_daily_limit INTEGER NOT NULL DEFAULT -1,
-    vchr_display_name VARCHAR(255),
+    pk_bint_id                BIGSERIAL PRIMARY KEY,                          -- Row ID (auto)
+    fk_bint_plan_id           BIGINT         NOT NULL REFERENCES tbl_subscription_plan(pk_bint_plan_id) ON DELETE CASCADE,  -- Which plan
+    fk_bint_module_id         BIGINT         NOT NULL REFERENCES tbl_module(pk_bint_module_id) ON DELETE CASCADE,           -- Which module
+    int_create                INTEGER        NOT NULL DEFAULT 0,              -- Create permission: 0=blocked, -1=unlimited, >0=limit per period
+    int_read                  INTEGER        NOT NULL DEFAULT 0,              -- Read permission (view/list)
+    int_update                INTEGER        NOT NULL DEFAULT 0,              -- Update/edit permission
+    int_delete                INTEGER        NOT NULL DEFAULT 0,              -- Delete permission
+    int_print                 INTEGER        NOT NULL DEFAULT 0,              -- Print/export permission
+    vchr_quota_period         VARCHAR(20)    DEFAULT NULL CHECK (vchr_quota_period IN ('daily','monthly','total')),  -- When numeric limits reset (NULL = no quota)
     UNIQUE(fk_bint_plan_id, fk_bint_module_id)
 );
 
-CREATE INDEX idx_plan_module_plan ON tbl_plan_module(fk_bint_plan_id);
+CREATE INDEX idx_plan_module_plan   ON tbl_plan_module(fk_bint_plan_id);
 CREATE INDEX idx_plan_module_module ON tbl_plan_module(fk_bint_module_id);
 
 -- Seed plan_module permissions
 DO $$
 DECLARE
-    v_free_id BIGINT;
-    v_standard_id BIGINT;
-    v_premium_id BIGINT;
-    v_mod_dashboard BIGINT;
-    v_mod_quotation BIGINT;
-    v_mod_invoice BIGINT;
-    v_mod_inventory BIGINT;
-    v_mod_ai BIGINT;
-    v_mod_warranty BIGINT;
-    v_mod_reports BIGINT;
-    v_mod_print BIGINT;
+    v_free BIGINT; v_std BIGINT; v_prm BIGINT;
+    v_dsh BIGINT; v_qtn BIGINT; v_inv BIGINT; v_itm BIGINT;
+    v_ai  BIGINT; v_wrn BIGINT; v_rpt BIGINT; v_prt BIGINT;
 BEGIN
-    SELECT pk_bint_plan_id INTO v_free_id FROM tbl_subscription_plan WHERE vchr_plan_name = 'free_trial';
-    SELECT pk_bint_plan_id INTO v_standard_id FROM tbl_subscription_plan WHERE vchr_plan_name = 'standard';
-    SELECT pk_bint_plan_id INTO v_premium_id FROM tbl_subscription_plan WHERE vchr_plan_name = 'premium';
+    SELECT pk_bint_plan_id INTO v_free FROM tbl_subscription_plan WHERE vchr_plan_name = 'free_trial';
+    SELECT pk_bint_plan_id INTO v_std  FROM tbl_subscription_plan WHERE vchr_plan_name = 'standard';
+    SELECT pk_bint_plan_id INTO v_prm  FROM tbl_subscription_plan WHERE vchr_plan_name = 'premium';
+    SELECT pk_bint_module_id INTO v_dsh FROM tbl_module WHERE vchr_module_key = 'dashboard';
+    SELECT pk_bint_module_id INTO v_qtn FROM tbl_module WHERE vchr_module_key = 'quotation';
+    SELECT pk_bint_module_id INTO v_inv FROM tbl_module WHERE vchr_module_key = 'invoice';
+    SELECT pk_bint_module_id INTO v_itm FROM tbl_module WHERE vchr_module_key = 'inventory';
+    SELECT pk_bint_module_id INTO v_ai  FROM tbl_module WHERE vchr_module_key = 'ai';
+    SELECT pk_bint_module_id INTO v_wrn FROM tbl_module WHERE vchr_module_key = 'warranty';
+    SELECT pk_bint_module_id INTO v_rpt FROM tbl_module WHERE vchr_module_key = 'reports';
+    SELECT pk_bint_module_id INTO v_prt FROM tbl_module WHERE vchr_module_key = 'print_settings';
 
-    SELECT pk_bint_module_id INTO v_mod_dashboard FROM tbl_module WHERE vchr_module_key = 'dashboard';
-    SELECT pk_bint_module_id INTO v_mod_quotation FROM tbl_module WHERE vchr_module_key = 'quotation';
-    SELECT pk_bint_module_id INTO v_mod_invoice FROM tbl_module WHERE vchr_module_key = 'invoice';
-    SELECT pk_bint_module_id INTO v_mod_inventory FROM tbl_module WHERE vchr_module_key = 'inventory';
-    SELECT pk_bint_module_id INTO v_mod_ai FROM tbl_module WHERE vchr_module_key = 'ai';
-    SELECT pk_bint_module_id INTO v_mod_warranty FROM tbl_module WHERE vchr_module_key = 'warranty';
-    SELECT pk_bint_module_id INTO v_mod_reports FROM tbl_module WHERE vchr_module_key = 'reports';
-    SELECT pk_bint_module_id INTO v_mod_print FROM tbl_module WHERE vchr_module_key = 'print_settings';
+    -- FREE:  create read update delete print  period
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_dsh,   0, -1,  0,  0,  0, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_qtn,  -1, -1, -1, -1, -1, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_inv,  -1, -1, -1, -1, -1, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_itm,  -1, -1, -1, -1,  0, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_ai,    1, -1,  0,  0,  0, 'daily');
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_wrn,   0,  0,  0,  0,  0, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_rpt,   0,  0,  0,  0,  0, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_prt,   0,  0,  0,  0,  0, NULL);
 
-    -- FREE: Limited AI (5/day), unlimited manual quotation/invoice, no warranty/reports/print
-    INSERT INTO tbl_plan_module (fk_bint_plan_id, fk_bint_module_id, int_create, int_read, int_update, int_delete, int_print, int_daily_limit, int_monthly_limit) VALUES
-        (v_free_id, v_mod_dashboard,  0,  0,  0,  0,  0, -1, -1),
-        (v_free_id, v_mod_quotation, -1, -1, -1, -1, -1, -1, -1),
-        (v_free_id, v_mod_invoice,   -1, -1, -1, -1, -1, -1, -1),
-        (v_free_id, v_mod_inventory, -1, -1, -1, -1,  0, -1, -1),
-        (v_free_id, v_mod_ai,       -1, -1,  0,  0,  0,  1, -1),
-        (v_free_id, v_mod_warranty,   0,  0,  0,  0,  0, -1, -1),
-        (v_free_id, v_mod_reports,    0,  0,  0,  0,  0, -1, -1),
-        (v_free_id, v_mod_print,      0,  0,  0,  0,  0, -1, -1);
+    -- STANDARD:
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_dsh,  -1, -1,  0,  0,  0, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_qtn,  -1, -1, -1, -1, -1, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_inv,  -1, -1, -1, -1, -1, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_itm,  -1, -1, -1, -1,  0, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_ai,   -1, -1,  0,  0,  0, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_wrn,  -1, -1, -1, -1, -1, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_rpt,  -1, -1,  0,  0,  0, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_prt,   3, -1, -1,  0, -1, 'monthly');
 
-    -- STANDARD: Unlimited everything, warranty, dashboard, limited print (3/month)
-    INSERT INTO tbl_plan_module (fk_bint_plan_id, fk_bint_module_id, int_create, int_read, int_update, int_delete, int_print, int_daily_limit, int_monthly_limit) VALUES
-        (v_standard_id, v_mod_dashboard, -1, -1,  0,  0,  0, -1, -1),
-        (v_standard_id, v_mod_quotation, -1, -1, -1, -1, -1, -1, -1),
-        (v_standard_id, v_mod_invoice,   -1, -1, -1, -1, -1, -1, -1),
-        (v_standard_id, v_mod_inventory, -1, -1, -1, -1,  0, -1, -1),
-        (v_standard_id, v_mod_ai,        -1, -1,  0,  0,  0, -1, -1),
-        (v_standard_id, v_mod_warranty,  -1, -1, -1, -1, -1, -1, -1),
-        (v_standard_id, v_mod_reports,   -1, -1,  0,  0,  0, -1, -1),
-        (v_standard_id, v_mod_print,     -1, -1, -1,  0, -1, -1,  3);
-
-    -- PREMIUM: Everything unlimited
-    INSERT INTO tbl_plan_module (fk_bint_plan_id, fk_bint_module_id, int_create, int_read, int_update, int_delete, int_print, int_daily_limit, int_monthly_limit) VALUES
-        (v_premium_id, v_mod_dashboard, -1, -1, -1, -1,  0, -1, -1),
-        (v_premium_id, v_mod_quotation, -1, -1, -1, -1, -1, -1, -1),
-        (v_premium_id, v_mod_invoice,   -1, -1, -1, -1, -1, -1, -1),
-        (v_premium_id, v_mod_inventory, -1, -1, -1, -1,  0, -1, -1),
-        (v_premium_id, v_mod_ai,        -1, -1,  0,  0,  0, -1, -1),
-        (v_premium_id, v_mod_warranty,  -1, -1, -1, -1, -1, -1, -1),
-        (v_premium_id, v_mod_reports,   -1, -1, -1, -1, -1, -1, -1),
-        (v_premium_id, v_mod_print,     -1, -1, -1, -1, -1, -1, -1);
+    -- PREMIUM:
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_dsh,  -1, -1, -1, -1,  0, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_qtn,  -1, -1, -1, -1, -1, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_inv,  -1, -1, -1, -1, -1, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_itm,  -1, -1, -1, -1,  0, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_ai,   -1, -1,  0,  0,  0, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_wrn,  -1, -1, -1, -1, -1, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_rpt,  -1, -1, -1, -1, -1, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_prt,  -1, -1, -1, -1, -1, NULL);
 END $$;
 
 
 -- =====================================================
--- Table 18: tbl_module_usage (Tracks usage per user per module)
+-- Table 17: tbl_user_module_override (Per-user permission override)
+-- Overrides plan permissions for specific (user, module) pairs.
+-- If a row exists here (not expired), it fully replaces the plan's permission.
+-- If no row, fall back to tbl_plan_module.
 -- =====================================================
-CREATE TABLE tbl_module_usage (
-    pk_bint_id BIGSERIAL PRIMARY KEY,
-    fk_bint_user_id BIGINT NOT NULL REFERENCES tbl_user(pk_bint_user_id) ON DELETE CASCADE,
-    fk_bint_module_id BIGINT NOT NULL REFERENCES tbl_module(pk_bint_module_id) ON DELETE CASCADE,
-    vchr_operation VARCHAR(20) NOT NULL,
-    int_count INTEGER NOT NULL DEFAULT 0,
-    dat_period_start DATE NOT NULL,
-    UNIQUE(fk_bint_user_id, fk_bint_module_id, vchr_operation, dat_period_start)
+CREATE TABLE tbl_user_module_override (
+    pk_bint_id            BIGSERIAL PRIMARY KEY,                                                         -- Override ID (auto)
+    fk_bint_user_id       BIGINT      NOT NULL REFERENCES tbl_user(pk_bint_user_id) ON DELETE CASCADE,   -- User getting the override
+    fk_bint_module_id     BIGINT      NOT NULL REFERENCES tbl_module(pk_bint_module_id) ON DELETE CASCADE, -- Which module
+    int_create            INTEGER     NOT NULL DEFAULT 0,                                                -- 0=blocked, -1=unlimited, >0=limit
+    int_read              INTEGER     NOT NULL DEFAULT 0,
+    int_update            INTEGER     NOT NULL DEFAULT 0,
+    int_delete            INTEGER     NOT NULL DEFAULT 0,
+    int_print             INTEGER     NOT NULL DEFAULT 0,
+    vchr_quota_period     VARCHAR(20) DEFAULT NULL CHECK (vchr_quota_period IN ('daily','monthly','total')),  -- Quota window
+    dat_expires_at        DATE,                                                                           -- NULL = permanent; date = auto-expires
+    txt_reason            TEXT,                                                                           -- Why admin created this (audit)
+    fk_bint_created_by    BIGINT      REFERENCES tbl_user(pk_bint_user_id),                              -- Admin who created it
+    tim_created_at        TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+    tim_updated_at        TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (fk_bint_user_id, fk_bint_module_id)                                                          -- One override per user per module
 );
 
-CREATE INDEX idx_module_usage_lookup ON tbl_module_usage(fk_bint_user_id, fk_bint_module_id, vchr_operation, dat_period_start);
+CREATE INDEX idx_override_user ON tbl_user_module_override(fk_bint_user_id);
+-- Note: UNIQUE(fk_bint_user_id, fk_bint_module_id) already creates an index for fast lookups.
+-- A partial index filtering by dat_expires_at cannot use CURRENT_DATE (not IMMUTABLE).
+
+CREATE TRIGGER trg_user_module_override_updated
+BEFORE UPDATE ON tbl_user_module_override
+FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+
+-- =====================================================
+-- Table 18: tbl_module_usage (Event log per user per module)
+-- =====================================================
+CREATE TABLE tbl_module_usage (
+    pk_bint_id                    BIGSERIAL PRIMARY KEY,                                          -- Event ID (auto)
+    fk_bint_user_id               BIGINT      NOT NULL REFERENCES tbl_user(pk_bint_user_id) ON DELETE CASCADE,  -- Who performed the action
+    fk_bint_module_id             BIGINT      NOT NULL REFERENCES tbl_module(pk_bint_module_id),  -- Which module
+    vchr_action                   VARCHAR(20) NOT NULL,                                           -- Action: 'create', 'read', 'update', 'delete', 'print'
+    vchr_resource_type            VARCHAR(50),                                                    -- Type of thing acted on: 'quotation', 'invoice'
+    vchr_resource_id              VARCHAR(100),                                                   -- ID of the specific resource (optional)
+    int_quantity                  INTEGER     NOT NULL DEFAULT 1,                                 -- Count (for bulk ops); usually 1
+    jsonb_metadata                JSONB,                                                          -- Extra context: IP, device, request details
+    tim_occurred_at               TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP                  -- When the action happened (used for quota windows)
+);
+
+CREATE INDEX idx_usage_check ON tbl_module_usage(fk_bint_user_id, fk_bint_module_id, vchr_action, tim_occurred_at DESC);
 
 
 -- =====================================================
@@ -660,5 +675,157 @@ CREATE INDEX idx_user_settings_user ON tbl_user_settings(fk_bint_user_id);
 
 
 -- =====================================================
--- End of Schema — 20 Tables
+-- DB Functions: Permission System (B2B — plan lives on tbl_user)
+-- =====================================================
+
+-- Check permission + quota for a user action
+CREATE OR REPLACE FUNCTION fn_check_permission(
+    p_user_id    BIGINT,
+    p_module_key VARCHAR(50),
+    p_action     VARCHAR(20)
+) RETURNS TABLE (
+    int_permission    INTEGER,
+    vchr_quota_period VARCHAR(20),
+    int_quota_used    INTEGER,
+    bln_is_allowed    BOOLEAN
+) AS $$
+DECLARE
+    v_plan_id  BIGINT;
+    v_mod_id   BIGINT;
+    v_perm     INTEGER;
+    v_period   VARCHAR(20);
+    v_used     INTEGER;
+    v_pstart   TIMESTAMP;
+BEGIN
+    SELECT u.fk_bint_plan_id INTO v_plan_id
+    FROM tbl_user u
+    WHERE u.pk_bint_user_id = p_user_id
+      AND u.vchr_plan_status IN ('active','trial')
+      AND u.dat_plan_end_date >= CURRENT_DATE;
+
+    IF v_plan_id IS NULL THEN
+        RETURN QUERY SELECT 0, NULL::VARCHAR, 0, FALSE;
+        RETURN;
+    END IF;
+
+    SELECT pk_bint_module_id INTO v_mod_id
+    FROM tbl_module WHERE vchr_module_key = p_module_key AND bln_active = TRUE;
+
+    IF v_mod_id IS NULL THEN
+        RETURN QUERY SELECT 0, NULL::VARCHAR, 0, FALSE;
+        RETURN;
+    END IF;
+
+    -- Check per-user override first (wins over plan if not expired)
+    EXECUTE format('SELECT int_%s, vchr_quota_period FROM tbl_user_module_override
+                    WHERE fk_bint_user_id = $1 AND fk_bint_module_id = $2
+                      AND (dat_expires_at IS NULL OR dat_expires_at >= CURRENT_DATE)', p_action)
+    INTO v_perm, v_period USING p_user_id, v_mod_id;
+
+    -- If no override, fall back to plan_module
+    IF v_perm IS NULL THEN
+        EXECUTE format('SELECT int_%s, vchr_quota_period FROM tbl_plan_module WHERE fk_bint_plan_id = $1 AND fk_bint_module_id = $2', p_action)
+        INTO v_perm, v_period USING v_plan_id, v_mod_id;
+    END IF;
+
+    IF v_perm IS NULL OR v_perm = 0 THEN
+        RETURN QUERY SELECT 0, NULL::VARCHAR, 0, FALSE;
+        RETURN;
+    END IF;
+
+    IF v_perm = -1 THEN
+        RETURN QUERY SELECT -1, NULL::VARCHAR, 0, TRUE;
+        RETURN;
+    END IF;
+
+    IF v_period = 'daily' THEN v_pstart := date_trunc('day', NOW());
+    ELSIF v_period = 'monthly' THEN v_pstart := date_trunc('month', NOW());
+    ELSE v_pstart := '2000-01-01'::TIMESTAMP;
+    END IF;
+
+    SELECT COUNT(*)::INTEGER INTO v_used
+    FROM tbl_module_usage
+    WHERE fk_bint_user_id = p_user_id
+      AND fk_bint_module_id = v_mod_id
+      AND vchr_action = p_action
+      AND tim_occurred_at >= v_pstart;
+
+    RETURN QUERY SELECT v_perm, v_period, v_used, (v_used < v_perm);
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Record a usage event
+CREATE OR REPLACE FUNCTION fn_record_usage(
+    p_user_id       BIGINT,
+    p_module_key    VARCHAR(50),
+    p_action        VARCHAR(20),
+    p_resource_type VARCHAR(50) DEFAULT NULL,
+    p_resource_id   VARCHAR(100) DEFAULT NULL,
+    p_metadata      JSONB DEFAULT NULL
+) RETURNS INTEGER AS $$
+DECLARE v_mod_id BIGINT;
+BEGIN
+    SELECT pk_bint_module_id INTO v_mod_id
+    FROM tbl_module WHERE vchr_module_key = p_module_key;
+
+    INSERT INTO tbl_module_usage
+        (fk_bint_user_id, fk_bint_module_id, vchr_action, vchr_resource_type, vchr_resource_id, jsonb_metadata)
+    VALUES (p_user_id, v_mod_id, p_action, p_resource_type, p_resource_id, p_metadata);
+
+    RETURN (SELECT COUNT(*)::INTEGER FROM tbl_module_usage
+            WHERE fk_bint_user_id = p_user_id AND fk_bint_module_id = v_mod_id
+              AND vchr_action = p_action AND tim_occurred_at >= date_trunc('day', NOW()));
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Get all permissions for sidebar (call at login)
+CREATE OR REPLACE FUNCTION fn_get_user_permissions(p_user_id BIGINT)
+RETURNS TABLE(
+    module_key      VARCHAR(50),
+    module_code     VARCHAR(10),
+    display_name    VARCHAR(100),
+    icon            VARCHAR(50),
+    path            VARCHAR(100),
+    label           VARCHAR(100),
+    show_in_sidebar BOOLEAN,
+    is_admin_only   BOOLEAN,
+    sort_order      INTEGER,
+    perm_create     INTEGER,
+    perm_read       INTEGER,
+    perm_update     INTEGER,
+    perm_delete     INTEGER,
+    perm_print      INTEGER,
+    quota_period    VARCHAR(20)
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        m.vchr_module_key, m.vchr_module_code, m.vchr_display_name,
+        m.vchr_icon, m.vchr_path, m.vchr_label,
+        m.bln_show_in_sidebar, m.bln_is_admin_only, m.int_sort_order,
+        COALESCE(o.int_create, pm.int_create) AS perm_create,
+        COALESCE(o.int_read,   pm.int_read)   AS perm_read,
+        COALESCE(o.int_update, pm.int_update) AS perm_update,
+        COALESCE(o.int_delete, pm.int_delete) AS perm_delete,
+        COALESCE(o.int_print,  pm.int_print)  AS perm_print,
+        COALESCE(o.vchr_quota_period, pm.vchr_quota_period) AS quota_period
+    FROM tbl_user u
+    JOIN tbl_plan_module pm ON pm.fk_bint_plan_id = u.fk_bint_plan_id
+    JOIN tbl_module m ON m.pk_bint_module_id = pm.fk_bint_module_id AND m.bln_active = TRUE
+    LEFT JOIN tbl_user_module_override o
+        ON o.fk_bint_user_id = p_user_id
+       AND o.fk_bint_module_id = m.pk_bint_module_id
+       AND (o.dat_expires_at IS NULL OR o.dat_expires_at >= CURRENT_DATE)
+    WHERE u.pk_bint_user_id = p_user_id
+      AND u.vchr_plan_status IN ('active','trial')
+      AND u.dat_plan_end_date >= CURRENT_DATE
+    ORDER BY m.int_sort_order;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- =====================================================
+-- End of Schema — 19 Tables + 3 Functions (B2B: tbl_subscription dropped, plan lives on tbl_user)
 -- =====================================================

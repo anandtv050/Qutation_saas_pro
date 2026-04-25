@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Home, FilePlus, Package, BarChart3, User, LogOut, Users,
   Printer, CreditCard, Wrench, Shield, Receipt, Brain, Loader2,
 } from "lucide-react";
-import userService from "@/services/userService";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 // Icon registry — maps DB icon name to actual component
 const ICON_MAP = {
@@ -22,32 +22,24 @@ const ADMIN_PAGES = [
 
 export default function Sidebar() {
   const location = useLocation();
-  const [navItems, setNavItems] = useState([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const { permissions, isLoading } = usePermissions();
+  const isLoaded = !isLoading;
 
   const userInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
   const isAdmin = userInfo.intUserId === 1;
 
-  useEffect(() => {
-    userService.getMyPermissions()
-      .then((res) => {
-        if (res.lstNav) {
-          setNavItems(
-            res.lstNav
-              .filter((m) => m.blnShowInSidebar && m.strPath)
-              .map((m) => ({
-                path: m.strPath,
-                label: m.strLabel,
-                icon: ICON_MAP[m.strIcon] || Package,
-                moduleKey: m.strKey,
-                adminOnly: m.blnAdminOnly,
-              }))
-          );
-        }
-        setIsLoaded(true);
-      })
-      .catch(() => setIsLoaded(true));
-  }, []);
+  const navItems = useMemo(() => {
+    if (!permissions?.lstNav) return [];
+    return permissions.lstNav
+      .filter((m) => m.blnShowInSidebar && m.strPath)
+      .map((m) => ({
+        path: m.strPath,
+        label: m.strLabel,
+        icon: ICON_MAP[m.strIcon] || Package,
+        moduleKey: m.strKey,
+        adminOnly: m.blnAdminOnly,
+      }));
+  }, [permissions]);
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");

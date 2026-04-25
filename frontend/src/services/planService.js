@@ -7,15 +7,9 @@ const planService = {
         return response.data;
     },
 
-    // Get active paid plans (public - for subscribe page)
+    // Get active paid plans (used by in-app Subscribe/Upgrade page)
     getActive: async () => {
         const response = await api.get('/plan/active');
-        return response.data;
-    },
-
-    // Get all active plans including free (public - for landing page)
-    getAllActive: async () => {
-        const response = await api.get('/plan/active?include_free=true');
         return response.data;
     },
 

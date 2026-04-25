@@ -1,4 +1,3 @@
-from datetime import date
 from asyncpg import Pool
 
 from app.core.baseSchema import ResponseStatus
@@ -142,41 +141,32 @@ class ClsUserService:
             strHashedPassword = fnHashPassword(mdlRequest.strPassword)
 
             # Insert new user
-            strInsertQuery = """
-                INSERT INTO tbl_user (
-                    vchr_email,
-                    vchr_password_hash,
-                    vchr_username,
-                    vchr_business_name,
-                    vchr_phone,
-                    txt_address
-                ) VALUES ($1, $2, $3, $4, $5, $6)
-                RETURNING pk_bint_user_id
-            """
+            # Look up free_trial plan (plan assignment is on tbl_user now)
+            rstTrialPlan = await conn.fetchrow(
+                "SELECT pk_bint_plan_id, int_trial_days FROM tbl_subscription_plan WHERE vchr_plan_name = 'free_trial' LIMIT 1"
+            )
+            intTrialPlanId = rstTrialPlan['pk_bint_plan_id'] if rstTrialPlan else None
+            intTrialDays = (rstTrialPlan['int_trial_days'] if rstTrialPlan else 7) or 7
+
             rstNew = await conn.fetchrow(
-                strInsertQuery,
+                """INSERT INTO tbl_user (
+                    vchr_email, vchr_password_hash, vchr_username,
+                    vchr_business_name, vchr_phone, txt_address,
+                    fk_bint_plan_id, vchr_plan_status, dat_plan_start_date, dat_plan_end_date
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'trial', CURRENT_DATE, CURRENT_DATE + ($8::integer))
+                RETURNING pk_bint_user_id""",
                 mdlRequest.strEmail,
                 strHashedPassword,
                 mdlRequest.strUsername,
                 mdlRequest.strBusinessName,
                 mdlRequest.strPhone,
-                mdlRequest.strAddress
+                mdlRequest.strAddress,
+                intTrialPlanId,
+                intTrialDays
             )
 
             intNewUserId = rstNew['pk_bint_user_id']
-
-            # Auto-create 7-day trial subscription
-            rstTrialPlan = await conn.fetchrow(
-                "SELECT pk_bint_plan_id FROM tbl_subscription_plan WHERE vchr_plan_name = 'free_trial' LIMIT 1"
-            )
-            if rstTrialPlan:
-                await conn.execute(
-                    """INSERT INTO tbl_subscription (fk_bint_user_id, fk_bint_plan_id, vchr_status, dat_start_date, dat_end_date)
-                       VALUES ($1, $2, 'trial', CURRENT_DATE, CURRENT_DATE + 7)""",
-                    intNewUserId, rstTrialPlan['pk_bint_plan_id']
-                )
-
-            self.logger.info(f"User created with 7-day trial: ID={intNewUserId} | Email={mdlRequest.strEmail}")
+            self.logger.info(f"User created with trial plan: ID={intNewUserId} | Email={mdlRequest.strEmail} | plan_id={intTrialPlanId}")
 
         # Return the created user
         return await self.fnGetSingleUser(intNewUserId)
@@ -307,59 +297,38 @@ class ClsUserService:
     # =====================================================
 
     async def fnGetUserPermissions(self, intTargetUserId: int):
-        """Get all module permissions for a user"""
+        """Get all module permissions for a user based on their subscription plan"""
         async with self.insPool.acquire() as conn:
-            # Get all modules with user's permission status
             rstModules = await conn.fetch(
-                """SELECT m.pk_bint_module_id, m.vchr_module_key, m.vchr_display_name,
-                          m.txt_description, m.vchr_icon, m.int_sort_order,
-                          COALESCE(p.bln_enabled, true) AS bln_enabled
-                   FROM tbl_module m
-                   LEFT JOIN tbl_user_module_permission p
-                       ON p.fk_bint_module_id = m.pk_bint_module_id
-                       AND p.fk_bint_user_id = $1
-                   WHERE m.bln_active = true
-                   ORDER BY m.int_sort_order""",
-                intTargetUserId
+                "SELECT * FROM fn_get_user_permissions($1)", intTargetUserId
             )
 
         lstPermissions = [
             MdlUserPermissionInfo(
-                intModuleId=row['pk_bint_module_id'],
-                strModuleKey=row['vchr_module_key'],
-                strDisplayName=row['vchr_display_name'],
-                strDescription=row['txt_description'],
-                strIcon=row['vchr_icon'],
-                blnEnabled=row['bln_enabled'],
+                intModuleId=0,
+                strModuleKey=row['module_key'],
+                strDisplayName=row['display_name'],
+                strDescription=None,
+                strIcon=row['icon'],
+                intCreate=row['perm_create'],
+                intRead=row['perm_read'],
+                intUpdate=row['perm_update'],
+                intDelete=row['perm_delete'],
+                intPrint=row['perm_print'],
+                strQuotaPeriod=row['quota_period'],
             )
             for row in rstModules
         ]
 
         return {"intUserId": intTargetUserId, "lstPermissions": lstPermissions}
 
-    async def fnSetUserPermissions(self, intTargetUserId: int, lstPermissions: list):
-        """Set module permissions for a user (list of {intModuleId, blnEnabled})"""
-        async with self.insPool.acquire() as conn:
-            for dctPerm in lstPermissions:
-                await conn.execute(
-                    """INSERT INTO tbl_user_module_permission (fk_bint_user_id, fk_bint_module_id, bln_enabled)
-                       VALUES ($1, $2, $3)
-                       ON CONFLICT (fk_bint_user_id, fk_bint_module_id)
-                       DO UPDATE SET bln_enabled = $3""",
-                    intTargetUserId,
-                    dctPerm["intModuleId"],
-                    dctPerm["blnEnabled"]
-                )
-
-        self.logger.info(f"Permissions updated for user {intTargetUserId}: {len(lstPermissions)} modules")
-        return {"strMessage": "Permissions updated", "blnSuccess": True}
-
     # ── Module CRUD ──
 
-    async def fnAddModule(self, strModuleKey: str, strDisplayName: str, strIcon: str = "Package",
-                          strPath: str = "", strLabel: str = "", blnShowInSidebar: bool = True,
-                          blnIsAdminOnly: bool = False, intSortOrder: int = 50):
-        """Admin: Add a new module"""
+    async def fnAddModule(self, strModuleKey: str, strModuleCode: str, strDisplayName: str,
+                          strIcon: str = "Package", strPath: str = "", strLabel: str = "",
+                          blnShowInSidebar: bool = True, blnIsAdminOnly: bool = False,
+                          intSortOrder: int = 50):
+        """Admin: Add a new module and seed blocked plan_module rows for every existing plan"""
         async with self.insPool.acquire() as conn:
             rstExisting = await conn.fetchrow(
                 "SELECT pk_bint_module_id FROM tbl_module WHERE vchr_module_key = $1", strModuleKey
@@ -367,13 +336,25 @@ class ClsUserService:
             if rstExisting:
                 return {"strMessage": f"Module '{strModuleKey}' already exists", "blnSuccess": False}
 
-            await conn.execute(
-                """INSERT INTO tbl_module (vchr_module_key, vchr_display_name, vchr_icon, vchr_path,
-                    vchr_label, bln_show_in_sidebar, bln_is_admin_only, int_sort_order)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
-                strModuleKey, strDisplayName, strIcon, strPath,
-                strLabel or strDisplayName, blnShowInSidebar, blnIsAdminOnly, intSortOrder
-            )
+            async with conn.transaction():
+                rstNew = await conn.fetchrow(
+                    """INSERT INTO tbl_module (vchr_module_key, vchr_module_code, vchr_display_name, vchr_icon,
+                        vchr_path, vchr_label, bln_show_in_sidebar, bln_is_admin_only, int_sort_order)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                       RETURNING pk_bint_module_id""",
+                    strModuleKey, strModuleCode, strDisplayName, strIcon, strPath,
+                    strLabel or strDisplayName, blnShowInSidebar, blnIsAdminOnly, intSortOrder
+                )
+                intNewModuleId = rstNew['pk_bint_module_id']
+
+                # Seed blocked plan_module rows for every existing plan — admin can edit permissions per plan
+                await conn.execute(
+                    """INSERT INTO tbl_plan_module
+                       (fk_bint_plan_id, fk_bint_module_id, int_create, int_read, int_update, int_delete, int_print)
+                       SELECT pk_bint_plan_id, $1, 0, 0, 0, 0, 0
+                       FROM tbl_subscription_plan""",
+                    intNewModuleId
+                )
         return {"strMessage": "Module added", "blnSuccess": True}
 
     async def fnUpdateModule(self, intModuleId: int, **kwargs):
@@ -404,34 +385,41 @@ class ClsUserService:
         return {"strMessage": "Module updated", "blnSuccess": True}
 
     async def fnDeleteModule(self, intModuleId: int):
-        """Admin: Delete a module and all related permissions/plan references"""
+        """Admin: Delete a module and all related plan references"""
         async with self.insPool.acquire() as conn:
             await conn.execute("DELETE FROM tbl_plan_module WHERE fk_bint_module_id = $1", intModuleId)
-            await conn.execute("DELETE FROM tbl_user_module_permission WHERE fk_bint_module_id = $1", intModuleId)
             await conn.execute("DELETE FROM tbl_module WHERE pk_bint_module_id = $1", intModuleId)
         return {"strMessage": "Module deleted", "blnSuccess": True}
 
     async def fnGetPermissionGrid(self):
-        """Get all users × all modules permission grid"""
+        """Get all users × all modules permission grid (plan-based)"""
         async with self.insPool.acquire() as conn:
             # Get all active modules
             rstModules = await conn.fetch(
                 "SELECT pk_bint_module_id, vchr_module_key, vchr_display_name, vchr_icon FROM tbl_module WHERE bln_active = true ORDER BY int_sort_order"
             )
-            # Get all non-admin users
+            # Get all non-admin users with their plan
             rstUsers = await conn.fetch(
-                """SELECT pk_bint_user_id, vchr_username, vchr_email, vchr_business_name, bln_is_active
-                   FROM tbl_user WHERE pk_bint_user_id != 1 ORDER BY pk_bint_user_id"""
+                """SELECT u.pk_bint_user_id, u.vchr_username, u.vchr_email,
+                          u.vchr_business_name, u.bln_is_active,
+                          p.vchr_display_name AS str_plan_name
+                   FROM tbl_user u
+                   LEFT JOIN tbl_subscription_plan p ON u.fk_bint_plan_id = p.pk_bint_plan_id
+                   WHERE u.pk_bint_user_id != 1
+                   ORDER BY u.pk_bint_user_id"""
             )
-            # Get all permissions
+            # Get plan-based permissions per user (plan lives on tbl_user now)
             rstPerms = await conn.fetch(
-                "SELECT fk_bint_user_id, fk_bint_module_id, bln_enabled FROM tbl_user_module_permission"
+                """SELECT u.pk_bint_user_id AS fk_bint_user_id, pm.fk_bint_module_id, pm.int_read
+                   FROM tbl_user u
+                   JOIN tbl_plan_module pm ON pm.fk_bint_plan_id = u.fk_bint_plan_id
+                   WHERE u.vchr_plan_status IN ('trial', 'active')"""
             )
 
-        # Build permission lookup
+        # Build permission lookup: {(user_id, module_id): has_read_access}
         dctPerms = {}
         for row in rstPerms:
-            dctPerms[(row['fk_bint_user_id'], row['fk_bint_module_id'])] = row['bln_enabled']
+            dctPerms[(row['fk_bint_user_id'], row['fk_bint_module_id'])] = row['int_read'] != 0
 
         lstModules = [
             {"intModuleId": r['pk_bint_module_id'], "strKey": r['vchr_module_key'],
@@ -444,7 +432,7 @@ class ClsUserService:
             dctModules = {}
             for m in rstModules:
                 key = (u['pk_bint_user_id'], m['pk_bint_module_id'])
-                dctModules[m['vchr_module_key']] = dctPerms.get(key, True)  # default = enabled
+                dctModules[m['vchr_module_key']] = dctPerms.get(key, False)
 
             lstUsers.append({
                 "intUserId": u['pk_bint_user_id'],
@@ -452,30 +440,94 @@ class ClsUserService:
                 "strEmail": u['vchr_email'],
                 "strBusinessName": u['vchr_business_name'],
                 "blnIsActive": u['bln_is_active'],
+                "strPlanName": u['str_plan_name'] or "No Plan",
                 "dctModules": dctModules,
             })
 
         return {"lstModules": lstModules, "lstUsers": lstUsers}
 
-    async def fnToggleModulePermission(self, intTargetUserId: int, strModuleKey: str, blnEnabled: bool):
-        """Toggle a single module permission for a user"""
+    # =====================================================
+    # MODULE PERMISSION OVERRIDES (per-user grant/revoke)
+    # =====================================================
+
+    async def fnSetUserModuleOverride(self, mdlRequest):
+        """Admin: create or update a per-user module permission override"""
         async with self.insPool.acquire() as conn:
-            rstModule = await conn.fetchrow(
-                "SELECT pk_bint_module_id FROM tbl_module WHERE vchr_module_key = $1",
-                strModuleKey
-            )
-            if not rstModule:
-                return {"strMessage": "Module not found", "blnSuccess": False}
-
             await conn.execute(
-                """INSERT INTO tbl_user_module_permission (fk_bint_user_id, fk_bint_module_id, bln_enabled)
-                   VALUES ($1, $2, $3)
-                   ON CONFLICT (fk_bint_user_id, fk_bint_module_id)
-                   DO UPDATE SET bln_enabled = $3""",
-                intTargetUserId, rstModule['pk_bint_module_id'], blnEnabled
+                """INSERT INTO tbl_user_module_override (
+                    fk_bint_user_id, fk_bint_module_id,
+                    int_create, int_read, int_update, int_delete, int_print,
+                    vchr_quota_period, dat_expires_at, txt_reason, fk_bint_created_by
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                ON CONFLICT (fk_bint_user_id, fk_bint_module_id)
+                DO UPDATE SET
+                    int_create        = EXCLUDED.int_create,
+                    int_read          = EXCLUDED.int_read,
+                    int_update        = EXCLUDED.int_update,
+                    int_delete        = EXCLUDED.int_delete,
+                    int_print         = EXCLUDED.int_print,
+                    vchr_quota_period = EXCLUDED.vchr_quota_period,
+                    dat_expires_at    = EXCLUDED.dat_expires_at,
+                    txt_reason        = EXCLUDED.txt_reason,
+                    fk_bint_created_by = EXCLUDED.fk_bint_created_by""",
+                mdlRequest.intTargetUserId, mdlRequest.intModuleId,
+                mdlRequest.intCreate, mdlRequest.intRead, mdlRequest.intUpdate,
+                mdlRequest.intDelete, mdlRequest.intPrint,
+                mdlRequest.strQuotaPeriod, mdlRequest.datExpiresAt,
+                mdlRequest.strReason, self.intUserId
+            )
+        self.logger.info(f"Override set: user={mdlRequest.intTargetUserId}, module={mdlRequest.intModuleId}, by_admin={self.intUserId}")
+        return {"strMessage": "Override saved", "blnSuccess": True}
+
+    async def fnDeleteUserModuleOverride(self, intTargetUserId: int, intModuleId: int):
+        """Admin: remove a per-user module permission override"""
+        async with self.insPool.acquire() as conn:
+            rstDeleted = await conn.fetchrow(
+                """DELETE FROM tbl_user_module_override
+                   WHERE fk_bint_user_id = $1 AND fk_bint_module_id = $2
+                   RETURNING pk_bint_id""",
+                intTargetUserId, intModuleId
+            )
+        if not rstDeleted:
+            return {"strMessage": "No override found", "blnSuccess": False}
+        self.logger.info(f"Override deleted: user={intTargetUserId}, module={intModuleId}, by_admin={self.intUserId}")
+        return {"strMessage": "Override removed", "blnSuccess": True}
+
+    async def fnListUserModuleOverrides(self, intTargetUserId: int):
+        """Admin: list all active (non-expired) overrides for a user"""
+        async with self.insPool.acquire() as conn:
+            rstOverrides = await conn.fetch(
+                """SELECT o.pk_bint_id, o.fk_bint_user_id, o.fk_bint_module_id,
+                          o.int_create, o.int_read, o.int_update, o.int_delete, o.int_print,
+                          o.vchr_quota_period, o.dat_expires_at, o.txt_reason,
+                          m.vchr_module_key, m.vchr_display_name
+                   FROM tbl_user_module_override o
+                   JOIN tbl_module m ON o.fk_bint_module_id = m.pk_bint_module_id
+                   WHERE o.fk_bint_user_id = $1
+                     AND (o.dat_expires_at IS NULL OR o.dat_expires_at >= CURRENT_DATE)
+                   ORDER BY m.int_sort_order""",
+                intTargetUserId
             )
 
-        return {"strMessage": "Permission updated", "blnSuccess": True}
+        lstOverrides = [
+            {
+                "intOverrideId": row['pk_bint_id'],
+                "intUserId": row['fk_bint_user_id'],
+                "intModuleId": row['fk_bint_module_id'],
+                "strModuleKey": row['vchr_module_key'],
+                "strModuleDisplayName": row['vchr_display_name'],
+                "intCreate": row['int_create'],
+                "intRead": row['int_read'],
+                "intUpdate": row['int_update'],
+                "intDelete": row['int_delete'],
+                "intPrint": row['int_print'],
+                "strQuotaPeriod": row['vchr_quota_period'],
+                "datExpiresAt": str(row['dat_expires_at']) if row['dat_expires_at'] else None,
+                "strReason": row['txt_reason'],
+            }
+            for row in rstOverrides
+        ]
+        return {"intUserId": intTargetUserId, "lstOverrides": lstOverrides}
 
     # ── Settings ──
 
@@ -634,16 +686,14 @@ class ClsUserService:
                        FROM tbl_module WHERE bln_active = true ORDER BY int_sort_order"""
                 )
             else:
+                # Use plan-based permissions via fn_get_user_permissions
                 rstModules = await conn.fetch(
                     """SELECT m.vchr_module_key, m.vchr_display_name, m.vchr_label, m.vchr_icon,
                               m.vchr_path, m.bln_show_in_sidebar, m.bln_is_admin_only
-                       FROM tbl_module m
-                       LEFT JOIN tbl_user_module_permission p
-                           ON p.fk_bint_module_id = m.pk_bint_module_id
-                           AND p.fk_bint_user_id = $1
-                       WHERE m.bln_active = true
-                         AND COALESCE(p.bln_enabled, true) = true
-                         AND m.bln_is_admin_only = false
+                       FROM fn_get_user_permissions($1) p
+                       JOIN tbl_module m ON m.vchr_module_key = p.module_key
+                       WHERE m.bln_is_admin_only = false
+                         AND p.perm_read != 0
                        ORDER BY m.int_sort_order""",
                     intUserId
                 )
@@ -663,134 +713,3 @@ class ClsUserService:
             ],
         }
 
-    # =====================================================
-    # PLAN USAGE STATS (Admin only)
-    # =====================================================
-
-    async def fnGetAllUsersUsageStats(self):
-        """Admin: Get all users with their plan, subscription status, and module usage"""
-        async with self.insPool.acquire() as conn:
-            # Get all users with their plan info
-            rstUsers = await conn.fetch(
-                """SELECT u.pk_bint_user_id, u.vchr_username, u.vchr_email,
-                          u.vchr_business_name, u.bln_is_active,
-                          s.vchr_status AS str_sub_status,
-                          s.dat_start_date, s.dat_end_date,
-                          p.vchr_display_name AS str_plan_name,
-                          p.vchr_plan_name AS str_plan_key
-                   FROM tbl_user u
-                   LEFT JOIN tbl_subscription s ON s.fk_bint_user_id = u.pk_bint_user_id
-                       AND s.pk_bint_subscription_id = (
-                           SELECT MAX(pk_bint_subscription_id) FROM tbl_subscription WHERE fk_bint_user_id = u.pk_bint_user_id
-                       )
-                   LEFT JOIN tbl_subscription_plan p ON s.fk_bint_plan_id = p.pk_bint_plan_id
-                   WHERE u.pk_bint_user_id != 1
-                   ORDER BY u.pk_bint_user_id"""
-            )
-
-            # Get module usage totals per user (all time)
-            rstUsage = await conn.fetch(
-                """SELECT mu.fk_bint_user_id, m.vchr_module_key, m.vchr_display_name,
-                          mu.vchr_operation, SUM(mu.int_count) AS int_total
-                   FROM tbl_module_usage mu
-                   JOIN tbl_module m ON mu.fk_bint_module_id = m.pk_bint_module_id
-                   GROUP BY mu.fk_bint_user_id, m.vchr_module_key, m.vchr_display_name, mu.vchr_operation
-                   ORDER BY mu.fk_bint_user_id, m.vchr_module_key"""
-            )
-
-            # Get today's usage per user (for daily limits)
-
-            rstTodayUsage = await conn.fetch(
-                """SELECT mu.fk_bint_user_id, m.vchr_module_key, mu.vchr_operation, mu.int_count
-                   FROM tbl_module_usage mu
-                   JOIN tbl_module m ON mu.fk_bint_module_id = m.pk_bint_module_id
-                   WHERE mu.dat_period_start = $1""",
-                date.today()
-            )
-
-            # Get plan limits per user
-            rstLimits = await conn.fetch(
-                """SELECT s.fk_bint_user_id, m.vchr_module_key, m.vchr_display_name,
-                          pm.int_create, pm.int_read, pm.int_daily_limit, pm.int_monthly_limit
-                   FROM tbl_plan_module pm
-                   JOIN tbl_module m ON pm.fk_bint_module_id = m.pk_bint_module_id
-                   JOIN tbl_subscription s ON pm.fk_bint_plan_id = s.fk_bint_plan_id
-                       AND s.pk_bint_subscription_id = (
-                           SELECT MAX(pk_bint_subscription_id) FROM tbl_subscription WHERE fk_bint_user_id = s.fk_bint_user_id
-                       )
-                   WHERE s.fk_bint_user_id != 1"""
-            )
-
-        # Build usage lookup: {userId: {moduleKey: {operation: total}}}
-        dctUsage = {}
-        for row in rstUsage:
-            uid = row['fk_bint_user_id']
-            mkey = row['vchr_module_key']
-            if uid not in dctUsage:
-                dctUsage[uid] = {}
-            if mkey not in dctUsage[uid]:
-                dctUsage[uid][mkey] = {"strDisplayName": row['vchr_display_name']}
-            dctUsage[uid][mkey][row['vchr_operation']] = row['int_total']
-
-        # Build today's usage lookup: {userId: {moduleKey: count}}
-        dctToday = {}
-        for row in rstTodayUsage:
-            uid = row['fk_bint_user_id']
-            if uid not in dctToday:
-                dctToday[uid] = {}
-            dctToday[uid][row['vchr_module_key']] = row['int_count']
-
-        # Build limits lookup: {userId: {moduleKey: {limits}}}
-        dctLimits = {}
-        for row in rstLimits:
-            uid = row['fk_bint_user_id']
-            if uid not in dctLimits:
-                dctLimits[uid] = {}
-            dctLimits[uid][row['vchr_module_key']] = {
-                "strDisplayName": row['vchr_display_name'],
-                "intCreate": row['int_create'],
-                "intRead": row['int_read'],
-                "intDailyLimit": row['int_daily_limit'],
-                "intMonthlyLimit": row['int_monthly_limit'],
-            }
-
-        # Build response
-        lstUsers = []
-        for row in rstUsers:
-            uid = row['pk_bint_user_id']
-            intDaysRemaining = 0
-            if row['dat_end_date']:
-    
-                intDaysRemaining = max((row['dat_end_date'] - date.today()).days, 0)
-
-            lstModules = []
-            userLimits = dctLimits.get(uid, {})
-            userUsage = dctUsage.get(uid, {})
-            userToday = dctToday.get(uid, {})
-
-            for mkey, limits in userLimits.items():
-                modUsage = userUsage.get(mkey, {})
-                lstModules.append({
-                    "strModuleKey": mkey,
-                    "strDisplayName": limits["strDisplayName"],
-                    "intTotalCreated": modUsage.get("create", 0),
-                    "intTodayUsed": userToday.get(mkey, 0),
-                    "intDailyLimit": limits["intDailyLimit"],
-                    "intMonthlyLimit": limits["intMonthlyLimit"],
-                    "blnBlocked": limits["intCreate"] == 0 and limits["intRead"] == 0,
-                })
-
-            lstUsers.append({
-                "intUserId": uid,
-                "strUsername": row['vchr_username'],
-                "strEmail": row['vchr_email'],
-                "strBusinessName": row['vchr_business_name'],
-                "blnIsActive": row['bln_is_active'],
-                "strPlanName": row['str_plan_name'] or "No Plan",
-                "strPlanKey": row['str_plan_key'] or "",
-                "strSubStatus": row['str_sub_status'] or "none",
-                "intDaysRemaining": intDaysRemaining,
-                "lstModules": lstModules,
-            })
-
-        return {"lstUsers": lstUsers}

@@ -8,6 +8,8 @@ import inventoryService from "@/services/inventoryService";
 import quotationService from "@/services/quotationService";
 import pdfService from "@/services/pdfService";
 import aiService from "@/services/aiService";
+import { usePermission } from "@/contexts/PermissionsContext";
+import NoPermission from "@/components/NoPermission";
 
 // Session storage key
 const STORAGE_KEY = "quotation_draft";
@@ -39,6 +41,12 @@ const clearDraft = () => {
 export default function NewQuotation() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const canWarranty = usePermission("warranty");
+  const canInvoice = usePermission("invoice");
+  const canReports = usePermission("reports");
+  const canAI = usePermission("ai");
+  const canInventory = usePermission("inventory");
+  const safeBack = canReports ? "/reports" : "/dashboard";
   const { id: editId } = useParams(); // Get ID from URL for edit mode
   const mode = searchParams.get("mode") || "ai";
   const isEditMode = !!editId;
@@ -47,6 +55,8 @@ export default function NewQuotation() {
   const draft = isEditMode ? null : loadDraft();
 
   const [rawInput, setRawInput] = useState(draft?.rawInput || "");
+  const [aiBlockMessage, setAiBlockMessage] = useState(null); // shown when quota/permission blocks AI
+  const [aiBlockVariant, setAiBlockVariant] = useState("permission");
   const [isProcessing, setIsProcessing] = useState(false);
   const [showForm, setShowForm] = useState(draft?.showForm ?? mode === "manual" ?? isEditMode);
 
@@ -77,8 +87,13 @@ export default function NewQuotation() {
   const [customRate, setCustomRate] = useState("");
   const searchRef = useRef(null);
 
-  // Fetch inventory on mount
+  // Fetch inventory on mount — only if user has inventory permission
   useEffect(() => {
+    if (!canInventory) {
+      setInventoryItems([]);
+      setIsLoadingInventory(false);
+      return;
+    }
     const fetchInventory = async () => {
       try {
         setIsLoadingInventory(true);
@@ -106,7 +121,7 @@ export default function NewQuotation() {
       }
     };
     fetchInventory();
-  }, []);
+  }, [canInventory]);
 
   // Fetch quotation for edit mode
   useEffect(() => {
@@ -155,12 +170,12 @@ export default function NewQuotation() {
           setShowForm(true);
         } else {
           alert(response.strMessage || "Quotation not found");
-          navigate("/reports");
+          navigate(safeBack);
         }
       } catch (error) {
         console.error("Failed to load quotation:", error);
         alert("Failed to load quotation");
-        navigate("/reports");
+        navigate(safeBack);
       } finally {
         setIsLoadingQuotation(false);
       }
@@ -264,6 +279,7 @@ export default function NewQuotation() {
   const processWithAI = async () => {
     if (!rawInput.trim()) return;
     setIsProcessing(true);
+    setAiBlockMessage(null);
 
     try {
       // Call AI API to process raw text
@@ -294,14 +310,24 @@ export default function NewQuotation() {
 
         setShowForm(true);
       } else {
-        // Fallback to local parsing if AI fails
+        // Fallback to local parsing if AI fails (non-permission failure)
         console.warn("AI processing failed, using local parsing:", response.strMessage);
         fallbackLocalParsing();
       }
     } catch (error) {
-      console.error("AI processing error:", error);
-      // Fallback to local parsing
-      fallbackLocalParsing();
+      // Detect permission (403) and quota (400 with "limit") errors and show inline notice
+      const status = error?.response?.status;
+      const detail = error?.response?.data?.detail || error?.message || "";
+      if (status === 403) {
+        setAiBlockVariant("permission");
+        setAiBlockMessage(detail || "You don't have access to AI Quick Create.");
+      } else if (status === 400 && /limit|quota/i.test(detail)) {
+        setAiBlockVariant("quota");
+        setAiBlockMessage(detail);
+      } else {
+        console.error("AI processing error:", error);
+        fallbackLocalParsing();
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -549,8 +575,35 @@ export default function NewQuotation() {
     );
   }
 
-  // AI Input Screen
-  if (!showForm && mode === "ai" && !isEditMode) {
+  // AI Input Screen — show a "no permission" message if user lacks AI access,
+  // otherwise render the normal AI input UI.
+  if (!showForm && mode === "ai" && !isEditMode && !canAI) {
+    return (
+      <div className="p-4 md:p-6 max-w-2xl mx-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <button onClick={() => navigate("/dashboard")} className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg">
+            <ArrowLeft className="w-5 h-5 text-neutral-600" />
+          </button>
+          <h1 className="text-lg font-semibold text-neutral-900">Quick Create</h1>
+        </div>
+        <NoPermission
+          moduleKey="ai"
+          moduleName="Quick Create"
+          message="Your plan doesn't include AI Quick Create. Switch to manual mode to add items by hand, or contact admin to upgrade."
+          compact
+        />
+        <div className="mt-6 flex justify-center">
+          <Button
+            onClick={() => navigate("/quotations/new?mode=manual")}
+            className="bg-neutral-900 hover:bg-neutral-800 text-white"
+          >
+            Switch to Manual Mode
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  if (!showForm && mode === "ai" && !isEditMode && canAI) {
     return (
       <div className="p-4 md:p-6 max-w-2xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
@@ -594,6 +647,19 @@ export default function NewQuotation() {
             </div>
           </div>
         </div>
+
+        {aiBlockMessage && (
+          <div className="mb-4">
+            <NoPermission
+              variant={aiBlockVariant}
+              moduleKey="ai"
+              moduleName="Quick Create"
+              message={aiBlockMessage}
+              compact
+              onDismiss={() => setAiBlockMessage(null)}
+            />
+          </div>
+        )}
 
         <Textarea
           placeholder="Type your items here...
@@ -645,7 +711,7 @@ Example:
                 return;
               }
               clearDraft();
-              navigate("/quotations/new?mode=ai");
+              navigate(canAI ? "/quotations/new?mode=ai" : "/quotations/new?mode=manual");
               setCustomerName("");
               setCustomerPhone("");
               setCustomerAddress("");
@@ -743,7 +809,8 @@ Example:
             </div>
           </div>
 
-          {/* Inventory Search */}
+          {/* Inventory Search — only for users with inventory access; others type items manually below */}
+          {canInventory && (
           <div ref={searchRef} className="relative">
             <div className="relative">
               {isLoadingInventory ? (
@@ -810,12 +877,22 @@ Example:
               </div>
             )}
           </div>
+          )}
 
           {/* Items List */}
           {items.length === 0 ? (
             <div className="border-2 border-dashed border-neutral-200 rounded-xl p-8 md:p-12 text-center">
-              <p className="text-neutral-400 mb-1">Search and add items from inventory</p>
-              <p className="text-xs text-neutral-300">Prices are automatically filled from inventory</p>
+              {canInventory ? (
+                <>
+                  <p className="text-neutral-400 mb-1">Search and add items from inventory</p>
+                  <p className="text-xs text-neutral-300">Prices are automatically filled from inventory</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-neutral-400 mb-1">Add items manually using the button below</p>
+                  <p className="text-xs text-neutral-300">Inventory access not enabled on your plan — type item name and rate directly</p>
+                </>
+              )}
             </div>
           ) : (
             <div className="border border-neutral-200 rounded-xl overflow-hidden bg-white">
@@ -1064,16 +1141,18 @@ Example:
                     )}
                     {isPrinting ? "Generating PDF..." : "Print Quotation"}
                   </Button>
-                  <Button
-                    onClick={() => navigate(`/warranty?sourceType=quotation&sourceId=${savedQuotation.intPkQuotationId}`)}
-                    variant="outline"
-                    className="w-full h-11 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-lg font-medium"
-                  >
-                    <ShieldCheck className="w-4 h-4 mr-2" />
-                    Warranty Certificate
-                  </Button>
+                  {canWarranty && (
+                    <Button
+                      onClick={() => navigate(`/warranty?sourceType=quotation&sourceId=${savedQuotation.intPkQuotationId}`)}
+                      variant="outline"
+                      className="w-full h-11 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-lg font-medium"
+                    >
+                      <ShieldCheck className="w-4 h-4 mr-2" />
+                      Warranty Certificate
+                    </Button>
+                  )}
                   {/* Convert to Invoice OR View Invoice if already converted */}
-                  {savedQuotation.linkedInvoiceId ? (
+                  {canInvoice && (savedQuotation.linkedInvoiceId ? (
                     <Button
                       onClick={() => navigate(`/invoices/view/${savedQuotation.linkedInvoiceId}`)}
                       variant="outline"
@@ -1091,7 +1170,7 @@ Example:
                       <FileText className="w-4 h-4 mr-2" />
                       Convert to Invoice
                     </Button>
-                  )}
+                  ))}
                   {/* New Quotation - TERTIARY (with subtle border for visibility) */}
                   <Button
                     onClick={resetForm}
@@ -1125,17 +1204,19 @@ Example:
               >
                 {isPrinting ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : <Printer className="w-[18px] h-[18px]" />}
               </button>
-              <button
-                onClick={() => navigate(`/warranty?sourceType=quotation&sourceId=${savedQuotation.intPkQuotationId}`)}
-                className="h-10 px-3 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-semibold shadow-sm shadow-amber-200 hover:from-amber-600 hover:to-orange-600 active:from-amber-700 active:to-orange-700"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                Warranty
-              </button>
+              {canWarranty && (
+                <button
+                  onClick={() => navigate(`/warranty?sourceType=quotation&sourceId=${savedQuotation.intPkQuotationId}`)}
+                  className="h-10 px-3 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-semibold shadow-sm shadow-amber-200 hover:from-amber-600 hover:to-orange-600 active:from-amber-700 active:to-orange-700"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  Warranty
+                </button>
+              )}
             </div>
             {/* Row 2: Primary CTAs */}
             <div className="flex items-center gap-2">
-              {savedQuotation.linkedInvoiceId ? (
+              {canInvoice && (savedQuotation.linkedInvoiceId ? (
                 <Button
                   onClick={() => navigate(`/invoices/view/${savedQuotation.linkedInvoiceId}`)}
                   className="h-11 flex-1 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl font-medium text-sm"
@@ -1151,7 +1232,7 @@ Example:
                   <FileText className="w-4 h-4 mr-1.5" />
                   Invoice
                 </Button>
-              )}
+              ))}
               <Button
                 onClick={handleSave}
                 disabled={isSaving}

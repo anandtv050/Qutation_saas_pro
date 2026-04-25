@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Home, FilePlus, Package, BarChart3, Users, User, LogOut, X,
   Printer, CreditCard, Wrench, Shield, Receipt, Brain,
 } from "lucide-react";
-import userService from "@/services/userService";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 const ICON_MAP = {
   Home, FilePlus, Package, BarChart3, User, Users,
@@ -22,28 +22,21 @@ const ADMIN_PAGES = [
 export default function MobileNav() {
   const location = useLocation();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [navItems, setNavItems] = useState([]);
+  const { permissions } = usePermissions();
 
   const userInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
   const isAdmin = userInfo.intUserId === 1;
 
-  useEffect(() => {
-    userService.getMyPermissions()
-      .then((res) => {
-        if (res.lstNav) {
-          setNavItems(
-            res.lstNav
-              .filter((m) => m.blnShowInSidebar && m.strPath && !m.blnAdminOnly)
-              .map((m) => ({
-                path: m.strPath,
-                label: m.strLabel,
-                icon: ICON_MAP[m.strIcon] || Package,
-              }))
-          );
-        }
-      })
-      .catch(() => {});
-  }, []);
+  const navItems = useMemo(() => {
+    if (!permissions?.lstNav) return [];
+    return permissions.lstNav
+      .filter((m) => m.blnShowInSidebar && m.strPath && !m.blnAdminOnly)
+      .map((m) => ({
+        path: m.strPath,
+        label: m.strLabel,
+        icon: ICON_MAP[m.strIcon] || Package,
+      }));
+  }, [permissions]);
 
   const isActive = (path) => {
     if (path === "/dashboard") return location.pathname === "/dashboard";

@@ -5,9 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import quotationService from "@/services/quotationService";
 import invoiceService from "@/services/invoiceService";
+import { usePermission } from "@/contexts/PermissionsContext";
 
 export default function Reports() {
   const navigate = useNavigate();
+  const canQuotation = usePermission("quotation");
+  const canInvoice = usePermission("invoice");
   const [activeTab, setActiveTab] = useState("quotations");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -153,13 +156,15 @@ export default function Reports() {
     overdue: "bg-red-50 text-red-600",
   };
 
-  // Handle quotation click - navigate to edit
+  // Handle quotation click - navigate to edit (only if user has quotation access)
   const handleQuotationClick = (quotationId) => {
+    if (!canQuotation) return;
     navigate(`/quotations/edit/${quotationId}`);
   };
 
-  // Handle invoice click - navigate to view/edit
+  // Handle invoice click - navigate to view/edit (only if user has invoice access)
   const handleInvoiceClick = (invoiceId) => {
+    if (!canInvoice) return;
     navigate(`/invoices/view/${invoiceId}`);
   };
 
@@ -352,7 +357,7 @@ export default function Reports() {
               <p className="text-sm text-neutral-500 mb-4">
                 {quotations.length === 0 ? "Create your first quotation to get started" : "Try a different search or date"}
               </p>
-              {quotations.length === 0 && (
+              {quotations.length === 0 && canQuotation && (
                 <Button onClick={() => navigate("/quotations/new?mode=manual")} className="bg-neutral-900 hover:bg-neutral-800">
                   Create Quotation
                 </Button>

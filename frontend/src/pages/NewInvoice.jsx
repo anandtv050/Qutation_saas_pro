@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import invoiceService from "@/services/invoiceService";
 import pdfService from "@/services/pdfService";
+import { usePermission } from "@/contexts/PermissionsContext";
 // Commented for later - inventory search
 // import { searchInventory, inventoryItems } from "@/data/inventoryData";
 
@@ -33,6 +34,9 @@ const saveDraft = (data) => {
 
 export default function NewInvoice() {
   const navigate = useNavigate();
+  const canWarranty = usePermission("warranty");
+  const canReports = usePermission("reports");
+  const safeBack = canReports ? "/reports" : "/dashboard";
   const location = useLocation();
   const { id: invoiceId } = useParams();
 
@@ -451,7 +455,7 @@ export default function NewInvoice() {
       <div className="p-4 md:p-6 pb-36 lg:pb-6">
         <div className="flex items-center mb-6">
           <button
-            onClick={() => navigate("/reports")}
+            onClick={() => navigate(safeBack)}
             className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg"
           >
             <ArrowLeft className="w-5 h-5 text-neutral-600" />
@@ -471,7 +475,7 @@ export default function NewInvoice() {
       <div className="p-4 md:p-6 pb-36 lg:pb-6">
         <div className="flex items-center mb-6">
           <button
-            onClick={() => navigate("/reports")}
+            onClick={() => navigate(safeBack)}
             className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg"
           >
             <ArrowLeft className="w-5 h-5 text-neutral-600" />
@@ -483,8 +487,8 @@ export default function NewInvoice() {
           </div>
           <h3 className="text-lg font-medium text-neutral-900 mb-2">Failed to load invoice</h3>
           <p className="text-sm text-neutral-500 mb-4">{loadError}</p>
-          <Button onClick={() => navigate("/reports")} variant="outline">
-            Back to Reports
+          <Button onClick={() => navigate(safeBack)} variant="outline">
+            {canReports ? "Back to Reports" : "Back to Dashboard"}
           </Button>
         </div>
       </div>
@@ -498,7 +502,7 @@ export default function NewInvoice() {
         {/* Top Row: Back button */}
         <div className="flex items-center mb-2">
           <button
-            onClick={() => navigateWithConfirm(isViewMode ? "/reports" : "/dashboard")}
+            onClick={() => navigateWithConfirm(isViewMode ? safeBack : "/dashboard")}
             className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg"
           >
             <ArrowLeft className="w-5 h-5 text-neutral-600" />
@@ -924,14 +928,16 @@ export default function NewInvoice() {
                     )}
                     {isPrinting ? "Generating PDF..." : "Print Invoice"}
                   </Button>
-                  <Button
-                    onClick={() => navigate(`/warranty?sourceType=invoice&sourceId=${getInvoiceSourceId()}`)}
-                    variant="outline"
-                    className="w-full h-11 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-lg font-medium"
-                  >
-                    <ShieldCheck className="w-4 h-4 mr-2" />
-                    Warranty Certificate
-                  </Button>
+                  {canWarranty && (
+                    <Button
+                      onClick={() => navigate(`/warranty?sourceType=invoice&sourceId=${getInvoiceSourceId()}`)}
+                      variant="outline"
+                      className="w-full h-11 border-amber-200 text-amber-700 hover:bg-amber-50 rounded-lg font-medium"
+                    >
+                      <ShieldCheck className="w-4 h-4 mr-2" />
+                      Warranty Certificate
+                    </Button>
+                  )}
                   {/* Share */}
                   <Button
                     onClick={handleShare}
@@ -986,13 +992,15 @@ export default function NewInvoice() {
                   <Printer className="w-4 h-4" />
                 )}
               </Button>
-              <Button
-                onClick={() => navigate(`/warranty?sourceType=invoice&sourceId=${getInvoiceSourceId()}`)}
-                className="h-11 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium shrink-0"
-              >
-                <ShieldCheck className="w-4 h-4 mr-1" />
-                Warranty
-              </Button>
+              {canWarranty && (
+                <Button
+                  onClick={() => navigate(`/warranty?sourceType=invoice&sourceId=${getInvoiceSourceId()}`)}
+                  className="h-11 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium shrink-0"
+                >
+                  <ShieldCheck className="w-4 h-4 mr-1" />
+                  Warranty
+                </Button>
+              )}
               {/* Share */}
               <Button
                 onClick={handleShare}

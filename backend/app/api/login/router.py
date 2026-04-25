@@ -44,7 +44,12 @@ async def fnLogin(mdlLoginRequest: MdlLoginRequest):
 
 @router.post("/signup", response_model=MdlLoginResponse)
 async def fnSignup(mdlSignupRequest: MdlSignupRequest):
-    """Self-service signup: create account, auto-login, add sample data"""
+    """Create a new user with a free-trial plan and return a JWT (auto-login).
+
+    Not surfaced in the frontend (B2B onboarding is admin-driven via /user/add),
+    but kept live for: programmatic onboarding scripts, future re-enablement,
+    partner/integrator use, and internal tooling.
+    """
     try:
         logger.info(f"Signup attempt: {mdlSignupRequest.email}")
 
@@ -62,13 +67,13 @@ async def fnSignup(mdlSignupRequest: MdlSignupRequest):
         logger.error(f"Database error during signup: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error. Please try again."
+            detail=f"Database error: {str(e)}"
         )
     except Exception as e:
         logger.error(f"Signup error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Something went wrong. Please try again."
+            detail=f"Internal server error: {str(e)}"
         )
 
 

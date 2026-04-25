@@ -9,7 +9,9 @@ class MdlCreateOrderRequest(BaseModel):
 
 class MdlCreateOrderResponse(BaseModel):
     strOrderId: str
-    dblAmount: float
+    dblAmount: float                       # Effective amount charged (offer or regular)
+    dblOriginalAmount: Optional[float] = None  # Regular price (for strikethrough UI if offer applied)
+    strOfferLabel: Optional[str] = None    # Offer name if offer was applied
     strCurrency: str
     strKeyId: str
     strPlanName: str
@@ -23,15 +25,17 @@ class MdlVerifyPaymentRequest(BaseModel):
 
 
 class MdlSubscriptionStatus(BaseModel):
-    intPlanId: int
-    strPlanName: str
-    strDisplayName: str
-    strStatus: str  # trial, active, expired, cancelled
-    datStartDate: date
-    datEndDate: date
-    intDaysRemaining: int
-    intMaxQuotationsPerMonth: int
-    blnAiEnabled: bool
+    """Current plan info for a user (stored on tbl_user after B2B refactor)."""
+    intPlanId: Optional[int] = None
+    strPlanName: Optional[str] = None
+    strDisplayName: Optional[str] = None
+    strStatus: str  # trial, active, expired, canceled, paused, past_due
+    datStartDate: Optional[date] = None
+    datEndDate: Optional[date] = None
+    datCurrentPeriodStart: Optional[date] = None
+    datCurrentPeriodEnd: Optional[date] = None
+    intDaysRemaining: int = 0
+    blnCancelAtPeriodEnd: bool = False
 
 
 # =====================================================

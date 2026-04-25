@@ -19,6 +19,8 @@ import PlanManagement from "./pages/PlanManagement";
 import ServiceManagement from "./pages/ServiceManagement";
 import ModuleManagement from "./pages/ModuleManagement";
 import MainLayout from "./components/layout/MainLayout";
+import NoPermission from "./components/NoPermission";
+import { usePermissions } from "./contexts/PermissionsContext";
 
 function App() {
   // Check if user is logged in
@@ -47,6 +49,19 @@ function App() {
     return children;
   };
 
+  // Module Route wrapper — blocks access if user's plan/override doesn't allow the module.
+  // Admin (user_id=1) bypasses. Unauthorized users see the NoPermission page (not a silent redirect).
+  const ModuleRoute = ({ moduleKey, children }) => {
+    const userInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
+    if (userInfo.intUserId === 1) return children; // admin bypass
+    const { permissions, isLoading } = usePermissions();
+    if (isLoading) return null; // wait for permissions to load
+    if (!permissions?.lstModules?.includes(moduleKey)) {
+      return <NoPermission moduleKey={moduleKey} />;
+    }
+    return children;
+  };
+
   return (
     <BrowserRouter>
       <Routes>
@@ -67,15 +82,15 @@ function App() {
           }
         >
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/quotations/new" element={<NewQuotation />} />
-          <Route path="/quotations/edit/:id" element={<NewQuotation />} />
-          <Route path="/invoices/new" element={<NewInvoice />} />
-          <Route path="/invoices/view/:id" element={<NewInvoice />} />
-          <Route path="/warranty" element={<WarrantyCertificate />} />
-          <Route path="/inventory" element={<Inventory />} />
-          <Route path="/reports" element={<Reports />} />
+          <Route path="/quotations/new" element={<ModuleRoute moduleKey="quotation"><NewQuotation /></ModuleRoute>} />
+          <Route path="/quotations/edit/:id" element={<ModuleRoute moduleKey="quotation"><NewQuotation /></ModuleRoute>} />
+          <Route path="/invoices/new" element={<ModuleRoute moduleKey="invoice"><NewInvoice /></ModuleRoute>} />
+          <Route path="/invoices/view/:id" element={<ModuleRoute moduleKey="invoice"><NewInvoice /></ModuleRoute>} />
+          <Route path="/warranty" element={<ModuleRoute moduleKey="warranty"><WarrantyCertificate /></ModuleRoute>} />
+          <Route path="/inventory" element={<ModuleRoute moduleKey="inventory"><Inventory /></ModuleRoute>} />
+          <Route path="/reports" element={<ModuleRoute moduleKey="reports"><Reports /></ModuleRoute>} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/print-settings" element={<PrintModelSettings />} />
+          <Route path="/print-settings" element={<ModuleRoute moduleKey="print_settings"><PrintModelSettings /></ModuleRoute>} />
           <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
           <Route path="/plans" element={<AdminRoute><PlanManagement /></AdminRoute>} />

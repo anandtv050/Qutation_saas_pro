@@ -69,16 +69,42 @@ export default function ModuleManagement() {
     const key = `${intUserId}-${strModuleKey}`;
     setToggling(key);
 
+    // Find the module ID by key
+    const mod = modules.find(m => m.strKey === strModuleKey);
+    if (!mod) {
+      setToggling(null);
+      return;
+    }
+
+    const newValue = !currentValue;
+
     // Optimistic update
     setUsers(prev => prev.map(u =>
       u.intUserId === intUserId
-        ? { ...u, dctModules: { ...u.dctModules, [strModuleKey]: !currentValue } }
+        ? { ...u, dctModules: { ...u.dctModules, [strModuleKey]: newValue } }
         : u
     ));
 
     try {
-      await userService.togglePermission(intUserId, strModuleKey, !currentValue);
+      if (newValue) {
+        // Grant access: override with unlimited CRUD (admin's override wins over plan)
+        await userService.setModuleOverride({
+          intTargetUserId: intUserId,
+          intModuleId: mod.intModuleId,
+          intCreate: -1, intRead: -1, intUpdate: -1, intDelete: -1, intPrint: -1,
+          strReason: "Admin grant via permission grid",
+        });
+      } else {
+        // Block access: override with zeros (admin's override wins over plan)
+        await userService.setModuleOverride({
+          intTargetUserId: intUserId,
+          intModuleId: mod.intModuleId,
+          intCreate: 0, intRead: 0, intUpdate: 0, intDelete: 0, intPrint: 0,
+          strReason: "Admin block via permission grid",
+        });
+      }
     } catch (err) {
+      console.error("Toggle failed:", err);
       // Revert on error
       setUsers(prev => prev.map(u =>
         u.intUserId === intUserId

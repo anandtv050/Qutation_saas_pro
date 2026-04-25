@@ -253,16 +253,6 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Sign up link */}
-          <div className="mt-6 text-center">
-            <p className="text-neutral-600 text-sm">
-              Don't have an account?{" "}
-              <Link to="/signup" className="font-semibold text-black hover:underline">
-                Start free trial
-              </Link>
-            </p>
-          </div>
-
           {/* Security Badge */}
           <div className="mt-5 flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-50/80 rounded-lg border border-neutral-200">
             <svg className="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">

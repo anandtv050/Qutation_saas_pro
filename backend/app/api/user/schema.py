@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
+from datetime import date
 
 from app.core.baseSchema import MdlBaseRequest, MdlBaseResponse
 
@@ -142,22 +143,22 @@ class MdlUserListResponse(MdlBaseResponse):
 
 
 class MdlUserPermissionInfo(BaseModel):
-    """Module permission info"""
-    intModuleId: int
+    """Module permission info (plan-based)"""
+    intModuleId: int = 0
     strModuleKey: str
     strDisplayName: str
     strDescription: Optional[str] = None
     strIcon: Optional[str] = None
-    blnEnabled: bool = True
+    intCreate: int = 0
+    intRead: int = 0
+    intUpdate: int = 0
+    intDelete: int = 0
+    intPrint: int = 0
+    strQuotaPeriod: Optional[str] = None
 
 
 class MdlGetPermissionsRequest(MdlBaseRequest):
     intTargetUserId: int
-
-
-class MdlSetPermissionsRequest(MdlBaseRequest):
-    intTargetUserId: int
-    lstPermissions: list  # [{intModuleId: int, blnEnabled: bool}]
 
 
 # =====================================================
@@ -166,6 +167,7 @@ class MdlSetPermissionsRequest(MdlBaseRequest):
 
 class MdlAddModuleRequest(MdlBaseRequest):
     strModuleKey: str
+    strModuleCode: str
     strDisplayName: str
     strIcon: str = "Package"
     strPath: str = ""
@@ -194,12 +196,6 @@ class MdlDeleteModuleRequest(MdlBaseRequest):
 # =====================================================
 # PERMISSION REQUESTS
 # =====================================================
-
-class MdlTogglePermissionRequest(MdlBaseRequest):
-    intTargetUserId: int
-    strModuleKey: str
-    blnEnabled: bool
-
 
 # =====================================================
 # SETTINGS REQUESTS
@@ -251,3 +247,49 @@ class MdlDeleteUserResponse(MdlBaseResponse):
     }
     """
     intDeletedId: Optional[int] = None
+
+
+# =====================================================
+# MODULE PERMISSION OVERRIDE (Per-user grant/revoke)
+# =====================================================
+
+class MdlUserModuleOverride(BaseModel):
+    """A single per-user module permission override"""
+    intOverrideId: int = 0
+    intUserId: int
+    intModuleId: int
+    strModuleKey: str = ""
+    strModuleDisplayName: str = ""
+    intCreate: int = 0
+    intRead: int = 0
+    intUpdate: int = 0
+    intDelete: int = 0
+    intPrint: int = 0
+    strQuotaPeriod: Optional[str] = None
+    datExpiresAt: Optional[date] = None
+    strReason: Optional[str] = None
+
+
+class MdlSetModuleOverrideRequest(MdlBaseRequest):
+    """Admin: create or update a module permission override for a user"""
+    intTargetUserId: int
+    intModuleId: int
+    intCreate: int = 0
+    intRead: int = 0
+    intUpdate: int = 0
+    intDelete: int = 0
+    intPrint: int = 0
+    strQuotaPeriod: Optional[str] = None
+    datExpiresAt: Optional[date] = None
+    strReason: Optional[str] = None
+
+
+class MdlDeleteModuleOverrideRequest(MdlBaseRequest):
+    """Admin: remove a module permission override for a user"""
+    intTargetUserId: int
+    intModuleId: int
+
+
+class MdlListModuleOverridesRequest(MdlBaseRequest):
+    """Admin: list all active module overrides for a user"""
+    intTargetUserId: int
