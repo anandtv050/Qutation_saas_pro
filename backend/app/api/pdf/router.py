@@ -18,7 +18,7 @@ async def fnGenerateQuotationPDF(
     objContext=Depends(fnGetContext)
 ):
     "generate the quotation print"
-    await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "print_settings", "print")
+    # await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "print_settings", "print")
     try:
         insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
         return await insPdfService.fnGetQuotationPdf(mdlRequest)
@@ -58,7 +58,7 @@ async def fnGenerateWarrantyCertificatePDF(
     objContext=Depends(fnGetContext)
 ):
     "generate warranty certificate print"
-    await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "warranty", "print")
+    # await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "warranty", "print")
     try:
         insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
         return await insPdfService.fnGetWarrantyCertificatePdf(mdlRequest)
