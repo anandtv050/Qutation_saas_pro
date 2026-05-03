@@ -77,18 +77,16 @@ class ClsDashboardService:
         objLogger = getUserLogger(self.intUserId)
         objLogger.debug("Fetching dashboard summary")
         async with self.insPool.acquire() as conn:
-            rstInvoice = await conn.fetchrow("""
+            rstQuotation = await conn.fetchrow("""
                 SELECT COALESCE(SUM(dbl_total_amount),0) as total,
-                       COUNT(*) as cnt,
-                       COUNT(CASE WHEN vchr_payment_status='paid' THEN 1 END) as paid,
-                       COUNT(CASE WHEN vchr_payment_status!='paid' THEN 1 END) as pending
-                FROM tbl_invoice WHERE fk_bint_user_id=$1
+                       COUNT(*) as cnt
+                FROM tbl_quotation WHERE fk_bint_user_id=$1
             """, self.intUserId)
 
             rstToday = await conn.fetchrow("""
                 SELECT COALESCE(SUM(dbl_total_amount),0) as earnings, COUNT(*) as cnt
-                FROM tbl_invoice WHERE fk_bint_user_id=$1
-                AND DATE(dat_invoice_date)=CURRENT_DATE
+                FROM tbl_quotation WHERE fk_bint_user_id=$1
+                AND DATE(dat_quotation_date)=CURRENT_DATE
             """, self.intUserId)
 
             intQuotationCount = await conn.fetchval(
@@ -102,11 +100,11 @@ class ClsDashboardService:
                 intStatusCode=ResponseStatus.HTTP_OK,
                 strMessage="OK",
                 data=MdlDashboardSummary(
-                    dblTotalCollected=float(rstInvoice['total']),
+                    dblTotalCollected=float(rstQuotation['total']),
                     dblTodayEarnings=float(rstToday['earnings']),
-                    intTotalInvoices=int(rstInvoice['cnt']),
-                    intPaidInvoices=int(rstInvoice['paid']),
-                    intPendingInvoices=int(rstInvoice['pending']),
+                    intTotalInvoices=int(rstQuotation['cnt']),
+                    intPaidInvoices=0,
+                    intPendingInvoices=0,
                     intTotalQuotations=int(intQuotationCount),
                     intTodayInvoices=int(rstToday['cnt']),
                 )

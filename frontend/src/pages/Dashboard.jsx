@@ -161,17 +161,17 @@ export default function Dashboard() {
               ) : (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-neutral-500 mb-1">Collected</p>
+                    <p className="text-sm text-neutral-500 mb-1">Quotation value</p>
                     <p className="text-2xl font-bold text-emerald-600">{formatCurrency(summary.dblTotalCollected)}</p>
                     {summary.intTotalInvoices > 0 && (
-                      <p className="text-xs text-neutral-400">{summary.intTotalInvoices} invoices</p>
+                      <p className="text-xs text-neutral-400">{summary.intTotalInvoices} quotations</p>
                     )}
                   </div>
                   <div>
                     <p className="text-sm text-neutral-500 mb-1">Today</p>
                     <p className="text-2xl font-bold text-blue-600">{formatCurrency(summary.dblTodayEarnings)}</p>
                     {summary.intTodayInvoices > 0 && (
-                      <p className="text-xs text-neutral-400">{summary.intTodayInvoices} invoices</p>
+                      <p className="text-xs text-neutral-400">{summary.intTodayInvoices} quotations</p>
                     )}
                   </div>
                 </div>
