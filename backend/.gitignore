@@ -12,6 +12,9 @@ venv/
 .env
 .env.local
 
+# Telegram bot session store (telegram_id -> user_id mapping)
+.bot_sessions.json
+
 # IDE
 .vscode/
 .idea/

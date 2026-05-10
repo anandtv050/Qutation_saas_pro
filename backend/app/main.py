@@ -58,8 +58,21 @@ async def lifespan(app:FastAPI):
     insDb = ClsDatabasepool()
     await insDb.fnStartUp()
 
+    # Telegram bot — no-op if TELEGRAM_BOT_TOKEN is unset. A bot failure must
+    # not crash the API.
+    from app.telegram_bot.bot import fnStartBot, fnStopBot
+    try:
+        await fnStartBot()
+    except Exception as e:
+        logger.error(f"Telegram bot failed to start: {e}")
+
     yield
-    
+
+    try:
+        await fnStopBot()
+    except Exception as e:
+        logger.error(f"Telegram bot stop error: {e}")
+
     await insDb.fnDisconnectPool()
     logger.info("Shutting down Quotely API Server...")
 
