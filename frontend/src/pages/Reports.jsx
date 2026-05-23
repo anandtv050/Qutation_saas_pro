@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, FileText, Receipt, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Search, FileText, Receipt, Loader2, RefreshCw, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import quotationService from "@/services/quotationService";
@@ -43,6 +43,15 @@ export default function Reports() {
   const [deleteId, setDeleteId] = useState(null);
   const [deleteType, setDeleteType] = useState(null); // "quotation" or "invoice"
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Pagination state
+  const PAGE_SIZE = 20;
+  const [quotationPage, setQuotationPage] = useState(1);
+  const [invoicePage, setInvoicePage] = useState(1);
+
+  // Reset to page 1 when filters/tab change
+  useEffect(() => { setQuotationPage(1); }, [searchQuery, fromDate, toDate, activeTab]);
+  useEffect(() => { setInvoicePage(1); }, [searchQuery, fromDate, toDate, activeTab]);
 
   // Fetch quotations from API
   const fetchQuotations = async () => {
@@ -140,6 +149,84 @@ export default function Reports() {
       return matchesSearch && matchesFromDate && matchesToDate;
     });
   }, [invoices, searchQuery, fromDate, toDate]);
+
+  // Paginated slices
+  const quotationTotalPages = Math.max(1, Math.ceil(filteredQuotations.length / PAGE_SIZE));
+  const invoiceTotalPages = Math.max(1, Math.ceil(filteredInvoices.length / PAGE_SIZE));
+  const currentQuotationPage = Math.min(quotationPage, quotationTotalPages);
+  const currentInvoicePage = Math.min(invoicePage, invoiceTotalPages);
+  const pagedQuotations = useMemo(
+    () => filteredQuotations.slice((currentQuotationPage - 1) * PAGE_SIZE, currentQuotationPage * PAGE_SIZE),
+    [filteredQuotations, currentQuotationPage]
+  );
+  const pagedInvoices = useMemo(
+    () => filteredInvoices.slice((currentInvoicePage - 1) * PAGE_SIZE, currentInvoicePage * PAGE_SIZE),
+    [filteredInvoices, currentInvoicePage]
+  );
+
+  // Build a windowed list of page numbers (with ellipsis) — max ~7 visible
+  const buildPageList = (total, current) => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages = new Set([1, total, current, current - 1, current + 1]);
+    if (current <= 3) [2, 3, 4].forEach(p => pages.add(p));
+    if (current >= total - 2) [total - 3, total - 2, total - 1].forEach(p => pages.add(p));
+    const sorted = [...pages].filter(p => p >= 1 && p <= total).sort((a, b) => a - b);
+    const result = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push("...");
+      result.push(sorted[i]);
+    }
+    return result;
+  };
+
+  const Pagination = ({ currentPage, totalPages, onChange, totalItems, itemLabel }) => {
+    if (totalPages <= 1) return null;
+    const start = (currentPage - 1) * PAGE_SIZE + 1;
+    const end = Math.min(currentPage * PAGE_SIZE, totalItems);
+    const pages = buildPageList(totalPages, currentPage);
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-3">
+        <p className="text-sm text-neutral-500">
+          Showing {start}-{end} of {totalItems} {itemLabel}
+        </p>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="h-8 w-8 flex items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          {pages.map((p, idx) =>
+            p === "..." ? (
+              <span key={`e-${idx}`} className="px-2 text-sm text-neutral-400">…</span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => onChange(p)}
+                className={`h-8 min-w-8 px-2 rounded-md text-sm font-medium transition-colors ${
+                  p === currentPage
+                    ? "bg-neutral-900 text-white"
+                    : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                }`}
+              >
+                {p}
+              </button>
+            )
+          )}
+          <button
+            onClick={() => onChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="h-8 w-8 flex items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            aria-label="Next page"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   const statusColors = {
     // Quotation statuses
@@ -377,12 +464,12 @@ export default function Reports() {
               </div>
 
               {/* Items */}
-              {filteredQuotations.map((q, index) => (
+              {pagedQuotations.map((q, index) => (
                 <div
                   key={q.intPkQuotationId}
                   onClick={() => handleQuotationClick(q.intPkQuotationId)}
                   className={`grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-neutral-50 cursor-pointer transition-colors ${
-                    index !== filteredQuotations.length - 1 ? "border-b border-neutral-100" : ""
+                    index !== pagedQuotations.length - 1 ? "border-b border-neutral-100" : ""
                   }`}
                 >
                   {/* Mobile: Stacked */}
@@ -434,11 +521,19 @@ export default function Reports() {
             </div>
           )}
 
-          {filteredQuotations.length > 0 && (
+          {filteredQuotations.length > 0 && quotationTotalPages <= 1 && (
             <p className="text-sm text-neutral-500 mt-3">
               Showing {filteredQuotations.length} quotation{filteredQuotations.length !== 1 ? "s" : ""}
             </p>
           )}
+
+          <Pagination
+            currentPage={currentQuotationPage}
+            totalPages={quotationTotalPages}
+            onChange={setQuotationPage}
+            totalItems={filteredQuotations.length}
+            itemLabel="quotations"
+          />
         </>
       )}
 
@@ -482,12 +577,12 @@ export default function Reports() {
               </div>
 
               {/* Items */}
-              {filteredInvoices.map((inv, index) => (
+              {pagedInvoices.map((inv, index) => (
                 <div
                   key={inv.intPkInvoiceId}
                   onClick={() => handleInvoiceClick(inv.intPkInvoiceId)}
                   className={`grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-neutral-50 cursor-pointer transition-colors ${
-                    index !== filteredInvoices.length - 1 ? "border-b border-neutral-100" : ""
+                    index !== pagedInvoices.length - 1 ? "border-b border-neutral-100" : ""
                   }`}
                 >
                   {/* Mobile: Stacked */}
@@ -542,11 +637,19 @@ export default function Reports() {
             </div>
           )}
 
-          {filteredInvoices.length > 0 && (
+          {filteredInvoices.length > 0 && invoiceTotalPages <= 1 && (
             <p className="text-sm text-neutral-500 mt-3">
               Showing {filteredInvoices.length} invoice{filteredInvoices.length !== 1 ? "s" : ""}
             </p>
           )}
+
+          <Pagination
+            currentPage={currentInvoicePage}
+            totalPages={invoiceTotalPages}
+            onChange={setInvoicePage}
+            totalItems={filteredInvoices.length}
+            itemLabel="invoices"
+          />
         </>
       )}
     </div>
