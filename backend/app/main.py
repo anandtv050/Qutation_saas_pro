@@ -39,6 +39,7 @@ LST_ROUTERS = [
     "app.api.inventory.router",
     "app.api.quotation.router",
     "app.api.invoice.router",
+    "app.api.warranty.router",        # Warranty report + (future) certificate ops
     "app.api.dashboard.router",
     "app.api.pdf.router",
     "app.api.ai.router",

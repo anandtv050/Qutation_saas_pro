@@ -1,16 +1,18 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, FileText, Receipt, Loader2, RefreshCw, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, FileText, Receipt, Loader2, RefreshCw, Trash2, ChevronLeft, ChevronRight, ShieldCheck, ShieldX } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import quotationService from "@/services/quotationService";
 import invoiceService from "@/services/invoiceService";
+import warrantyService from "@/services/warrantyService";
 import { usePermission } from "@/contexts/PermissionsContext";
 
 export default function Reports() {
   const navigate = useNavigate();
   const canQuotation = usePermission("quotation");
   const canInvoice = usePermission("invoice");
+  const canWarranty = usePermission("warranty");
   const [activeTab, setActiveTab] = useState("quotations");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -39,6 +41,11 @@ export default function Reports() {
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(true);
   const [invoiceError, setInvoiceError] = useState(null);
 
+  // Warranty state
+  const [warranties, setWarranties] = useState([]);
+  const [isLoadingWarranties, setIsLoadingWarranties] = useState(true);
+  const [warrantyError, setWarrantyError] = useState(null);
+
   // Delete confirmation state
   const [deleteId, setDeleteId] = useState(null);
   const [deleteType, setDeleteType] = useState(null); // "quotation" or "invoice"
@@ -48,10 +55,12 @@ export default function Reports() {
   const PAGE_SIZE = 20;
   const [quotationPage, setQuotationPage] = useState(1);
   const [invoicePage, setInvoicePage] = useState(1);
+  const [warrantyPage, setWarrantyPage] = useState(1);
 
   // Reset to page 1 when filters/tab change
   useEffect(() => { setQuotationPage(1); }, [searchQuery, fromDate, toDate, activeTab]);
   useEffect(() => { setInvoicePage(1); }, [searchQuery, fromDate, toDate, activeTab]);
+  useEffect(() => { setWarrantyPage(1); }, [searchQuery, fromDate, toDate, activeTab]);
 
   // Fetch quotations from API
   const fetchQuotations = async () => {
@@ -97,9 +106,31 @@ export default function Reports() {
     }
   };
 
+  // Fetch warranty report
+  const fetchWarranties = async () => {
+    setIsLoadingWarranties(true);
+    setWarrantyError(null);
+    try {
+      const response = await warrantyService.getList();
+      if (response.intStatus === 1) {
+        setWarranties(response.lstWarranty || []);
+      } else if (response.intStatus === -1) {
+        setWarranties([]);
+      } else {
+        setWarrantyError(response.strMessage || "Failed to load warranty report");
+      }
+    } catch (error) {
+      console.error("Failed to fetch warranty report:", error);
+      setWarrantyError(error.message || "Failed to load warranty report");
+    } finally {
+      setIsLoadingWarranties(false);
+    }
+  };
+
   useEffect(() => {
     fetchQuotations();
     fetchInvoices();
+    fetchWarranties();
   }, []);
 
   const formatCurrency = (amount) => {
@@ -150,11 +181,37 @@ export default function Reports() {
     });
   }, [invoices, searchQuery, fromDate, toDate]);
 
+  // Derive a warranty number from a quotation number ("QT-2025-S0001" -> "WTY-2025-S0001")
+  const toWarrantyNumber = (strQuotationNumber) => {
+    if (!strQuotationNumber) return "";
+    return strQuotationNumber.replace(/^QT-/i, "WTY-");
+  };
+
+  // Filter warranties (uses expiry date for date range, falls back to quotation date)
+  const filteredWarranties = useMemo(() => {
+    return warranties.filter(w => {
+      const strWarrantyNumber = toWarrantyNumber(w.strQuotationNumber);
+      const matchesSearch = !searchQuery.trim() ||
+        strWarrantyNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        w.strQuotationNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        w.strCustomerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        w.strItemName?.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const dateValue = w.datExpiryDate || w.datQuotationDate;
+      const matchesFromDate = !fromDate || !dateValue || dateValue >= fromDate;
+      const matchesToDate = !toDate || !dateValue || dateValue <= toDate;
+
+      return matchesSearch && matchesFromDate && matchesToDate;
+    });
+  }, [warranties, searchQuery, fromDate, toDate]);
+
   // Paginated slices
   const quotationTotalPages = Math.max(1, Math.ceil(filteredQuotations.length / PAGE_SIZE));
   const invoiceTotalPages = Math.max(1, Math.ceil(filteredInvoices.length / PAGE_SIZE));
+  const warrantyTotalPages = Math.max(1, Math.ceil(filteredWarranties.length / PAGE_SIZE));
   const currentQuotationPage = Math.min(quotationPage, quotationTotalPages);
   const currentInvoicePage = Math.min(invoicePage, invoiceTotalPages);
+  const currentWarrantyPage = Math.min(warrantyPage, warrantyTotalPages);
   const pagedQuotations = useMemo(
     () => filteredQuotations.slice((currentQuotationPage - 1) * PAGE_SIZE, currentQuotationPage * PAGE_SIZE),
     [filteredQuotations, currentQuotationPage]
@@ -162,6 +219,10 @@ export default function Reports() {
   const pagedInvoices = useMemo(
     () => filteredInvoices.slice((currentInvoicePage - 1) * PAGE_SIZE, currentInvoicePage * PAGE_SIZE),
     [filteredInvoices, currentInvoicePage]
+  );
+  const pagedWarranties = useMemo(
+    () => filteredWarranties.slice((currentWarrantyPage - 1) * PAGE_SIZE, currentWarrantyPage * PAGE_SIZE),
+    [filteredWarranties, currentWarrantyPage]
   );
 
   // Build a windowed list of page numbers (with ellipsis) — max ~7 visible
@@ -362,6 +423,16 @@ export default function Reports() {
         >
           Invoices ({invoices.length})
         </button>
+        <button
+          onClick={() => { setActiveTab("warranty"); setSearchQuery(""); setFromDate(""); setToDate(""); }}
+          className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
+            activeTab === "warranty"
+              ? "bg-white text-neutral-900 shadow-sm"
+              : "text-neutral-500 hover:text-neutral-700"
+          }`}
+        >
+          Warranty ({warranties.length})
+        </button>
       </div>
 
       {/* Search & Date Filters */}
@@ -389,7 +460,11 @@ export default function Reports() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
           <Input
-            placeholder={activeTab === "quotations" ? "Search by Q number or customer..." : "Search by INV number..."}
+            placeholder={
+              activeTab === "quotations" ? "Search by Q number or customer..."
+              : activeTab === "invoices" ? "Search by INV number..."
+              : "Search by Q number, customer, or item..."
+            }
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 h-10 bg-white border-neutral-200"
@@ -417,7 +492,19 @@ export default function Reports() {
             <RefreshCw className={`w-4 h-4 ${isLoadingInvoices ? "animate-spin" : ""}`} />
           </Button>
         )}
+        {activeTab === "warranty" && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={fetchWarranties}
+            disabled={isLoadingWarranties}
+            className="h-10 w-10 shrink-0"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoadingWarranties ? "animate-spin" : ""}`} />
+          </Button>
+        )}
       </div>
+
 
       {/* Quotations List */}
       {activeTab === "quotations" && (
@@ -649,6 +736,106 @@ export default function Reports() {
             onChange={setInvoicePage}
             totalItems={filteredInvoices.length}
             itemLabel="invoices"
+          />
+        </>
+      )}
+
+      {/* Warranty Report */}
+      {activeTab === "warranty" && (
+        <>
+          {isLoadingWarranties ? (
+            <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
+              <Loader2 className="w-8 h-8 mx-auto text-neutral-400 animate-spin mb-4" />
+              <p className="text-sm text-neutral-500">Loading warranty report...</p>
+            </div>
+          ) : warrantyError ? (
+            <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
+              <ShieldX className="w-12 h-12 mx-auto text-red-300 mb-4" />
+              <h3 className="font-medium text-neutral-900 mb-1">Error loading warranties</h3>
+              <p className="text-sm text-neutral-500 mb-4">{warrantyError}</p>
+              <Button variant="outline" onClick={fetchWarranties}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          ) : filteredWarranties.length === 0 ? (
+            <div className="bg-white border border-neutral-200 rounded-xl p-6 sm:p-12 text-center">
+              <ShieldCheck className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-neutral-300 mb-3 sm:mb-4" />
+              <h3 className="font-medium text-neutral-900 mb-1">No warranty items</h3>
+              <p className="text-sm text-neutral-500">
+                {warranties.length === 0
+                  ? "Warranty items will appear here once you add warranty periods to quotation items"
+                  : "Try a different search, status, or date range"}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+              {/* Table Header - Desktop */}
+              <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-neutral-50 border-b border-neutral-200 text-xs font-medium text-neutral-500 uppercase">
+                <div className="col-span-3">Warranty No.</div>
+                <div className="col-span-3">Customer</div>
+                <div className="col-span-3">Item</div>
+                <div className="col-span-1">Period</div>
+                <div className="col-span-2 text-right">Expiry</div>
+              </div>
+
+              {/* Items */}
+              {pagedWarranties.map((w, index) => {
+                const period = `${w.intWarrantyYears || 0}Y ${w.intWarrantyMonths || 0}M ${w.intWarrantyDays || 0}D`;
+                const strWarrantyNumber = toWarrantyNumber(w.strQuotationNumber);
+
+                return (
+                  <div
+                    key={w.intPkQuotationItemId}
+                    onClick={() => {
+                      if (!canWarranty) return;
+                      navigate(`/warranty?sourceType=quotation&sourceId=${w.intPkQuotationId}`);
+                    }}
+                    className={`grid grid-cols-12 gap-4 px-4 py-3 items-center transition-colors ${
+                      canWarranty ? "hover:bg-neutral-50 cursor-pointer" : "cursor-default"
+                    } ${index !== pagedWarranties.length - 1 ? "border-b border-neutral-100" : ""}`}
+                  >
+                    {/* Mobile: stacked summary */}
+                    <div className="col-span-8 md:col-span-3">
+                      <p className="font-medium text-neutral-900 text-sm">{strWarrantyNumber}</p>
+                      <p className="text-xs text-neutral-500 md:hidden">{w.strCustomerName}</p>
+                      <p className="text-xs text-neutral-500 md:hidden truncate">{w.strItemName}</p>
+                    </div>
+
+                    <div className="hidden md:block col-span-3 text-sm text-neutral-700 truncate">
+                      {w.strCustomerName}
+                    </div>
+
+                    <div className="hidden md:block col-span-3 text-sm text-neutral-700 truncate">
+                      {w.strItemName}
+                      {w.strItemCode && <span className="text-neutral-400 ml-1">({w.strItemCode})</span>}
+                    </div>
+
+                    <div className="hidden md:block col-span-1 text-xs text-neutral-500">
+                      {period}
+                    </div>
+
+                    <div className="col-span-4 md:col-span-2 text-right text-sm text-neutral-700">
+                      {formatDate(w.datExpiryDate)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {filteredWarranties.length > 0 && warrantyTotalPages <= 1 && (
+            <p className="text-sm text-neutral-500 mt-3">
+              Showing {filteredWarranties.length} warranty item{filteredWarranties.length !== 1 ? "s" : ""}
+            </p>
+          )}
+
+          <Pagination
+            currentPage={currentWarrantyPage}
+            totalPages={warrantyTotalPages}
+            onChange={setWarrantyPage}
+            totalItems={filteredWarranties.length}
+            itemLabel="items"
           />
         </>
       )}
