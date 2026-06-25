@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Minus, X, Loader2, ChevronRight, Search, Printer, FilePlus, Calendar, Check, FileText, ShieldCheck, GripVertical } from "lucide-react";
+import { ArrowLeft, Plus, Minus, X, Loader2, ChevronRight, Search, Printer, FilePlus, Calendar, Check, FileText, ShieldCheck, GripVertical, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -74,6 +74,9 @@ export default function NewQuotation() {
 
   // Loading state for edit mode
   const [isLoadingQuotation, setIsLoadingQuotation] = useState(false);
+
+  // Duplicate mode: tracks which quotation's items were copied
+  const [duplicatedFrom, setDuplicatedFrom] = useState(null);
 
   // Inventory data from API
   const [inventoryItems, setInventoryItems] = useState([]);
@@ -183,6 +186,50 @@ export default function NewQuotation() {
 
     fetchQuotation();
   }, [isEditMode, editId, navigate]);
+
+  // Duplicate mode: load items from source quotation (no customer details)
+  useEffect(() => {
+    const duplicateId = searchParams.get("duplicate");
+    if (!duplicateId || isEditMode) return;
+
+    // Wipe any state carried over  from the previous edit-mode render
+    clearDraft();
+    setSavedQuotation(null);
+    setIsUpdated(false);
+    setCustomerName("");
+    setCustomerPhone("");
+    setCustomerAddress("");
+    setRawInput("");
+
+    const fetchDuplicate = async () => {
+      setIsLoadingQuotation(true);
+      try {
+        const response = await quotationService.get(parseInt(duplicateId));
+        if (response.intStatus === 1 && response.data) {
+          const q = response.data;
+          const uiItems = (q.lstItems || []).map((item, i) => ({
+            id: Date.now() + i,
+            inventoryId: item.intInventoryId,
+            code: item.strItemCode,
+            name: item.strItemName,
+            unit: item.strUnit,
+            qty: item.dblQuantity,
+            rate: item.dblUnitPrice,
+            fromInventory: !!item.intInventoryId,
+          }));
+          setItems(uiItems);
+          setDuplicatedFrom(q.strQuotationNumber);
+          setShowForm(true);
+        }
+      } catch (error) {
+        console.error("Failed to load source quotation for duplicate:", error);
+      } finally {
+        setIsLoadingQuotation(false);
+      }
+    };
+
+    fetchDuplicate();
+  }, [searchParams, isEditMode]);
 
   // Current date
   const today = new Date().toLocaleDateString("en-IN", {
@@ -704,6 +751,21 @@ Example:
             <ArrowLeft className="w-5 h-5 text-neutral-600" />
           </button>
 
+          <div className="flex items-center gap-2">
+          {/* Copy button - visible only when viewing a saved quotation */}
+          {isEditMode && (
+            <Button
+              onClick={() => navigate(`/quotations/new?mode=manual&duplicate=${editId}`)}
+              variant="outline"
+              size="sm"
+              className="h-9 px-3 border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+              title="Copy items to new quotation"
+            >
+              <Copy className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Copy</span>
+            </Button>
+          )}
+
           {/* New button - always visible to clear and start fresh */}
           <Button
             onClick={() => {
@@ -728,6 +790,7 @@ Example:
             <FilePlus className="w-4 h-4 mr-1.5" />
             New
           </Button>
+          </div>
         </div>
 
         {/* Quotation Info Bar */}
@@ -808,6 +871,14 @@ Example:
               </div>
             </div>
           </div>
+
+          {/* Duplicated-from banner */}
+          {duplicatedFrom && (
+            <div className="flex items-center gap-2 px-3 py-2 mb-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+              <Copy className="w-4 h-4 shrink-0" />
+              Items copied from <span className="font-semibold">{duplicatedFrom}</span>
+            </div>
+          )}
 
           {/* Inventory Search — only for users with inventory access; others type items manually below */}
           {canInventory && (
