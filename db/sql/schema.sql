@@ -346,6 +346,11 @@ CREATE TABLE tbl_print_model_settings (
     vchr_qr_link                     VARCHAR(500) DEFAULT NULL,
     vchr_qr_label                    VARCHAR(100) DEFAULT 'Scan to Pay',
     txt_footer_custom_html           TEXT         DEFAULT NULL,
+    vchr_qr_image_path               VARCHAR(500) DEFAULT NULL,
+
+    -- ── Footer side note (free text, right column next to signature/QR —
+    --    e.g. bank details, UPI id, anything) ───────────────────
+    txt_footer_side_html             TEXT         DEFAULT NULL,
 
     -- ── Timestamps ─────────────────────────────────────────────
     tim_created_at                   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,

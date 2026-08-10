@@ -1,4 +1,5 @@
 import json
+
 from app.core.baseSchema import ResponseStatus
 from app.api.print_settings.schema import (
     MdlPrintSettingsResponse,
@@ -6,6 +7,7 @@ from app.api.print_settings.schema import (
     MdlColumnConfig,
 )
 from app.core.logger import getUserLogger
+from app.core.qr import fnGenerateQrImage, fnDeleteQrImage
 
 
 class ClsPrintSettingsService:
@@ -51,6 +53,8 @@ class ClsPrintSettingsService:
             vchQrLink=row["vchr_qr_link"],
             vchQrLabel=row["vchr_qr_label"],
             txtFooterCustomHtml=row["txt_footer_custom_html"],
+            vchQrImagePath=row["vchr_qr_image_path"],
+            txtFooterSideHtml=row["txt_footer_side_html"],
         )
 
     # ── GET settings for current user + module ──────────────────
@@ -83,6 +87,14 @@ class ClsPrintSettingsService:
 
         strModule = (mdlReq.vchModule or "QUOTATION").upper()
 
+        # QR image is server-generated (not client-supplied) — regenerate on
+        # save when enabled+linked, otherwise drop any previously saved file.
+        if mdlReq.blnQrEnabled and mdlReq.vchQrLink:
+            qr_image_path = fnGenerateQrImage(mdlReq.vchQrLink, self.intUserId, strModule)
+        else:
+            fnDeleteQrImage(self.intUserId, strModule)
+            qr_image_path = None
+
         async with self.objPool.acquire() as conn:
             row = await conn.fetchrow(
                 """
@@ -99,9 +111,9 @@ class ClsPrintSettingsService:
                     bln_show_signature, vchr_signature_url,
                     int_signature_width, int_signature_height,
                     bln_qr_enabled, vchr_qr_link, vchr_qr_label,
-                    txt_footer_custom_html
+                    txt_footer_custom_html, vchr_qr_image_path, txt_footer_side_html
                 ) VALUES (
-                    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28
+                    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30
                 )
                 ON CONFLICT (fk_bint_user_id, vchr_module) DO UPDATE SET
                     vchr_primary_color   = EXCLUDED.vchr_primary_color,
@@ -129,7 +141,9 @@ class ClsPrintSettingsService:
                     bln_qr_enabled       = EXCLUDED.bln_qr_enabled,
                     vchr_qr_link         = EXCLUDED.vchr_qr_link,
                     vchr_qr_label        = EXCLUDED.vchr_qr_label,
-                    txt_footer_custom_html = EXCLUDED.txt_footer_custom_html
+                    txt_footer_custom_html = EXCLUDED.txt_footer_custom_html,
+                    vchr_qr_image_path   = EXCLUDED.vchr_qr_image_path,
+                    txt_footer_side_html = EXCLUDED.txt_footer_side_html
                 RETURNING *
                 """,
                 self.intUserId,
@@ -160,6 +174,8 @@ class ClsPrintSettingsService:
                 mdlReq.vchQrLink,
                 mdlReq.vchQrLabel,
                 mdlReq.txtFooterCustomHtml,
+                qr_image_path,
+                mdlReq.txtFooterSideHtml,
             )
 
         self.logger.info(f"Print model settings saved/updated for module={strModule}")

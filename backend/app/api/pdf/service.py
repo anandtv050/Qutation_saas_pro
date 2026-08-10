@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 import io
 import json
 from pathlib import Path
+from urllib.parse import urlparse
 
 # ── column registry: maps column key → DB field per module ──────
 MODULE_COLUMN_REGISTRY = {
@@ -136,6 +137,103 @@ class ClsPdfGenerator:
         ]))
         elements.append(box_tbl)
 
+    def _build_footer_side_flowables(self, styles):
+        """Return right-column flowables for free-form text (bank details,
+        UPI id, anything). Each line becomes its own Paragraph, so ReportLab's
+        mini-markup (<b>, <i>, <br/>) works the same as txt_footer_custom_html."""
+        text = self._clean_text(self._setting("txt_footer_side_html"))
+        if not text:
+            return []
+        stSide = ParagraphStyle(
+            "footerSide", parent=styles["Normal"],
+            fontSize=8, fontName="Helvetica", textColor=TEXT_MUTED,
+            alignment=TA_RIGHT, leading=11,
+        )
+        return [Paragraph(ln.strip(), stSide) for ln in text.splitlines() if ln.strip()]
+
+    def _build_qr_flowables(self, styles):
+        """Return right-column flowables for the saved QR image + its label.
+        Empty list if QR is disabled or no image was saved."""
+        if not self._setting_bool("bln_qr_enabled", False):
+            return []
+        qr_path = self._asset_path_or_url(self._setting("vchr_qr_image_path"))
+        if not qr_path:
+            return []
+        try:
+            stQrLabel = ParagraphStyle(
+                "qrLabel", parent=styles["Normal"],
+                fontSize=8, fontName="Helvetica", textColor=TEXT_MUTED,
+                alignment=TA_RIGHT, spaceBefore=3,
+            )
+            label = self._clean_text(self._setting("vchr_qr_label")) or "Scan to Pay"
+            return [Image(qr_path, width=72, height=72, hAlign="RIGHT"), Paragraph(label, stQrLabel)]
+        except Exception:
+            return []
+
+    def _build_footer_section(self, elements, styles, terms_heading="Terms & Conditions"):
+        """Two-column footer, matching the Print Model Settings live preview:
+        Terms & footer note on the left; Signature, footer side-note, and QR
+        stacked on the right. Replaces the old single-column vertical flow."""
+        terms_lines = self._footer_terms_lines()
+        footer_note = self._clean_text(self._setting("txt_footer_note"))
+
+        stTermsHead = ParagraphStyle(
+            "ftTermsHead", parent=styles["Normal"],
+            fontSize=8, fontName="Helvetica-Bold", textColor=TEXT_DARK, spaceAfter=4,
+        )
+        stTermsItem = ParagraphStyle(
+            "ftTermsItem", parent=styles["Normal"],
+            fontSize=8.5, fontName="Helvetica", textColor=TEXT_MUTED, spaceAfter=2, leading=11,
+        )
+        left = []
+        if terms_lines:
+            left.append(Paragraph(terms_heading, stTermsHead))
+            for ln in terms_lines:
+                left.append(Paragraph(f"• {ln}", stTermsItem))
+            left.append(Spacer(1, 6))
+        if footer_note:
+            left.append(Paragraph(footer_note, stTermsItem))
+
+        right = []
+        if self._setting_bool("bln_show_signature", False):
+            sig = self._asset_path_or_url(self._setting("vchr_signature_url"))
+            if sig:
+                try:
+                    sig_w = float(self._setting("int_signature_width", 180) or 180)
+                    sig_h = float(self._setting("int_signature_height", 56) or 56)
+                    stSignLbl = ParagraphStyle(
+                        "ftSignLbl", parent=styles["Normal"],
+                        fontSize=8, fontName="Helvetica-Bold", textColor=TEXT_DARK,
+                        alignment=TA_RIGHT, spaceAfter=3,
+                    )
+                    right.append(Paragraph("Authorized Signature", stSignLbl))
+                    right.append(Image(sig, width=min(sig_w, 220), height=min(sig_h, 90), hAlign="RIGHT"))
+                    right.append(Spacer(1, 10))
+                except Exception:
+                    pass
+
+        side_flowables = self._build_footer_side_flowables(styles)
+        if side_flowables:
+            right.extend(side_flowables)
+            right.append(Spacer(1, 8))
+        right.extend(self._build_qr_flowables(styles))
+
+        if not left and not right:
+            return
+        left = left or [Paragraph("", stTermsItem)]
+        right = right or [Paragraph("", stTermsItem)]
+
+        footer_tbl = Table([[left, right]], colWidths=[300, 210])
+        footer_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        elements.append(footer_tbl)
+
     def _build_preview_style_header(
         self,
         *,
@@ -243,7 +341,8 @@ class ClsPdfGenerator:
                 "bln_show_subtotal, bln_show_tax, bln_show_discount, bln_show_grand_total, "
                 "bln_show_signature, vchr_signature_url, int_signature_width, int_signature_height, "
                 "txt_terms_text, txt_footer_note, txt_footer_custom_html, "
-                "bln_qr_enabled, vchr_qr_link, vchr_qr_label, "
+                "bln_qr_enabled, vchr_qr_link, vchr_qr_label, vchr_qr_image_path, "
+                "txt_footer_side_html, "
                 "jsonb_columns "
                 "FROM tbl_print_model_settings WHERE fk_bint_user_id = $1 AND vchr_module = $2",
                 self.intUserId, strModule,
@@ -460,7 +559,6 @@ class ClsPdfGenerator:
         styles = getSampleStyleSheet()
         elements = []
         doc_title = self._setting("vchr_header_title", "QUOTATION") or "QUOTATION"
-        terms_lines = self._footer_terms_lines()
         elements.extend(self._build_preview_style_header(
             styles=styles,
             business_name=strBusinessName,
@@ -619,40 +717,8 @@ class ClsPdfGenerator:
         else:
             elements.append(Spacer(1, 22))
 
-        # ── footer terms / note from DB settings ────────────────
-        stTermsHead = ParagraphStyle(
-            "qTermsHead", parent=styles["Normal"],
-            fontSize=8, fontName="Helvetica-Bold",
-            textColor=TEXT_DARK, spaceAfter=4,
-        )
-        stTermsItem = ParagraphStyle(
-            "qTermsItem", parent=styles["Normal"],
-            fontSize=8.5, fontName="Helvetica",
-            textColor=TEXT_MUTED, spaceAfter=2, leading=11,
-        )
-        if terms_lines:
-            elements.append(Paragraph("Terms & Conditions", stTermsHead))
-            for ln in terms_lines:
-                elements.append(Paragraph(f"• {ln}", stTermsItem))
-            elements.append(Spacer(1, 6))
-
-        footer_note = self._setting("txt_footer_note", "")
-        if footer_note:
-            elements.append(Paragraph(str(footer_note), stTermsItem))
-
-        # signature block
-        if self._setting_bool("bln_show_signature", False):
-            sig = self._asset_path_or_url(self._setting("vchr_signature_url"))
-            if sig:
-                try:
-                    sig_w = float(self._setting("int_signature_width", 180) or 180)
-                    sig_h = float(self._setting("int_signature_height", 56) or 56)
-                    elements.append(Spacer(1, 10))
-                    elements.append(Paragraph("Authorized Signature", stTermsHead))
-                    elements.append(Image(sig, width=min(sig_w, 220), height=min(sig_h, 90)))
-                except Exception:
-                    pass
-
+        # ── footer: two-column layout (terms/note left, signature/side-note/QR right) ──
+        self._build_footer_section(elements, styles)
         self._build_footer_box(elements)
 
         # ── 3. Build with header/footer on every page ───────────
@@ -766,7 +832,6 @@ class ClsPdfGenerator:
         styles = getSampleStyleSheet()
         elements = []
         doc_title = self._setting("vchr_header_title", "INVOICE") or "INVOICE"
-        terms_lines = self._footer_terms_lines()
         elements.extend(self._build_preview_style_header(
             styles=styles,
             business_name=strBusinessName,
@@ -1052,40 +1117,8 @@ class ClsPdfGenerator:
             elements.append(Paragraph(strNotes, stNotesBody))
             elements.append(Spacer(1, 10))
 
-        # ── footer terms / note from DB settings ────────────────
-        stNote = ParagraphStyle(
-            "iNote", parent=styles["Normal"],
-            fontSize=9, fontName="Helvetica",
-            textColor=TEXT_MUTED, spaceAfter=3, leading=12,
-        )
-        if terms_lines:
-            elements.append(Paragraph("Terms & Conditions", ParagraphStyle(
-                "iTermsHead", parent=styles["Normal"],
-                fontSize=8, fontName="Helvetica-Bold", textColor=TEXT_DARK, spaceAfter=4,
-            )))
-            for ln in terms_lines:
-                elements.append(Paragraph(f"• {ln}", stNote))
-            elements.append(Spacer(1, 6))
-
-        footer_note = self._setting("txt_footer_note", "")
-        if footer_note:
-            elements.append(Paragraph(str(footer_note), stNote))
-
-        if self._setting_bool("bln_show_signature", False):
-            sig = self._asset_path_or_url(self._setting("vchr_signature_url"))
-            if sig:
-                try:
-                    sig_w = float(self._setting("int_signature_width", 180) or 180)
-                    sig_h = float(self._setting("int_signature_height", 56) or 56)
-                    elements.append(Spacer(1, 10))
-                    elements.append(Paragraph("Authorized Signature", ParagraphStyle(
-                        "iSignLbl", parent=styles["Normal"],
-                        fontSize=8, fontName="Helvetica-Bold", textColor=TEXT_DARK, spaceAfter=3,
-                    )))
-                    elements.append(Image(sig, width=min(sig_w, 220), height=min(sig_h, 90)))
-                except Exception:
-                    pass
-
+        # ── footer: two-column layout (terms/note left, signature/side-note/QR right) ──
+        self._build_footer_section(elements, styles)
         self._build_footer_box(elements)
 
         # ── 3. Build with header/footer ─────────────────────────
@@ -1362,40 +1395,8 @@ class ClsPdfGenerator:
         elements.append(tbl)
         elements.append(Spacer(1, 20))
 
-        stNote = ParagraphStyle(
-            "wNote", parent=styles["Normal"],
-            fontSize=9, fontName="Helvetica",
-            textColor=TEXT_MUTED, spaceAfter=3, leading=12,
-        )
-        terms_lines = self._footer_terms_lines()
-        if terms_lines:
-            elements.append(Paragraph("Warranty Terms", ParagraphStyle(
-                "wTermsHead", parent=styles["Normal"],
-                fontSize=8, fontName="Helvetica-Bold", textColor=TEXT_DARK, spaceAfter=4,
-            )))
-            for ln in terms_lines:
-                elements.append(Paragraph(f"• {ln}", stNote))
-            elements.append(Spacer(1, 6))
-
-        footer_note = self._setting("txt_footer_note", "")
-        if footer_note:
-            elements.append(Paragraph(str(footer_note), stNote))
-
-        if self._setting_bool("bln_show_signature", False):
-            sig = self._asset_path_or_url(self._setting("vchr_signature_url"))
-            if sig:
-                try:
-                    sig_w = float(self._setting("int_signature_width", 180) or 180)
-                    sig_h = float(self._setting("int_signature_height", 56) or 56)
-                    elements.append(Spacer(1, 10))
-                    elements.append(Paragraph("Authorized Signature", ParagraphStyle(
-                        "wSignLbl", parent=styles["Normal"],
-                        fontSize=8, fontName="Helvetica-Bold", textColor=TEXT_DARK, spaceAfter=3,
-                    )))
-                    elements.append(Image(sig, width=min(sig_w, 220), height=min(sig_h, 90)))
-                except Exception:
-                    pass
-
+        # ── footer: two-column layout (terms/note left, signature/side-note/QR right) ──
+        self._build_footer_section(elements, styles, terms_heading="Warranty Terms")
         self._build_footer_box(elements)
 
         def on_page(cvs, doc_ref):

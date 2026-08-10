@@ -51,6 +51,8 @@ __pycache__/
 *.db
 *.sqlite
 *.sqlite3
+*.dump
+db/backups/
 
 # Temporary files
 *.tmp
@@ -63,3 +65,6 @@ coverage/
 # Cache
 .cache/
 .eslintcache
+
+# Runtime-generated uploads (regenerated automatically, not source)
+backend/uploads/qrcodes/

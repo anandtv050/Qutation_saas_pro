@@ -3,13 +3,15 @@ import { useNavigate } from "react-router-dom";
 import {
   Palette, Type, Image, ToggleLeft, Columns3, FileText,
   PenTool, QrCode, ChevronUp, ChevronDown, Save, RotateCcw,
-  Loader2, Settings2, Code,
+  Loader2, Settings2, Code, Landmark,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { QRCodeSVG } from "qrcode.react";
 import printSettingsService from "@/services/printSettingsService";
 import userService from "@/services/userService";
+
 
 /* ── module column registry ──────────────────────────────────── */
 const MODULE_COLUMNS = {
@@ -72,7 +74,8 @@ function getDefaultSettings(module = "QUOTATION") {
       footerNote: "Thank you for your business.",
       showSignature: true, signatureUrl: "",
       signatureWidth: 180, signatureHeight: 56,
-      qr: { enabled: false, link: "", label: "Scan to Pay" },
+      qr: { enabled: false, link: "", label: "Scan to Pay", imagePath: "" },
+      sideHtml: "",
       customHtml: "",
     },
   };
@@ -167,7 +170,8 @@ function apiToLocal(d) {
       showSignature: d.blnShowSignature,
       signatureUrl: d.vchSignatureUrl || "",
       signatureWidth: d.intSignatureWidth, signatureHeight: d.intSignatureHeight,
-      qr: { enabled: d.blnQrEnabled, link: d.vchQrLink || "", label: d.vchQrLabel || "" },
+      qr: { enabled: d.blnQrEnabled, link: d.vchQrLink || "", label: d.vchQrLabel || "", imagePath: d.vchQrImagePath || "" },
+      sideHtml: d.txtFooterSideHtml || "",
       customHtml: d.txtFooterCustomHtml || "",
     },
   };
@@ -202,6 +206,7 @@ function localToApi(s) {
     blnQrEnabled: s.footer.qr.enabled,
     vchQrLink: s.footer.qr.link || null,
     vchQrLabel: s.footer.qr.label || "Scan to Pay",
+    txtFooterSideHtml: s.footer.sideHtml || null,
     txtFooterCustomHtml: s.footer.customHtml || null,
   };
 }
@@ -276,6 +281,7 @@ export default function PrintModelSettings() {
 
   const eff = useMemo(() => normalizeSettings(settings, activeModule), [settings, activeModule]);
   const validation = useMemo(() => validateSettings(eff), [eff]);
+  const qrPreviewValue = useMemo(() => eff.footer.qr.link.trim(), [eff.footer.qr.link]);
 
 
   const totals = { subtotal: 21000, taxAmount: 2100, discountAmount: 500, grandTotal: 22600 };
@@ -640,6 +646,18 @@ export default function PrintModelSettings() {
                   <Input value={eff.footer.qr.link} onChange={(e) => updateFooterQr("link", e.target.value)} placeholder="https://..." className="text-sm" />
                   <label className="block text-xs font-medium text-neutral-600 mb-1 mt-3">QR Label</label>
                   <Input value={eff.footer.qr.label} onChange={(e) => updateFooterQr("label", e.target.value)} className="text-sm" />
+                  <p className="text-[10px] text-neutral-400 mt-2">Preview only — the QR image is generated and saved when you click Save Settings.</p>
+                </Panel>
+
+                <Panel title="Footer Side Note" icon={Landmark}>
+                  <p className="text-[10px] text-neutral-400 mb-2">Free text shown next to the signature/QR (one line per row) — bank details, UPI id, anything.</p>
+                  <Textarea
+                    rows={4}
+                    value={eff.footer.sideHtml}
+                    onChange={(e) => updateFooter("sideHtml", e.target.value)}
+                    placeholder={"Account Name: Future Technologies\nAccount Number: 1233333333313341324\nIFSC: ADAF0032434\nBranch: Kozhikode West"}
+                    className="text-xs"
+                  />
                 </Panel>
 
                 <Panel title="Extra Footer Info" icon={Code}>
@@ -769,12 +787,30 @@ export default function PrintModelSettings() {
                       )}
                     </div>
                   )}
-                  {eff.footer.qr.enabled && eff.footer.qr.link && (
-                    <div className="border border-neutral-200 rounded-lg p-2 w-[130px] text-center">
-                      <div className="w-full aspect-square bg-neutral-100 rounded grid place-items-center text-[10px] text-neutral-400">QR Preview</div>
-                      <p className="text-[11px] text-neutral-600 mt-1">{eff.footer.qr.label}</p>
+                  {eff.footer.sideHtml.trim() && (
+                    <div className="text-right w-[220px]">
+                      {eff.footer.sideHtml.split("\n").map((l) => l.trim()).filter(Boolean).map((l, i) => (
+                        <p key={i} className="text-[11px] text-neutral-600">{l}</p>
+                      ))}
                     </div>
                   )}
+                  {eff.footer.qr.enabled && qrPreviewValue && (
+  <div className="border border-neutral-200 rounded-lg p-2 w-[130px] text-center bg-white">
+    <div className="inline-flex bg-white rounded p-2">
+      <QRCodeSVG
+        value={qrPreviewValue}
+        size={96}
+        bgColor="#FFFFFF"
+        fgColor="#111827"
+        level="M"
+        includeMargin={true}
+      />
+    </div>
+    <p className="text-[11px] text-neutral-600 mt-1">
+      {eff.footer.qr.label || "Scan to Pay"}
+    </p>
+  </div>
+)}
                 </div>
               </footer>
 

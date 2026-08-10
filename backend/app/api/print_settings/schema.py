@@ -67,6 +67,9 @@ class MdlSavePrintSettingsRequest(MdlBaseRequest):
     vchQrLabel: str = "Scan to Pay"
     txtFooterCustomHtml: Optional[str] = None
 
+    # Footer side note (free text, right column next to signature/QR)
+    txtFooterSideHtml: Optional[str] = None
+
 
 # ── Data model returned from DB ─────────────────────────────────
 class MdlPrintSettingsData(BaseModel):
@@ -111,6 +114,10 @@ class MdlPrintSettingsData(BaseModel):
     vchQrLink: Optional[str] = None
     vchQrLabel: str
     txtFooterCustomHtml: Optional[str] = None
+    vchQrImagePath: Optional[str] = None
+
+    # Footer side note (free text, right column next to signature/QR)
+    txtFooterSideHtml: Optional[str] = None
 
 
 # ── Responses ───────────────────────────────────────────────────
