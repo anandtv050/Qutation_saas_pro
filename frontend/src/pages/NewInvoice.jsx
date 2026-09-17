@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Loader2, Printer, Calendar, Check, Share2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Loader2, Printer, Calendar, Check, Share2, ShieldCheck, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import invoiceService from "@/services/invoiceService";
@@ -35,6 +35,7 @@ const saveDraft = (data) => {
 export default function NewInvoice() {
   const navigate = useNavigate();
   const canWarranty = usePermission("warranty");
+  const canAdvanceReceipt = usePermission("advance_receipt");
   const canReports = usePermission("reports");
   const safeBack = canReports ? "/reports" : "/dashboard";
   const location = useLocation();
@@ -938,6 +939,16 @@ export default function NewInvoice() {
                       Warranty Certificate
                     </Button>
                   )}
+                  {canAdvanceReceipt && (
+                    <Button
+                      onClick={() => navigate(`/advance-receipts?sourceType=invoice&sourceId=${getInvoiceSourceId()}`)}
+                      variant="outline"
+                      className="w-full h-11 border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-lg font-medium"
+                    >
+                      <Receipt className="w-4 h-4 mr-2" />
+                      Advance Receipt
+                    </Button>
+                  )}
                   {/* Share */}
                   <Button
                     onClick={handleShare}
@@ -999,6 +1010,15 @@ export default function NewInvoice() {
                 >
                   <ShieldCheck className="w-4 h-4 mr-1" />
                   Warranty
+                </Button>
+              )}
+              {canAdvanceReceipt && (
+                <Button
+                  onClick={() => navigate(`/advance-receipts?sourceType=invoice&sourceId=${getInvoiceSourceId()}`)}
+                  className="h-11 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium shrink-0"
+                >
+                  <Receipt className="w-4 h-4 mr-1" />
+                  Receipt
                 </Button>
               )}
               {/* Share */}

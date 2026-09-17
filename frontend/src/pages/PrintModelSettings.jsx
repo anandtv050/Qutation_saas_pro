@@ -38,6 +38,8 @@ const MODULE_COLUMNS = {
     implementation_date: { label: "Implementation Date", defaultWidth: 20 },
     expiry_date:         { label: "Expiry Date",         defaultWidth: 20 },
   },
+  // A receipt is a single record, not an item table — no columns to configure.
+  ADVANCE_RECEIPT: {},
 };
 
 function getColumnMeta(module) {
@@ -55,21 +57,32 @@ function getDefaultSettings(module = "QUOTATION") {
   return {
     theme: { primaryColor: "#1f2a67", accentColor: "#0ea5a4" },
     header: {
-      title: module === "WARRANTY" ? "WARRANTY CERTIFICATE" : module,
+      title: module === "WARRANTY" ? "WARRANTY CERTIFICATE"
+           : module === "ADVANCE_RECEIPT" ? "CASH RECEIPT"
+           : module,
       showCompanyName: true, showPhone: true, showEmail: true, showAddress: true,
       logoUrl: "", logoWidth: 160, logoHeight: 64,
       customHtml: "",
     },
     body: {
       columns: getDefaultColumns(module),
-      showSubtotal: module !== "WARRANTY",
-      showTax: module !== "WARRANTY",
-      showDiscount: module !== "WARRANTY",
-      showGrandTotal: module !== "WARRANTY",
+      // For ADVANCE_RECEIPT these 4 generic toggles are repurposed as the
+      // receipt's own field-visibility switches (no item table, so the
+      // subtotal/tax/discount/grand-total meaning doesn't apply there):
+      //   showSubtotal   -> "Show Amount in Words"
+      //   showTax        -> "Show Payment Mode"
+      //   showDiscount   -> "Show Amount Due / Balance Summary"
+      //   showGrandTotal -> "Show 'For Payment Of'"
+      showSubtotal: module === "ADVANCE_RECEIPT" ? true : module !== "WARRANTY",
+      showTax: module === "ADVANCE_RECEIPT" ? true : module !== "WARRANTY",
+      showDiscount: module === "ADVANCE_RECEIPT" ? true : module !== "WARRANTY",
+      showGrandTotal: module === "ADVANCE_RECEIPT" ? true : module !== "WARRANTY",
     },
     footer: {
       termsText: module === "WARRANTY"
         ? "Warranty is void if product is physically damaged\nKeep this certificate for future reference"
+        : module === "ADVANCE_RECEIPT"
+        ? "This receipt is valid subject to realization of payment."
         : "50% advance payment required\nWarranty: 1 year on all products\nInstallation within 5 working days",
       footerNote: "Thank you for your business.",
       showSignature: true, signatureUrl: "",
@@ -129,12 +142,17 @@ function normalizeSettings(raw, module = "QUOTATION") {
   return merged;
 }
 
-function validateSettings(s) {
+function validateSettings(s, module) {
   const issues = [];
   const vis = s.body.columns.filter((c) => c.visible);
   const wt = vis.reduce((sum, c) => sum + Number(c.widthPct || 0), 0);
-  if (vis.length === 0) issues.push("At least one column must stay visible.");
-  if (Math.round(wt) !== 100) issues.push(`Visible column widths must total 100%. Current: ${wt}%.`);
+  // Modules with no item table (e.g. ADVANCE_RECEIPT — a single-record
+  // document, not a line-item list) have nothing to configure here.
+  const hasConfigurableColumns = Object.keys(getColumnMeta(module)).length > 0;
+  if (hasConfigurableColumns) {
+    if (vis.length === 0) issues.push("At least one column must stay visible.");
+    if (Math.round(wt) !== 100) issues.push(`Visible column widths must total 100%. Current: ${wt}%.`);
+  }
   if (s.footer.qr.enabled && !s.footer.qr.link.trim()) issues.push("QR link is required when QR code is enabled.");
   return { isValid: issues.length === 0, issues, widthTotal: wt };
 }
@@ -223,7 +241,8 @@ export default function PrintModelSettings() {
     if (userInfo.intUserId !== 1) navigate("/dashboard", { replace: true });
   }, [navigate]);
 
-  const MODULES = ["QUOTATION", "INVOICE", "WARRANTY"];
+  const MODULES = ["QUOTATION", "INVOICE", "WARRANTY", "ADVANCE_RECEIPT"];
+  const MODULE_TAB_LABEL = { ADVANCE_RECEIPT: "RECEIPT" };
   const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [activeModule, setActiveModule] = useState("QUOTATION");
@@ -280,7 +299,7 @@ export default function PrintModelSettings() {
   }, [toast]);
 
   const eff = useMemo(() => normalizeSettings(settings, activeModule), [settings, activeModule]);
-  const validation = useMemo(() => validateSettings(eff), [eff]);
+  const validation = useMemo(() => validateSettings(eff, activeModule), [eff, activeModule]);
   const qrPreviewValue = useMemo(() => eff.footer.qr.link.trim(), [eff.footer.qr.link]);
 
 
@@ -422,7 +441,7 @@ export default function PrintModelSettings() {
                       : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
                   }`}
                 >
-                  {m}
+                  {MODULE_TAB_LABEL[m] || m}
                 </button>
               ))}
             </div>
@@ -556,55 +575,80 @@ export default function PrintModelSettings() {
             {/* ── BODY TAB ────────────────────────────────────── */}
             {activeTab === "body" && (
               <>
-                <Panel title="Column Controls" icon={Columns3}>
-                  <p className={`text-xs font-medium mb-2 ${Math.round(validation.widthTotal) === 100 ? "text-emerald-600" : "text-red-600"}`}>
-                    Visible width total: {validation.widthTotal}%
-                  </p>
-                  <div className="space-y-2">
-                    {[...eff.body.columns].sort((a, b) => a.order - b.order).map((col, idx, list) => (
-                      <div key={col.key} className="grid grid-cols-[1fr_60px_28px_28px] gap-1.5 items-center">
-                        <label className="flex items-center gap-2 text-xs font-medium text-neutral-700">
-                          <input
-                            type="checkbox"
-                            className="w-3.5 h-3.5 rounded"
-                            checked={col.visible}
-                            onChange={(e) => updateColumn(col.key, { visible: e.target.checked })}
-                          />
-                          {getColumnMeta(activeModule)[col.key]?.label || col.key}
-                        </label>
-                        <Input
-                          type="number" min={0} max={100}
-                          value={col.widthPct}
-                          onChange={(e) => updateColumn(col.key, { widthPct: Number(e.target.value) || 0 })}
-                          className="text-xs text-center h-7 px-1"
-                        />
-                        <button
-                          onClick={() => moveColumn(col.key, "up")}
-                          disabled={idx === 0}
-                          className="h-7 w-7 flex items-center justify-center rounded border border-neutral-200 hover:bg-neutral-50 disabled:opacity-30"
-                        >
-                          <ChevronUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => moveColumn(col.key, "down")}
-                          disabled={idx === list.length - 1}
-                          className="h-7 w-7 flex items-center justify-center rounded border border-neutral-200 hover:bg-neutral-50 disabled:opacity-30"
-                        >
-                          <ChevronDown className="w-3.5 h-3.5" />
-                        </button>
+                {Object.keys(getColumnMeta(activeModule)).length === 0 ? (
+                  activeModule === "ADVANCE_RECEIPT" ? (
+                    <Panel title="Receipt Fields" icon={ToggleLeft}>
+                      <p className="text-xs text-neutral-500 mb-3">
+                        A receipt is a single record, not an item list, so there's no column
+                        table to configure — but you can still turn these blocks on or off.
+                      </p>
+                      <div className="grid grid-cols-1 gap-2">
+                        <Toggle label="Amount in words" checked={eff.body.showSubtotal} onChange={(v) => updateBody("showSubtotal", v)} />
+                        <Toggle label="Payment mode" checked={eff.body.showTax} onChange={(v) => updateBody("showTax", v)} />
+                        <Toggle label="Amount Due / Balance summary" checked={eff.body.showDiscount} onChange={(v) => updateBody("showDiscount", v)} />
+                        <Toggle label="“For Payment Of” note" checked={eff.body.showGrandTotal} onChange={(v) => updateBody("showGrandTotal", v)} />
                       </div>
-                    ))}
-                  </div>
-                </Panel>
+                    </Panel>
+                  ) : (
+                    <Panel title="Column Controls" icon={Columns3}>
+                      <p className="text-xs text-neutral-500">
+                        This module has no configurable columns. Use the Header and Footer tabs instead.
+                      </p>
+                    </Panel>
+                  )
+                ) : (
+                  <>
+                    <Panel title="Column Controls" icon={Columns3}>
+                      <p className={`text-xs font-medium mb-2 ${Math.round(validation.widthTotal) === 100 ? "text-emerald-600" : "text-red-600"}`}>
+                        Visible width total: {validation.widthTotal}%
+                      </p>
+                      <div className="space-y-2">
+                        {[...eff.body.columns].sort((a, b) => a.order - b.order).map((col, idx, list) => (
+                          <div key={col.key} className="grid grid-cols-[1fr_60px_28px_28px] gap-1.5 items-center">
+                            <label className="flex items-center gap-2 text-xs font-medium text-neutral-700">
+                              <input
+                                type="checkbox"
+                                className="w-3.5 h-3.5 rounded"
+                                checked={col.visible}
+                                onChange={(e) => updateColumn(col.key, { visible: e.target.checked })}
+                              />
+                              {getColumnMeta(activeModule)[col.key]?.label || col.key}
+                            </label>
+                            <Input
+                              type="number" min={0} max={100}
+                              value={col.widthPct}
+                              onChange={(e) => updateColumn(col.key, { widthPct: Number(e.target.value) || 0 })}
+                              className="text-xs text-center h-7 px-1"
+                            />
+                            <button
+                              onClick={() => moveColumn(col.key, "up")}
+                              disabled={idx === 0}
+                              className="h-7 w-7 flex items-center justify-center rounded border border-neutral-200 hover:bg-neutral-50 disabled:opacity-30"
+                            >
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => moveColumn(col.key, "down")}
+                              disabled={idx === list.length - 1}
+                              className="h-7 w-7 flex items-center justify-center rounded border border-neutral-200 hover:bg-neutral-50 disabled:opacity-30"
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </Panel>
 
-                <Panel title="Totals Visibility" icon={ToggleLeft}>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Toggle label="Subtotal" checked={eff.body.showSubtotal} onChange={(v) => updateBody("showSubtotal", v)} />
-                    <Toggle label="Tax" checked={eff.body.showTax} onChange={(v) => updateBody("showTax", v)} />
-                    <Toggle label="Discount" checked={eff.body.showDiscount} onChange={(v) => updateBody("showDiscount", v)} />
-                    <Toggle label="Grand Total" checked={eff.body.showGrandTotal} onChange={(v) => updateBody("showGrandTotal", v)} />
-                  </div>
-                </Panel>
+                    <Panel title="Totals Visibility" icon={ToggleLeft}>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Toggle label="Subtotal" checked={eff.body.showSubtotal} onChange={(v) => updateBody("showSubtotal", v)} />
+                        <Toggle label="Tax" checked={eff.body.showTax} onChange={(v) => updateBody("showTax", v)} />
+                        <Toggle label="Discount" checked={eff.body.showDiscount} onChange={(v) => updateBody("showDiscount", v)} />
+                        <Toggle label="Grand Total" checked={eff.body.showGrandTotal} onChange={(v) => updateBody("showGrandTotal", v)} />
+                      </div>
+                    </Panel>
+                  </>
+                )}
               </>
             )}
 
@@ -718,50 +762,93 @@ export default function PrintModelSettings() {
                 {eff.header.customHtml && <span>{eff.header.customHtml}</span>}
               </div>
 
-              {/* bill-to */}
-              <div className="mt-4 border-b border-neutral-200 pb-3">
-                <div>
-                  <h3 className="font-semibold mb-2" style={{ color: "var(--primary)" }}>Bill To</h3>
-                  <p className="text-sm">Customer Name</p>
-                  <p className="text-sm whitespace-pre-line">Customer Address Line 1{"\n"}City, State, ZIP</p>
-                </div>
-              </div>
-
-              {/* items table */}
-              <table className="w-full border-collapse mt-4" style={{ tableLayout: "fixed" }}>
-                <thead>
-                  <tr>
-                    {visibleColumns.map((c) => (
-                      <th key={c.key} style={{ width: `${c.widthPct}%`, background: "var(--primary)", wordBreak: "break-word", textAlign: ["amount","unit_price","qty"].includes(c.key) ? "right" : "left" }} className="text-white text-xs font-semibold px-2.5 py-2.5 tracking-wide overflow-hidden">
-                        {getColumnMeta(activeModule)[c.key]?.label || c.key}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[0, 1, 2].map((ri) => (
-                    <tr key={ri} className={ri % 2 === 1 ? "bg-neutral-50" : ""}>
-                      {visibleColumns.map((c) => (
-                        <td key={c.key} className="text-xs border-b border-neutral-200 px-2.5 py-2 text-neutral-800 overflow-hidden" style={{ wordBreak: "break-word", textAlign: ["amount","unit_price","qty"].includes(c.key) ? "right" : "left" }}>
-                          {placeholderValue(c.key, ri)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* totals box */}
-              <div className="ml-auto mt-3.5 border border-neutral-200 rounded-lg p-2.5" style={{ width: "min(320px, 100%)" }}>
-                {eff.body.showSubtotal && <TotalRow label="Subtotal" value={formatCurrency(totals.subtotal)} />}
-                {eff.body.showTax && <TotalRow label="Tax (10%)" value={formatCurrency(totals.taxAmount)} />}
-                {eff.body.showDiscount && <TotalRow label="Discount" value={`- ${formatCurrency(totals.discountAmount)}`} />}
-                {eff.body.showGrandTotal && (
-                  <div className="flex justify-between py-1.5 text-base font-bold" style={{ color: "var(--primary)" }}>
-                    <span>Grand Total</span><span>{formatCurrency(totals.grandTotal)}</span>
+              {activeModule === "ADVANCE_RECEIPT" ? (
+                <>
+                  {/* Received From — a receipt is a single record, not an item list */}
+                  <div className="mt-4 border-b border-neutral-200 pb-3">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1">Received From</h3>
+                    <p className="text-sm">Customer Name</p>
                   </div>
-                )}
-              </div>
+
+                  {/* Amount, boxed — always shown; words line is toggleable */}
+                  <div className="mt-4 border border-neutral-200 rounded-lg bg-neutral-50 px-4 py-3">
+                    <p className="text-2xl font-bold" style={{ color: "var(--primary)" }}>Rs. 30,000.00</p>
+                    {eff.body.showSubtotal && <p className="text-xs italic text-neutral-500 mt-1">(Thirty Thousand Only)</p>}
+                  </div>
+
+                  {eff.body.showGrandTotal && (
+                    <div className="mt-4">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1">For Payment Of</h3>
+                      <p className="text-sm">Advance payment for installation</p>
+                    </div>
+                  )}
+
+                  {eff.body.showTax && (
+                    <div className="mt-4">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1">Payment Mode</h3>
+                      <p className="text-sm font-semibold" style={{ color: "var(--accent)" }}>Cheque</p>
+                    </div>
+                  )}
+
+                  {/* Amount Due / Paid / Balance box */}
+                  {eff.body.showDiscount && (
+                  <div className="ml-auto mt-4 border border-neutral-200 rounded-lg overflow-hidden" style={{ width: "min(260px, 100%)" }}>
+                    <div className="px-2.5"><TotalRow label="Amount Due" value={formatCurrency(totals.grandTotal)} /></div>
+                    <div className="px-2.5"><TotalRow label="Amount Paid" value={formatCurrency(totals.subtotal)} /></div>
+                    <div className="flex justify-between px-2.5 py-1.5 text-sm font-bold bg-neutral-100" style={{ color: "var(--primary)" }}>
+                      <span>Balance</span><span>{formatCurrency(totals.taxAmount)}</span>
+                    </div>
+                  </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* bill-to */}
+                  <div className="mt-4 border-b border-neutral-200 pb-3">
+                    <div>
+                      <h3 className="font-semibold mb-2" style={{ color: "var(--primary)" }}>Bill To</h3>
+                      <p className="text-sm">Customer Name</p>
+                      <p className="text-sm whitespace-pre-line">Customer Address Line 1{"\n"}City, State, ZIP</p>
+                    </div>
+                  </div>
+
+                  {/* items table */}
+                  <table className="w-full border-collapse mt-4" style={{ tableLayout: "fixed" }}>
+                    <thead>
+                      <tr>
+                        {visibleColumns.map((c) => (
+                          <th key={c.key} style={{ width: `${c.widthPct}%`, background: "var(--primary)", wordBreak: "break-word", textAlign: ["amount","unit_price","qty"].includes(c.key) ? "right" : "left" }} className="text-white text-xs font-semibold px-2.5 py-2.5 tracking-wide overflow-hidden">
+                            {getColumnMeta(activeModule)[c.key]?.label || c.key}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[0, 1, 2].map((ri) => (
+                        <tr key={ri} className={ri % 2 === 1 ? "bg-neutral-50" : ""}>
+                          {visibleColumns.map((c) => (
+                            <td key={c.key} className="text-xs border-b border-neutral-200 px-2.5 py-2 text-neutral-800 overflow-hidden" style={{ wordBreak: "break-word", textAlign: ["amount","unit_price","qty"].includes(c.key) ? "right" : "left" }}>
+                              {placeholderValue(c.key, ri)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* totals box */}
+                  <div className="ml-auto mt-3.5 border border-neutral-200 rounded-lg p-2.5" style={{ width: "min(320px, 100%)" }}>
+                    {eff.body.showSubtotal && <TotalRow label="Subtotal" value={formatCurrency(totals.subtotal)} />}
+                    {eff.body.showTax && <TotalRow label="Tax (10%)" value={formatCurrency(totals.taxAmount)} />}
+                    {eff.body.showDiscount && <TotalRow label="Discount" value={`- ${formatCurrency(totals.discountAmount)}`} />}
+                    {eff.body.showGrandTotal && (
+                      <div className="flex justify-between py-1.5 text-base font-bold" style={{ color: "var(--primary)" }}>
+                        <span>Grand Total</span><span>{formatCurrency(totals.grandTotal)}</span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
 
               {/* footer */}
               <footer className="mt-10 border-t border-neutral-200 pt-5 grid grid-cols-[1fr_240px] gap-3">

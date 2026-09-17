@@ -5,6 +5,7 @@ from app.api.pdf.schema import (
     MdlQuotationPDFRequest,
     MdlInvoicePDFRequest,
     MdlWarrantyCertificatePDFRequest,
+    MdlAdvanceReceiptPDFRequest,
 )
 from app.api.pdf.service import ClsPdfGenerator
 from app.core.dependency import fnGetContext
@@ -62,6 +63,25 @@ async def fnGenerateWarrantyCertificatePDF(
     try:
         insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
         return await insPdfService.fnGetWarrantyCertificatePdf(mdlRequest)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
+
+
+@router.post("/advance-receipt")
+async def fnGenerateAdvanceReceiptPDF(
+    mdlRequest: MdlAdvanceReceiptPDFRequest,
+    objContext=Depends(fnGetContext)
+):
+    "generate advance receipt print"
+    try:
+        insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
+        return await insPdfService.fnGetAdvanceReceiptPdf(mdlRequest)
     except HTTPException:
         raise
     except Exception as e:

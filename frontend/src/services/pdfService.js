@@ -75,6 +75,24 @@ const pdfService = {
     },
 
     /**
+     * Generate Advance Receipt PDF
+     *
+     * @param {Object} data - { intReceiptId }
+     * @returns {Blob} PDF file blob
+     */
+    generateAdvanceReceiptPDF: async (data) => {
+        try {
+            const response = await api.post('/pdf/advance-receipt', data, {
+                responseType: 'blob'
+            });
+            return response.data;
+        } catch (error) {
+            const strMessage = error.response?.data?.detail || 'Failed to generate receipt PDF';
+            throw new Error(strMessage);
+        }
+    },
+
+    /**
      * Open PDF in new tab for printing
      * @param {Blob} pdfBlob - PDF blob
      */

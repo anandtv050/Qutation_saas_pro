@@ -40,6 +40,7 @@ LST_ROUTERS = [
     "app.api.quotation.router",
     "app.api.invoice.router",
     "app.api.warranty.router",        # Warranty report + (future) certificate ops
+    "app.api.advance_receipt.router", # Advance/partial payment receipts against a quotation
     "app.api.dashboard.router",
     "app.api.pdf.router",
     "app.api.ai.router",

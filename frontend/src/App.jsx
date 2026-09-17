@@ -14,6 +14,7 @@ import Profile from "./pages/Profile";
 import UserManagement from "./pages/UserManagement";
 import AdminDashboard from "./pages/AdminDashboard";
 import WarrantyCertificate from "./pages/WarrantyCertificate";
+import AdvanceReceipt from "./pages/AdvanceReceipt";
 import PrintModelSettings from "./pages/PrintModelSettings";
 import PlanManagement from "./pages/PlanManagement";
 import ServiceManagement from "./pages/ServiceManagement";
@@ -87,6 +88,7 @@ function App() {
           <Route path="/invoices/new" element={<ModuleRoute moduleKey="invoice"><NewInvoice /></ModuleRoute>} />
           <Route path="/invoices/view/:id" element={<ModuleRoute moduleKey="invoice"><NewInvoice /></ModuleRoute>} />
           <Route path="/warranty" element={<ModuleRoute moduleKey="warranty"><WarrantyCertificate /></ModuleRoute>} />
+          <Route path="/advance-receipts" element={<ModuleRoute moduleKey="advance_receipt"><AdvanceReceipt /></ModuleRoute>} />
           <Route path="/inventory" element={<ModuleRoute moduleKey="inventory"><Inventory /></ModuleRoute>} />
           <Route path="/reports" element={<ModuleRoute moduleKey="reports"><Reports /></ModuleRoute>} />
           <Route path="/profile" element={<Profile />} />

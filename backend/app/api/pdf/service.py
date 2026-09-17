@@ -58,6 +58,44 @@ TEXT_MUTED   = colors.HexColor("#64748B")
 # Use "Rs." instead of unicode ₹ — Helvetica doesn't have the glyph
 RUPEE = "Rs."
 
+_ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+         "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+         "Seventeen", "Eighteen", "Nineteen"]
+_TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
+
+
+def _fnTwoDigitsToWords(n: int) -> str:
+    if n < 20:
+        return _ONES[n]
+    return (_TENS[n // 10] + (f" {_ONES[n % 10]}" if n % 10 else "")).strip()
+
+
+def _fnThreeDigitsToWords(n: int) -> str:
+    if n >= 100:
+        rest = _fnTwoDigitsToWords(n % 100)
+        return f"{_ONES[n // 100]} Hundred" + (f" {rest}" if rest else "")
+    return _fnTwoDigitsToWords(n)
+
+
+def fnAmountToWordsIndian(dblAmount: float) -> str:
+    """Indian numbering (lakh/crore) amount-in-words, e.g. 30000 -> 'Thirty Thousand'."""
+    intRupees = int(round(dblAmount))
+    if intRupees == 0:
+        return "Zero"
+    parts = []
+    crore, intRupees = divmod(intRupees, 10_000_000)
+    lakh, intRupees = divmod(intRupees, 100_000)
+    thousand, hundred = divmod(intRupees, 1000)
+    if crore:
+        parts.append(f"{_fnThreeDigitsToWords(crore)} Crore")
+    if lakh:
+        parts.append(f"{_fnThreeDigitsToWords(lakh)} Lakh")
+    if thousand:
+        parts.append(f"{_fnThreeDigitsToWords(thousand)} Thousand")
+    if hundred:
+        parts.append(_fnThreeDigitsToWords(hundred))
+    return " ".join(parts) or "Zero"
+
 
 class ClsPdfGenerator:
     def __init__(self, objPool, intUserid) -> None:
@@ -1411,5 +1449,173 @@ class ClsPdfGenerator:
             headers={
                 "Content-Disposition":
                     f"inline; filename=Warranty_{strQuotationNumber}.pdf"
+            },
+        )
+
+    async def fnGetAdvanceReceiptPdf(self, mdlRequest):
+        """Generate an advance/partial-payment receipt PDF — a single-record
+        layout (no item table), matching a paper cash-receipt form: Received
+        From / Amount (+ words) / For Payment Of / payment-mode checkboxes /
+        Received By / Amount Due-Paid-Balance box, with the usual
+        signature/QR/bank-details footer reused from the other document PDFs."""
+        await self._load_print_settings("ADVANCE_RECEIPT")
+        doc_title = self._setting("vchr_header_title", "CASH RECEIPT") or "CASH RECEIPT"
+
+        async with self.objPool.acquire() as conn:
+            rstReceipt = await conn.fetchrow(
+                """
+                SELECT r.*, q.vchr_quotation_number, q.dat_quotation_date,
+                       u.vchr_business_name, u.vchr_email, u.vchr_phone
+                FROM tbl_advance_receipt r
+                JOIN tbl_quotation q ON q.pk_bint_quotation_id = r.fk_bint_quotation_id
+                LEFT JOIN tbl_user u ON u.pk_bint_user_id = r.fk_bint_user_id
+                WHERE r.pk_bint_advance_receipt_id = $1 AND r.fk_bint_user_id = $2
+                """,
+                mdlRequest.intReceiptId, self.intUserId,
+            )
+            if not rstReceipt:
+                return {"error": "Receipt not found"}
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, pagesize=A4,
+            rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=70,
+        )
+        styles = getSampleStyleSheet()
+        elements = []
+        elements.extend(self._build_preview_style_header(
+            styles=styles,
+            business_name=rstReceipt["vchr_business_name"],
+            phone=rstReceipt["vchr_phone"],
+            email=rstReceipt["vchr_email"],
+            doc_title=doc_title,
+            doc_number=rstReceipt["vchr_receipt_number"],
+            doc_date=str(rstReceipt["dat_receipt_date"]),
+        ))
+
+        stLabel = ParagraphStyle(
+            "rcLabel", parent=styles["Normal"], fontSize=8, fontName="Helvetica-Bold",
+            textColor=TEXT_MUTED, spaceAfter=2,
+        )
+        stValue = ParagraphStyle(
+            "rcValue", parent=styles["Normal"], fontSize=10.5, fontName="Helvetica",
+            textColor=TEXT_DARK, spaceAfter=10, leading=13,
+        )
+        elements.append(Paragraph("RECEIVED FROM", stLabel))
+        elements.append(Paragraph(self._clean_text(rstReceipt["vchr_received_from"]) or "-", stValue))
+
+        # ── Amount (numeral + words), boxed ──
+        dblAmount = float(rstReceipt["dbl_amount_paid"])
+        stAmountBig = ParagraphStyle(
+            "rcAmountBig", parent=styles["Normal"], fontSize=18, fontName="Helvetica-Bold",
+            textColor=self.BRAND_DARK,
+        )
+        stAmountWords = ParagraphStyle(
+            "rcAmountWords", parent=styles["Normal"], fontSize=9, fontName="Helvetica-Oblique",
+            textColor=TEXT_MUTED, spaceBefore=2,
+        )
+        # Field-visibility toggles from Print Settings (Body tab, "Receipt Fields"
+        # panel) — the same 4 generic booleans QUOTATION uses for its totals,
+        # repurposed here since a receipt has no item table of its own.
+        blnShowAmountWords = self._setting_bool("bln_show_subtotal", True)
+        blnShowPaymentFor = self._setting_bool("bln_show_grand_total", True)
+        blnShowPaymentMode = self._setting_bool("bln_show_tax", True)
+        blnShowAmountSummary = self._setting_bool("bln_show_discount", True)
+
+        amount_box_rows = [[Paragraph(f"{RUPEE} {dblAmount:,.2f}", stAmountBig)]]
+        if blnShowAmountWords:
+            amount_box_rows.append([Paragraph(f"({fnAmountToWordsIndian(dblAmount)} Only)", stAmountWords)])
+        amount_box = Table(amount_box_rows, colWidths=[510])
+        amount_box.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), LIGHT_BG),
+            ("BOX", (0, 0), (-1, -1), 0.8, BORDER_CLR),
+            ("LEFTPADDING", (0, 0), (-1, -1), 12),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+            ("TOPPADDING", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ]))
+        elements.append(amount_box)
+        elements.append(Spacer(1, 12))
+
+        strPaymentFor = self._clean_text(rstReceipt["txt_payment_for"])
+        if strPaymentFor and blnShowPaymentFor:
+            elements.append(Paragraph("FOR PAYMENT OF", stLabel))
+            elements.append(Paragraph(strPaymentFor, stValue))
+
+        # ── Payment mode — just the mode that was actually used ──
+        if blnShowPaymentMode:
+            MODE_LABELS = {"cash": "Cash", "cheque": "Cheque", "upi": "UPI",
+                           "account": "Account", "other": "Other"}
+            strModeLabel = MODE_LABELS.get((rstReceipt["vchr_payment_mode"] or "cash").lower(), "Cash")
+            stModeSel = ParagraphStyle(
+                "rcModeSel", parent=styles["Normal"], fontSize=10, fontName="Helvetica-Bold",
+                textColor=self.BRAND_ACCENT, spaceAfter=10,
+            )
+            elements.append(Paragraph("PAYMENT MODE", stLabel))
+            elements.append(Paragraph(strModeLabel, stModeSel))
+
+        # ── Received By (left) + Amount Due/Paid/Balance box (right) ──
+        left_col = []
+        if self._clean_text(rstReceipt["vchr_received_by"]):
+            left_col = [Paragraph("RECEIVED BY", stLabel), Paragraph(rstReceipt["vchr_received_by"], stValue)]
+
+        right_col = [Paragraph("", stValue)]
+        if blnShowAmountSummary:
+            dblDue = rstReceipt["dbl_amount_due_snapshot"]
+            dblBalance = rstReceipt["dbl_balance_snapshot"]
+            stSummaryLbl = ParagraphStyle(
+                "rcSumLbl", parent=styles["Normal"], fontSize=8.5, fontName="Helvetica",
+                textColor=TEXT_MUTED,
+            )
+            stSummaryVal = ParagraphStyle(
+                "rcSumVal", parent=styles["Normal"], fontSize=8.5, fontName="Helvetica-Bold",
+                textColor=TEXT_DARK, alignment=TA_RIGHT,
+            )
+            summary_rows = [
+                ["Amount Due", f"{RUPEE} {float(dblDue):,.2f}" if dblDue is not None else "-"],
+                ["Amount Paid", f"{RUPEE} {dblAmount:,.2f}"],
+                ["Balance", f"{RUPEE} {float(dblBalance):,.2f}" if dblBalance is not None else "-"],
+            ]
+            summary_tbl = Table(
+                [[Paragraph(r[0], stSummaryLbl), Paragraph(r[1], stSummaryVal)] for r in summary_rows],
+                colWidths=[100, 110],
+            )
+            summary_tbl.setStyle(TableStyle([
+                ("BOX", (0, 0), (-1, -1), 0.8, BORDER_CLR),
+                ("INNERGRID", (0, 0), (-1, -1), 0.4, BORDER_CLR),
+                ("BACKGROUND", (0, -1), (-1, -1), LIGHT_BG),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]))
+            right_col = summary_tbl
+
+        if left_col or blnShowAmountSummary:
+            combo = Table([[left_col or [Paragraph("", stValue)], right_col]], colWidths=[300, 210])
+            combo.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            elements.append(combo)
+            elements.append(Spacer(1, 20))
+
+        self._build_footer_section(elements, styles, terms_heading="Notes")
+        self._build_footer_box(elements)
+
+        def on_page(cvs, doc_ref):
+            self._draw_footer(cvs, doc_ref)
+
+        doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)
+        buffer.seek(0)
+
+        return StreamingResponse(
+            buffer,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition":
+                    f"inline; filename=Receipt_{rstReceipt['vchr_receipt_number']}.pdf"
             },
         )

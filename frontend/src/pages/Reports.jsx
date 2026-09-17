@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import quotationService from "@/services/quotationService";
 import invoiceService from "@/services/invoiceService";
 import warrantyService from "@/services/warrantyService";
+import advanceReceiptService from "@/services/advanceReceiptService";
 import { usePermission } from "@/contexts/PermissionsContext";
 
 export default function Reports() {
@@ -13,6 +14,7 @@ export default function Reports() {
   const canQuotation = usePermission("quotation");
   const canInvoice = usePermission("invoice");
   const canWarranty = usePermission("warranty");
+  const canAdvanceReceipt = usePermission("advance_receipt");
   const [activeTab, setActiveTab] = useState("quotations");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -46,6 +48,11 @@ export default function Reports() {
   const [isLoadingWarranties, setIsLoadingWarranties] = useState(true);
   const [warrantyError, setWarrantyError] = useState(null);
 
+  // Advance Receipt state
+  const [receipts, setReceipts] = useState([]);
+  const [isLoadingReceipts, setIsLoadingReceipts] = useState(true);
+  const [receiptError, setReceiptError] = useState(null);
+
   // Delete confirmation state
   const [deleteId, setDeleteId] = useState(null);
   const [deleteType, setDeleteType] = useState(null); // "quotation" or "invoice"
@@ -56,11 +63,13 @@ export default function Reports() {
   const [quotationPage, setQuotationPage] = useState(1);
   const [invoicePage, setInvoicePage] = useState(1);
   const [warrantyPage, setWarrantyPage] = useState(1);
+  const [receiptPage, setReceiptPage] = useState(1);
 
   // Reset to page 1 when filters/tab change
   useEffect(() => { setQuotationPage(1); }, [searchQuery, fromDate, toDate, activeTab]);
   useEffect(() => { setInvoicePage(1); }, [searchQuery, fromDate, toDate, activeTab]);
   useEffect(() => { setWarrantyPage(1); }, [searchQuery, fromDate, toDate, activeTab]);
+  useEffect(() => { setReceiptPage(1); }, [searchQuery, fromDate, toDate, activeTab]);
 
   // Fetch quotations from API
   const fetchQuotations = async () => {
@@ -127,10 +136,32 @@ export default function Reports() {
     }
   };
 
+  // Fetch advance receipts
+  const fetchReceipts = async () => {
+    setIsLoadingReceipts(true);
+    setReceiptError(null);
+    try {
+      const response = await advanceReceiptService.getList();
+      if (response.intStatus === 1) {
+        setReceipts(response.lstReceipts || []);
+      } else if (response.intStatus === -1) {
+        setReceipts([]);
+      } else {
+        setReceiptError(response.strMessage || "Failed to load receipts");
+      }
+    } catch (error) {
+      console.error("Failed to fetch receipts:", error);
+      setReceiptError(error.message || "Failed to load receipts");
+    } finally {
+      setIsLoadingReceipts(false);
+    }
+  };
+
   useEffect(() => {
     fetchQuotations();
     fetchInvoices();
     fetchWarranties();
+    fetchReceipts();
   }, []);
 
   const formatCurrency = (amount) => {
@@ -205,13 +236,31 @@ export default function Reports() {
     });
   }, [warranties, searchQuery, fromDate, toDate]);
 
+  // Filter advance receipts
+  const filteredReceipts = useMemo(() => {
+    return receipts.filter(r => {
+      const matchesSearch = !searchQuery.trim() ||
+        r.strReceiptNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.strQuotationNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.strReceivedFrom?.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const dateValue = r.datReceiptDate;
+      const matchesFromDate = !fromDate || dateValue >= fromDate;
+      const matchesToDate = !toDate || dateValue <= toDate;
+
+      return matchesSearch && matchesFromDate && matchesToDate;
+    });
+  }, [receipts, searchQuery, fromDate, toDate]);
+
   // Paginated slices
   const quotationTotalPages = Math.max(1, Math.ceil(filteredQuotations.length / PAGE_SIZE));
   const invoiceTotalPages = Math.max(1, Math.ceil(filteredInvoices.length / PAGE_SIZE));
   const warrantyTotalPages = Math.max(1, Math.ceil(filteredWarranties.length / PAGE_SIZE));
+  const receiptTotalPages = Math.max(1, Math.ceil(filteredReceipts.length / PAGE_SIZE));
   const currentQuotationPage = Math.min(quotationPage, quotationTotalPages);
   const currentInvoicePage = Math.min(invoicePage, invoiceTotalPages);
   const currentWarrantyPage = Math.min(warrantyPage, warrantyTotalPages);
+  const currentReceiptPage = Math.min(receiptPage, receiptTotalPages);
   const pagedQuotations = useMemo(
     () => filteredQuotations.slice((currentQuotationPage - 1) * PAGE_SIZE, currentQuotationPage * PAGE_SIZE),
     [filteredQuotations, currentQuotationPage]
@@ -223,6 +272,10 @@ export default function Reports() {
   const pagedWarranties = useMemo(
     () => filteredWarranties.slice((currentWarrantyPage - 1) * PAGE_SIZE, currentWarrantyPage * PAGE_SIZE),
     [filteredWarranties, currentWarrantyPage]
+  );
+  const pagedReceipts = useMemo(
+    () => filteredReceipts.slice((currentReceiptPage - 1) * PAGE_SIZE, currentReceiptPage * PAGE_SIZE),
+    [filteredReceipts, currentReceiptPage]
   );
 
   // Build a windowed list of page numbers (with ellipsis) — max ~7 visible
@@ -432,6 +485,16 @@ export default function Reports() {
           }`}
         >
           Warranty ({warranties.length})
+        </button>
+        <button
+          onClick={() => { setActiveTab("receipts"); setSearchQuery(""); setFromDate(""); setToDate(""); }}
+          className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
+            activeTab === "receipts"
+              ? "bg-white text-neutral-900 shadow-sm"
+              : "text-neutral-500 hover:text-neutral-700"
+          }`}
+        >
+          Receipts ({receipts.length})
         </button>
       </div>
 
@@ -836,6 +899,103 @@ export default function Reports() {
             onChange={setWarrantyPage}
             totalItems={filteredWarranties.length}
             itemLabel="items"
+          />
+        </>
+      )}
+
+      {/* Advance Receipts */}
+      {activeTab === "receipts" && (
+        <>
+          {isLoadingReceipts ? (
+            <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
+              <Loader2 className="w-8 h-8 mx-auto text-neutral-400 animate-spin mb-4" />
+              <p className="text-sm text-neutral-500">Loading receipts...</p>
+            </div>
+          ) : receiptError ? (
+            <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
+              <Receipt className="w-12 h-12 mx-auto text-red-300 mb-4" />
+              <h3 className="font-medium text-neutral-900 mb-1">Error loading receipts</h3>
+              <p className="text-sm text-neutral-500 mb-4">{receiptError}</p>
+              <Button variant="outline" onClick={fetchReceipts}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          ) : filteredReceipts.length === 0 ? (
+            <div className="bg-white border border-neutral-200 rounded-xl p-6 sm:p-12 text-center">
+              <Receipt className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-neutral-300 mb-3 sm:mb-4" />
+              <h3 className="font-medium text-neutral-900 mb-1">No advance receipts</h3>
+              <p className="text-sm text-neutral-500">
+                {receipts.length === 0
+                  ? "Advance receipts will appear here once you issue one against a quotation"
+                  : "Try a different search or date range"}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+              {/* Table Header - Desktop */}
+              <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-neutral-50 border-b border-neutral-200 text-xs font-medium text-neutral-500 uppercase">
+                <div className="col-span-3">Receipt No.</div>
+                <div className="col-span-3">Quotation</div>
+                <div className="col-span-2">Mode</div>
+                <div className="col-span-2 text-right">Date</div>
+                <div className="col-span-2 text-right">Amount</div>
+              </div>
+
+              {/* Items */}
+              {pagedReceipts.map((r, index) => (
+                <div
+                  key={r.intPkReceiptId}
+                  onClick={() => {
+                    if (!canAdvanceReceipt) return;
+                    navigate(`/advance-receipts?sourceType=quotation&sourceId=${r.intQuotationId}`);
+                  }}
+                  className={`grid grid-cols-12 gap-4 px-4 py-3 items-center transition-colors ${
+                    canAdvanceReceipt ? "hover:bg-neutral-50 cursor-pointer" : "cursor-default"
+                  } ${index !== pagedReceipts.length - 1 ? "border-b border-neutral-100" : ""}`}
+                >
+                  <div className="col-span-8 md:col-span-3">
+                    <p className="font-medium text-neutral-900 text-sm">
+                      {r.strReceiptNumber}
+                      {r.strStatus === "void" && (
+                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600">VOID</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-neutral-500 md:hidden">{r.strQuotationNumber}</p>
+                  </div>
+
+                  <div className="hidden md:block col-span-3 text-sm text-neutral-700 truncate">
+                    {r.strQuotationNumber}
+                  </div>
+
+                  <div className="hidden md:block col-span-2 text-xs text-neutral-500 capitalize">
+                    {r.strPaymentMode}
+                  </div>
+
+                  <div className="col-span-4 md:col-span-2 text-right text-sm text-neutral-700">
+                    {formatDate(r.datReceiptDate)}
+                  </div>
+
+                  <div className="hidden md:block col-span-2 text-right font-semibold text-neutral-900">
+                    {formatCurrency(r.dblAmountPaid)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {filteredReceipts.length > 0 && receiptTotalPages <= 1 && (
+            <p className="text-sm text-neutral-500 mt-3">
+              Showing {filteredReceipts.length} receipt{filteredReceipts.length !== 1 ? "s" : ""}
+            </p>
+          )}
+
+          <Pagination
+            currentPage={currentReceiptPage}
+            totalPages={receiptTotalPages}
+            onChange={setReceiptPage}
+            totalItems={filteredReceipts.length}
+            itemLabel="receipts"
           />
         </>
       )}

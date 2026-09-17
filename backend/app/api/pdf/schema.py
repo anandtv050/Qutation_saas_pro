@@ -35,3 +35,7 @@ class MdlWarrantyCertificatePDFRequest(BaseModel):
     intQuotationId: Optional[int] = None
     intInvoiceId: Optional[int] = None
     strCertificateDate: Optional[str] = None
+
+
+class MdlAdvanceReceiptPDFRequest(BaseModel):
+    intReceiptId: int

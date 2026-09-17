@@ -17,6 +17,7 @@ DROP TABLE IF EXISTS tbl_subscription_plan CASCADE;
 DROP TABLE IF EXISTS tbl_service CASCADE;
 DROP TABLE IF EXISTS tbl_print_model_settings CASCADE;
 DROP TABLE IF EXISTS tbl_document_counter CASCADE;
+DROP TABLE IF EXISTS tbl_advance_receipt CASCADE;
 DROP TABLE IF EXISTS tbl_invoice_item CASCADE;
 DROP TABLE IF EXISTS tbl_invoice CASCADE;
 DROP TABLE IF EXISTS tbl_quotation_item CASCADE;
@@ -279,6 +280,37 @@ CREATE INDEX idx_invoice_item_invoice_id ON tbl_invoice_item(fk_bint_invoice_id)
 
 
 -- =====================================================
+-- Table 8b: tbl_advance_receipt (advance/partial payment receipts
+-- issued against a quotation — see migration_add_advance_receipt.sql)
+-- =====================================================
+CREATE TABLE tbl_advance_receipt (
+    pk_bint_advance_receipt_id BIGSERIAL PRIMARY KEY,
+    fk_bint_user_id            BIGINT NOT NULL REFERENCES tbl_user(pk_bint_user_id) ON DELETE CASCADE,
+    fk_bint_quotation_id       BIGINT NOT NULL REFERENCES tbl_quotation(pk_bint_quotation_id) ON DELETE CASCADE,
+    vchr_receipt_number        VARCHAR(50)  NOT NULL,
+    dat_receipt_date           DATE         NOT NULL,
+    vchr_received_from         VARCHAR(200) NOT NULL,
+    dbl_amount_paid            DECIMAL(12,2) NOT NULL CHECK (dbl_amount_paid > 0),
+    txt_payment_for            TEXT,
+    vchr_payment_mode          VARCHAR(20)  DEFAULT 'cash',   -- cash|cheque|upi|account|other
+    vchr_received_by           VARCHAR(200),
+    dbl_amount_due_snapshot    DECIMAL(12,2),
+    dbl_balance_snapshot       DECIMAL(12,2),
+    vchr_status                VARCHAR(20)  DEFAULT 'issued', -- issued|void
+    tim_created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    tim_updated_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX idx_advance_receipt_number ON tbl_advance_receipt(fk_bint_user_id, vchr_receipt_number);
+CREATE INDEX idx_advance_receipt_quotation ON tbl_advance_receipt(fk_bint_quotation_id);
+
+CREATE TRIGGER trg_advance_receipt_updated_at
+BEFORE UPDATE ON tbl_advance_receipt
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();
+
+
+-- =====================================================
 -- Table 9: tbl_document_counter (For Quotation & Invoice)
 -- =====================================================
 
@@ -510,7 +542,8 @@ VALUES
     ('ai',             'AIC', 'Quick Create',    'AI-powered quotation generation', 'Brain',     '',                'Quick Create',   false, false, 5),
     ('warranty',       'WRN', 'Warranty',        'Warranty certificate generation', 'Shield',    '/warranty',       'Warranty',       false, false, 6),
     ('reports',        'RPT', 'Reports',         'Financial reports and analytics', 'BarChart3', '/reports',         'Reports',        true,  false, 7),
-    ('print_settings', 'PRT', 'Print Settings',  'Custom print formats',           'Printer',   '/print-settings', 'Print Settings', true,  true,  8);
+    ('print_settings', 'PRT', 'Print Settings',  'Custom print formats',           'Printer',   '/print-settings', 'Print Settings', true,  true,  8),
+    ('advance_receipt','ARC', 'Advance Receipt', 'Advance/partial payment receipts against a quotation', 'Receipt', '/advance-receipts', 'Receipts', false, false, 9);
 
 
 -- =====================================================
@@ -538,7 +571,7 @@ DO $$
 DECLARE
     v_free BIGINT; v_std BIGINT; v_prm BIGINT;
     v_dsh BIGINT; v_qtn BIGINT; v_inv BIGINT; v_itm BIGINT;
-    v_ai  BIGINT; v_wrn BIGINT; v_rpt BIGINT; v_prt BIGINT;
+    v_ai  BIGINT; v_wrn BIGINT; v_rpt BIGINT; v_prt BIGINT; v_arc BIGINT;
 BEGIN
     SELECT pk_bint_plan_id INTO v_free FROM tbl_subscription_plan WHERE vchr_plan_name = 'free_trial';
     SELECT pk_bint_plan_id INTO v_std  FROM tbl_subscription_plan WHERE vchr_plan_name = 'standard';
@@ -551,6 +584,7 @@ BEGIN
     SELECT pk_bint_module_id INTO v_wrn FROM tbl_module WHERE vchr_module_key = 'warranty';
     SELECT pk_bint_module_id INTO v_rpt FROM tbl_module WHERE vchr_module_key = 'reports';
     SELECT pk_bint_module_id INTO v_prt FROM tbl_module WHERE vchr_module_key = 'print_settings';
+    SELECT pk_bint_module_id INTO v_arc FROM tbl_module WHERE vchr_module_key = 'advance_receipt';
 
     -- FREE:  create read update delete print  period
     INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_dsh,   0, -1,  0,  0,  0, NULL);
@@ -561,6 +595,7 @@ BEGIN
     INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_wrn,   0,  0,  0,  0,  0, NULL);
     INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_rpt,   0,  0,  0,  0,  0, NULL);
     INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_prt,   0,  0,  0,  0,  0, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_free, v_arc,   0,  0,  0,  0,  0, NULL);
 
     -- STANDARD:
     INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_dsh,  -1, -1,  0,  0,  0, NULL);
@@ -571,6 +606,7 @@ BEGIN
     INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_wrn,  -1, -1, -1, -1, -1, NULL);
     INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_rpt,  -1, -1,  0,  0,  0, NULL);
     INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_prt,   3, -1, -1,  0, -1, 'monthly');
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_std, v_arc,  -1, -1, -1, -1, -1, NULL);
 
     -- PREMIUM:
     INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_dsh,  -1, -1, -1, -1,  0, NULL);
@@ -581,6 +617,7 @@ BEGIN
     INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_wrn,  -1, -1, -1, -1, -1, NULL);
     INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_rpt,  -1, -1, -1, -1, -1, NULL);
     INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_prt,  -1, -1, -1, -1, -1, NULL);
+    INSERT INTO tbl_plan_module VALUES (DEFAULT, v_prm, v_arc,  -1, -1, -1, -1, -1, NULL);
 END $$;
 
 

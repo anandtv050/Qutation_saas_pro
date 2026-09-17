@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Minus, X, Loader2, ChevronRight, Search, Printer, FilePlus, Calendar, Check, FileText, ShieldCheck, GripVertical, Copy } from "lucide-react";
+import { ArrowLeft, Plus, Minus, X, Loader2, ChevronRight, Search, Printer, FilePlus, Calendar, Check, FileText, ShieldCheck, GripVertical, Copy, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,6 +42,7 @@ export default function NewQuotation() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const canWarranty = usePermission("warranty");
+  const canAdvanceReceipt = usePermission("advance_receipt");
   const canInvoice = usePermission("invoice");
   const canReports = usePermission("reports");
   const canAI = usePermission("ai");
@@ -1222,6 +1223,16 @@ Example:
                       Warranty Certificate
                     </Button>
                   )}
+                  {canAdvanceReceipt && (
+                    <Button
+                      onClick={() => navigate(`/advance-receipts?sourceType=quotation&sourceId=${savedQuotation.intPkQuotationId}`)}
+                      variant="outline"
+                      className="w-full h-11 border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-lg font-medium"
+                    >
+                      <Receipt className="w-4 h-4 mr-2" />
+                      Advance Receipt
+                    </Button>
+                  )}
                   {/* Convert to Invoice OR View Invoice if already converted */}
                   {canInvoice && (savedQuotation.linkedInvoiceId ? (
                     <Button
@@ -1282,6 +1293,15 @@ Example:
                 >
                   <ShieldCheck className="w-4 h-4" />
                   Warranty
+                </button>
+              )}
+              {canAdvanceReceipt && (
+                <button
+                  onClick={() => navigate(`/advance-receipts?sourceType=quotation&sourceId=${savedQuotation.intPkQuotationId}`)}
+                  className="h-10 px-3 flex items-center gap-1.5 rounded-full bg-emerald-600 text-white text-xs font-semibold shadow-sm shadow-emerald-200 hover:bg-emerald-700 active:bg-emerald-800"
+                >
+                  <Receipt className="w-4 h-4" />
+                  Receipt
                 </button>
               )}
             </div>
