@@ -31,6 +31,33 @@ const printSettingsService = {
             throw new Error(strMessage);
         }
     },
+
+    /**
+     * Upload a logo/signature image. Resolves to the relative path to keep in settings
+     * (it is persisted only when the user saves).
+     * @param {File} file
+     * @param {"logo"|"signature"} strKind
+     * @param {string} vchModule
+     * @param {number|null} intTargetUserId
+     */
+    uploadAsset: async (file, strKind, vchModule = "QUOTATION", intTargetUserId = null) => {
+        try {
+            const form = new FormData();
+            form.append("objFile", file);
+            form.append("strKind", strKind);
+            form.append("strModule", vchModule);
+            if (intTargetUserId) form.append("intTargetUserId", String(intTargetUserId));
+            // The api instance defaults to JSON, which would make axios stringify the FormData.
+            // multipart/form-data stops that; the browser then adds the boundary itself.
+            const response = await api.post("/print-settings/upload-asset", form, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            return response.data.vchUrl;
+        } catch (error) {
+            const detail = error.response?.data?.detail;
+            throw new Error(typeof detail === "string" ? detail : "Failed to upload image");
+        }
+    },
 };
 
 export default printSettingsService;

@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 import asyncpg
 
 from app.api.print_settings.schema import (
@@ -7,6 +9,7 @@ from app.api.print_settings.schema import (
     MdlPrintSettingsResponse,
 )
 from app.api.print_settings.service import ClsPrintSettingsService
+from app.api.print_settings import assets
 from app.core.baseSchema import ResponseStatus
 from app.core.dependency import fnGetContext, fnRequireModule
 from app.core.security import ADMIN_USER_ID
@@ -82,3 +85,27 @@ async def fnSavePrintSettings(
             strMessage=f"Unexpected error: {str(e)}",
             data=None,
         )
+
+
+@router.post("/upload-asset")
+async def fnUploadPrintAsset(
+    strKind: str = Form(...),                      # "logo" | "signature"
+    strModule: str = Form("QUOTATION"),
+    intTargetUserId: Optional[int] = Form(None),
+    objFile: UploadFile = File(...),
+    objContext=Depends(fnRequireModule("print_settings")),
+):
+    """Upload a logo/signature image. Returns the path to store via /save."""
+    logger = getUserLogger(objContext.intUserId)
+    try:
+        intTargetUser = _resolve_target_user(objContext, intTargetUserId)
+        strPath = await assets.fnStoreAsset(
+            objContext.objPool, intTargetUser, strKind, strModule, objFile
+        )
+        return {"intStatus": ResponseStatus.SUCCESS, "vchUrl": strPath}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading print asset: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Could not upload the image. Please try again.")

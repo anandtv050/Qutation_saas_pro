@@ -39,7 +39,7 @@ async def fnGenerateInvoicePDF(
     objContext=Depends(fnGetContext)
 ):
     "generate the invoice print"
-    await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "print_settings", "print")
+    await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "invoice", "print")
     try:
         insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
         return await insPdfService.fnGetInvoicePdf(mdlRequest)

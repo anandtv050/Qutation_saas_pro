@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { QRCodeSVG } from "qrcode.react";
 import printSettingsService from "@/services/printSettingsService";
 import userService from "@/services/userService";
+import AssetUpload, { SafeImage } from "@/components/AssetUpload";
 
 
 /* ── module column registry ──────────────────────────────────── */
@@ -539,8 +540,7 @@ export default function PrintModelSettings() {
 
                 {/* Logo */}
                 <Panel title="Logo" icon={Image}>
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">Logo URL</label>
-                  <Input value={eff.header.logoUrl} onChange={(e) => updateHeader("logoUrl", e.target.value)} placeholder="https://..." className="text-sm" />
+                  <AssetUpload kind="logo" label="logo" module={activeModule} targetUserId={selectedUserId} value={eff.header.logoUrl} onChange={(v) => updateHeader("logoUrl", v)} toFullUrl={toFullUrl} />
                   <div className="grid grid-cols-2 gap-3 mt-3">
                     <div>
                       <label className="block text-xs font-medium text-neutral-600 mb-1">Width (px)</label>
@@ -551,12 +551,6 @@ export default function PrintModelSettings() {
                       <Input type="number" min={24} max={140} value={eff.header.logoHeight} onChange={(e) => updateHeader("logoHeight", Number(e.target.value) || 0)} className="text-sm" />
                     </div>
                   </div>
-                  {displayLogo && (
-                    <div className="mt-3 border border-neutral-200 rounded-lg p-2">
-                      <p className="text-[10px] text-neutral-400 mb-1">Preview</p>
-                      <img src={displayLogo} alt="Logo preview" className="max-h-16 object-contain" />
-                    </div>
-                  )}
                 </Panel>
 
                 {/* Custom header HTML */}
@@ -664,8 +658,9 @@ export default function PrintModelSettings() {
 
                 <Panel title="Signature" icon={PenTool}>
                   <Toggle label="Show signature" checked={eff.footer.showSignature} onChange={(v) => updateFooter("showSignature", v)} />
-                  <label className="block text-xs font-medium text-neutral-600 mb-1 mt-3">Signature URL</label>
-                  <Input value={eff.footer.signatureUrl} onChange={(e) => updateFooter("signatureUrl", e.target.value)} placeholder="https://..." className="text-sm" />
+                  <div className="mt-3">
+                    <AssetUpload kind="signature" label="signature" module={activeModule} targetUserId={selectedUserId} value={eff.footer.signatureUrl} onChange={(v) => updateFooter("signatureUrl", v)} toFullUrl={toFullUrl} previewClass="max-h-12 object-contain" />
+                  </div>
                   <div className="grid grid-cols-2 gap-3 mt-3">
                     <div>
                       <label className="block text-xs font-medium text-neutral-600 mb-1">Width (px)</label>
@@ -676,12 +671,6 @@ export default function PrintModelSettings() {
                       <Input type="number" min={24} max={140} value={eff.footer.signatureHeight} onChange={(e) => updateFooter("signatureHeight", Number(e.target.value) || 0)} className="text-sm" />
                     </div>
                   </div>
-                  {displaySignature && (
-                    <div className="mt-3 border border-neutral-200 rounded-lg p-2">
-                      <p className="text-[10px] text-neutral-400 mb-1">Preview</p>
-                      <img src={displaySignature} alt="Signature preview" className="max-h-12 object-contain" />
-                    </div>
-                  )}
                 </Panel>
 
                 <Panel title="QR Code" icon={QrCode}>
@@ -736,13 +725,16 @@ export default function PrintModelSettings() {
               {/* header */}
               <header className="flex justify-between gap-5">
                 <div className="flex flex-col gap-1.5">
-                  {displayLogo ? (
-                    <img src={displayLogo} alt="Logo" style={{ width: eff.header.logoWidth, height: eff.header.logoHeight, objectFit: "contain" }} />
-                  ) : (
-                    <div className="border border-dashed border-neutral-400 rounded-lg grid place-items-center text-neutral-500 text-xs" style={{ width: eff.header.logoWidth, height: eff.header.logoHeight }}>
-                      Logo
-                    </div>
-                  )}
+                  <SafeImage
+                    src={displayLogo}
+                    alt="Logo"
+                    style={{ width: eff.header.logoWidth, height: eff.header.logoHeight, objectFit: "contain" }}
+                    fallback={
+                      <div className="border border-dashed border-neutral-400 rounded-lg grid place-items-center text-neutral-500 text-xs" style={{ width: eff.header.logoWidth, height: eff.header.logoHeight }}>
+                        Logo
+                      </div>
+                    }
+                  />
                   {eff.header.showCompanyName && (
                     <h2 className="text-2xl font-bold tracking-tight" style={{ color: "var(--primary)" }}>{selectedUser?.strBusinessName || selectedUser?.strUsername || "Business Name"}</h2>
                   )}
@@ -865,13 +857,16 @@ export default function PrintModelSettings() {
                   {eff.footer.showSignature && (
                     <div className="text-right">
                       <p className="text-xs mb-1.5">Authorized Signature</p>
-                      {displaySignature ? (
-                        <img src={displaySignature} alt="Signature" style={{ width: eff.footer.signatureWidth, height: eff.footer.signatureHeight, objectFit: "contain" }} />
-                      ) : (
-                        <div className="border border-dashed border-neutral-400 rounded-lg grid place-items-center text-neutral-500 text-xs" style={{ width: eff.footer.signatureWidth, height: eff.footer.signatureHeight }}>
-                          Signature
-                        </div>
-                      )}
+                      <SafeImage
+                        src={displaySignature}
+                        alt="Signature"
+                        style={{ width: eff.footer.signatureWidth, height: eff.footer.signatureHeight, objectFit: "contain" }}
+                        fallback={
+                          <div className="border border-dashed border-neutral-400 rounded-lg grid place-items-center text-neutral-500 text-xs" style={{ width: eff.footer.signatureWidth, height: eff.footer.signatureHeight }}>
+                            Signature
+                          </div>
+                        }
+                      />
                     </div>
                   )}
                   {eff.footer.sideHtml.trim() && (
