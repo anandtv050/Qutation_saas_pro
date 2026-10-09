@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
 import MarketingLayout, { RichText, TrialButton, FeatureGrid } from "./MarketingLayout";
 import { SITE } from "./site";
 import { GENERAL_PAGES, getPage } from "./pages";
@@ -304,10 +303,9 @@ export default function MarketingPage({ slug }) {
     <MarketingLayout>
       <article className="max-w-3xl mx-auto px-4 sm:px-6 pt-24 pb-16">
         <nav aria-label="Breadcrumb" className="text-sm text-neutral-600 mb-6">
-          <ol className="flex items-center gap-1 flex-wrap">
+          <ol className="flex items-center flex-wrap">
             <li><Link to="/" className="hover:text-black">Home</Link></li>
-            <li aria-hidden="true"><ChevronRight className="w-3.5 h-3.5" /></li>
-            <li aria-current="page" className="text-neutral-800">{page.h1}</li>
+            <li aria-current="page" className="text-neutral-800 before:content-['/'] before:mx-2 before:text-neutral-400">{page.h1}</li>
           </ol>
         </nav>
 

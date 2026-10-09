@@ -79,29 +79,18 @@ function Nav() {
         <Link to="/" aria-label="Quotely Pro home">
           <Logo />
         </Link>
-        <div className="hidden md:flex items-center gap-6">
-          <Link to="/quotation-format" className="text-sm text-neutral-600 hover:text-black">Quotation format</Link>
-          <a href="/#industries" className="text-sm text-neutral-600 hover:text-black">Industries</a>
-          <a href="/#pricing" className="text-sm text-neutral-600 hover:text-black">Pricing</a>
+        <div className="flex items-center gap-3 md:gap-6">
+          <Link to="/quotation-format" className="hidden md:inline text-sm text-neutral-600 hover:text-black">Quotation format</Link>
+          <a href="/#industries" className="hidden md:inline text-sm text-neutral-600 hover:text-black">Industries</a>
+          <a href="/#pricing" className="hidden md:inline text-sm text-neutral-600 hover:text-black">Pricing</a>
           <a href="/login" className="text-sm font-medium text-neutral-700 hover:text-black">Sign in</a>
           <a
             href={demoLink()}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-4 py-2 text-sm font-semibold bg-black text-white rounded-lg hover:bg-neutral-800"
+            className="px-3 md:px-4 py-1.5 md:py-2 text-sm font-semibold bg-black text-white rounded-lg hover:bg-neutral-800"
           >
             Start free trial
-          </a>
-        </div>
-        <div className="md:hidden flex items-center gap-3">
-          <a href="/login" className="text-sm font-medium text-neutral-700">Sign in</a>
-          <a
-            href={demoLink()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-1.5 text-sm font-semibold bg-black text-white rounded-lg"
-          >
-            Free trial
           </a>
         </div>
       </nav>

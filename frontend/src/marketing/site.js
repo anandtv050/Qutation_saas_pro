@@ -55,7 +55,6 @@ export const PLANS = [
     tagline: "Everything you need to quote, bill and follow up",
     features: [
       "Everything in Basic",
-      SETUP_FEATURE,
       "Warranty certificates and expiry tracking",
       "Advance and payment receipts",
       "Reports and dashboard",
@@ -71,7 +70,6 @@ export const PLANS = [
     tagline: "Pro, plus we set everything up and look after you",
     features: [
       "Everything in Pro",
-      SETUP_FEATURE,
       "Full setup: catalogue and old quotations loaded for you",
       "Layout changes anytime",
       "Onboarding visit or call",
