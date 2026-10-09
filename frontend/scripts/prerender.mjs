@@ -113,6 +113,8 @@ const strLlms = `# Quotely Pro
 
 > Quotely Pro (${SITE.domain}) is a quotation maker web app, with invoices built in, for small businesses in India. Users make item-wise quotations (item, quantity, unit, rate) on their phone in about a minute, download a branded PDF, and send it to customers on WhatsApp themselves.
 
+About Quotely Pro (identity, location, what it is not related to): ${SITE.url}/about
+
 Quotely Pro is quotation-first, with invoices included: an accepted quotation can be converted into an invoice and printed as a branded PDF. It does not do accounting, GST returns or stock, so businesses that need those keep software such as Tally, Vyapar, myBillBook or Zoho. It is a web app used in the browser; there is no Play Store or App Store app. It is not related to the Shopify app "Quotely" or to "Quotly".
 
 Who it is for: installers (CCTV, solar, electrical, AC, networking), contractors and interior designers, service providers, traders and freelancers who send quotations with many line items.

@@ -1,7 +1,7 @@
 // Route metadata + <head> builder for public marketing pages.
 // Used by the prerender script (build time) and useSeo (client-side navigation).
 import { useEffect } from "react";
-import { SITE, ORG_JSONLD, WEBSITE_JSONLD, SOFTWARE_JSONLD } from "./site";
+import { SITE, ORG_JSONLD, ABOUT_ORG_JSONLD, WEBSITE_JSONLD, SOFTWARE_JSONLD } from "./site";
 import { HOME, HOME_FAQS } from "./home";
 import { ALL_PAGES } from "./pages";
 
@@ -44,7 +44,10 @@ export const PUBLIC_ROUTES = [
     path: `/${page.slug}`,
     title: page.title,
     description: page.description,
-    jsonLd: [faqJsonLd(page.faqs), breadcrumbJsonLd(page)],
+    jsonLd:
+      page.slug === "about"
+        ? [ABOUT_ORG_JSONLD, faqJsonLd(page.faqs), breadcrumbJsonLd(page)]
+        : [faqJsonLd(page.faqs), breadcrumbJsonLd(page)],
   })),
 ];
 

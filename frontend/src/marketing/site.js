@@ -104,6 +104,17 @@ export const ORG_JSONLD = {
   ],
 };
 
+// About page: same organisation (same @id) with its location filled in.
+export const ABOUT_ORG_JSONLD = {
+  ...ORG_JSONLD,
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Kozhikode",
+    addressRegion: "Kerala",
+    addressCountry: "IN",
+  },
+};
+
 export const WEBSITE_JSONLD = {
   "@context": "https://schema.org",
   "@type": "WebSite",

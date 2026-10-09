@@ -12,7 +12,7 @@ export const HOME = {
 export const HOME_FAQS = [
   {
     q: "What is Quotely Pro?",
-    a: "Quotely Pro is a quotation maker web app for small businesses in India. You add items with quantity, unit and rate on your phone, download a branded PDF quotation, and send it to your customer on WhatsApp. It is built in India and runs at quotelypro.in.",
+    a: "Quotely Pro is a quotation maker web app for small businesses in India. You add items with quantity, unit and rate on your phone, download a branded PDF quotation, and send it to your customer on WhatsApp. It is built in India and runs at quotelypro.in. Read more [about Quotely Pro](/about).",
   },
   {
     q: "Who is Quotely Pro for?",

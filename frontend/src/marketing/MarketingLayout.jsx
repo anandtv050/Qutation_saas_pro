@@ -159,7 +159,10 @@ function Footer() {
         <p className="text-xs text-neutral-600">
           &copy; <span suppressHydrationWarning>{new Date().getFullYear()}</span> Quotely Pro (quotelypro.in). Made in India.
         </p>
-        <a href="/login" className="text-xs text-neutral-600 hover:text-black">Sign in</a>
+        <div className="flex items-center gap-4">
+          <Link to="/about" className="text-xs text-neutral-600 hover:text-black">About Quotely Pro</Link>
+          <a href="/login" className="text-xs text-neutral-600 hover:text-black">Sign in</a>
+        </div>
       </div>
     </footer>
   );

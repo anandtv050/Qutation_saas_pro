@@ -2413,7 +2413,75 @@ export const COMPARISON_PAGES = [
   },
 ];
 
-export const ALL_PAGES = [...GENERAL_PAGES, ...INDUSTRY_PAGES, ...COMPARISON_PAGES];
+export const ABOUT_PAGE = {
+  slug: "about",
+  kind: "about",
+  navLabel: "About Quotely Pro",
+  title: "About Quotely Pro \u2013 Quotation App Made in Kerala, India",
+  description:
+    "Quotely Pro (quotelypro.in) is a web app for quotations and invoices, built in Kozhikode, Kerala for small businesses and installers in India.",
+  h1: "About Quotely Pro",
+  intro: [
+    "Quotely Pro (quotelypro.in) is a web app for quotations and invoices for small businesses and installers in India.",
+    "Quotely Pro (quotelypro.in) is an Indian product and is not related to quotelypro.com, the QuotelyPro mobile app, or other apps named Quotely or Quotly.",
+  ],
+  sections: [
+    {
+      heading: "What Quotely Pro is",
+      list: [
+        "A web app for making quotations and invoices. You add items with quantity, unit and rate, and download a branded PDF.",
+        "It works in any browser on a phone, tablet or computer. There is no app to install, and it is not a mobile-only app.",
+        "Your data is stored in a cloud database, so you can sign in from any device.",
+        "It is built in Kozhikode, Kerala, India.",
+        "Prices are in Indian rupees. Plans start from \u20b9999 per month, with a 7-day free trial. No payment needed for the trial.",
+      ],
+    },
+    {
+      heading: "Main features",
+      paragraphs: ["Every feature below is in the app today."],
+      features: true,
+    },
+    {
+      heading: "What Quotely Pro does not do",
+      paragraphs: [
+        "Quotely Pro does not do accounting, GST returns or stock management. Businesses that need those keep their accounting software and use Quotely Pro for quotations and invoices.",
+      ],
+    },
+    {
+      heading: "Not the same as other apps called Quotely",
+      paragraphs: ["Quotely Pro (quotelypro.in) is an Indian product and is not related to quotelypro.com, the QuotelyPro mobile app, or other apps named Quotely or Quotly."],
+    },
+    {
+      heading: "Contact",
+      list: [
+        "WhatsApp: +91 88486 44935",
+        "Email: supportquotely@gmail.com",
+      ],
+    },
+  ],
+  ctaContext: "my business",
+  faqs: [
+    {
+      q: "What is Quotely Pro?",
+      a: "Quotely Pro (quotelypro.in) is a web app for quotations and invoices for small businesses and installers in India. It works in any browser, with nothing to install.",
+    },
+    {
+      q: "Where is Quotely Pro made?",
+      a: "Quotely Pro is built in Kozhikode, Kerala, India. Prices are in Indian rupees.",
+    },
+    {
+      q: "Is Quotely Pro the same as quotelypro.com or the QuotelyPro mobile app?",
+      a: "No. Quotely Pro (quotelypro.in) is an Indian product and is not related to quotelypro.com, the QuotelyPro mobile app, or other apps named Quotely or Quotly.",
+    },
+    {
+      q: "Is Quotely Pro a mobile app?",
+      a: "No. It is a web app that works in the browser on a phone, tablet or computer. There is no Play Store or App Store app.",
+    },
+  ],
+  related: [],
+};
+
+export const ALL_PAGES = [...GENERAL_PAGES, ...INDUSTRY_PAGES, ...COMPARISON_PAGES, ABOUT_PAGE];
 
 export function getPage(slug) {
   return ALL_PAGES.find((p) => p.slug === slug);
