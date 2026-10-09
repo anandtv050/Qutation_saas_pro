@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import inventoryService from "@/services/inventoryService";
 import quotationService from "@/services/quotationService";
+import WhatsAppShareButton from "@/components/WhatsAppShareButton";
+import { useWhatsAppShare } from "@/lib/whatsappShare";
 import pdfService from "@/services/pdfService";
 import aiService from "@/services/aiService";
 import { usePermission } from "@/contexts/PermissionsContext";
@@ -611,6 +613,17 @@ export default function NewQuotation() {
     }
   };
 
+  // One hook for both toolbars so the PDF is prefetched once per saved version.
+  const strQuotationNumber = savedQuotation?.quotation_number || "draft";
+  const whatsappShare = useWhatsAppShare({
+    fetchPdf: () =>
+      pdfService.generateQuotationPDF({ intQuotationId: savedQuotation.intPkQuotationId, blnIncludeInfoPage: true }),
+    filename: `Quotation_${strQuotationNumber}.pdf`,
+    message: `Hello ${customerName || ""}, please find quotation ${strQuotationNumber} attached.`.replace("Hello ,", "Hello,"),
+    phone: customerPhone,
+    prefetchKey: savedQuotation || null,
+  });
+
   // Loading screen for edit mode
   if (isLoadingQuotation) {
     return (
@@ -1213,6 +1226,10 @@ Example:
                     )}
                     {isPrinting ? "Generating PDF..." : "Print Quotation"}
                   </Button>
+                  <WhatsAppShareButton
+                    share={whatsappShare}
+                    className="w-full h-11 rounded-lg font-medium text-sm border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  />
                   {canWarranty && (
                     <Button
                       onClick={() => navigate(`/warranty?sourceType=quotation&sourceId=${savedQuotation.intPkQuotationId}`)}
@@ -1286,6 +1303,11 @@ Example:
               >
                 {isPrinting ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : <Printer className="w-[18px] h-[18px]" />}
               </button>
+              <WhatsAppShareButton
+                share={whatsappShare}
+                variant="icon"
+                className="w-10 h-10 rounded-full border border-emerald-200 text-emerald-700 hover:bg-emerald-50 active:bg-emerald-100"
+              />
               {canWarranty && (
                 <button
                   onClick={() => navigate(`/warranty?sourceType=quotation&sourceId=${savedQuotation.intPkQuotationId}`)}

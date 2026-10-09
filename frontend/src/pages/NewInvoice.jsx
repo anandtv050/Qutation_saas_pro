@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Loader2, Printer, Calendar, Check, Share2, ShieldCheck, Receipt } from "lucide-react";
+import { ArrowLeft, Loader2, Printer, Calendar, Check, ShieldCheck, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import invoiceService from "@/services/invoiceService";
 import pdfService from "@/services/pdfService";
+import WhatsAppShareButton from "@/components/WhatsAppShareButton";
+import { useWhatsAppShare } from "@/lib/whatsappShare";
 import { usePermission } from "@/contexts/PermissionsContext";
 // Commented for later - inventory search
 // import { searchInventory, inventoryItems } from "@/data/inventoryData";
@@ -370,10 +372,15 @@ export default function NewInvoice() {
     }
   };
 
-  const handleShare = () => {
-    // In real app, this would generate a shareable link or PDF
-    alert("Share functionality coming soon!");
-  };
+  // One hook for both toolbars so the PDF is prefetched once per saved version.
+  const strInvoiceNumber = savedInvoice?.invoice_number || invoiceId || "draft";
+  const whatsappShare = useWhatsAppShare({
+    fetchPdf: () => pdfService.generateInvoicePDF({ intInvoiceId: getInvoiceSourceId(), blnIncludeInfoPage: false }),
+    filename: `Invoice_${strInvoiceNumber}.pdf`,
+    message: `Hello ${customerName || ""}, please find invoice ${strInvoiceNumber} attached.`.replace("Hello ,", "Hello,"),
+    phone: customerPhone,
+    prefetchKey: savedInvoice || (isViewMode ? invoiceId : null),
+  });
 
   // Set default due date to 15 days from now if not set
   useEffect(() => {
@@ -950,14 +957,10 @@ export default function NewInvoice() {
                     </Button>
                   )}
                   {/* Share */}
-                  <Button
-                    onClick={handleShare}
-                    variant="outline"
-                    className="w-full h-11 border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-lg font-medium"
-                  >
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Share Invoice
-                  </Button>
+                  <WhatsAppShareButton
+                    share={whatsappShare}
+                    className="w-full h-11 rounded-lg font-medium text-sm border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  />
                 </>
               )}
             </div>
@@ -1022,13 +1025,11 @@ export default function NewInvoice() {
                 </Button>
               )}
               {/* Share */}
-              <Button
-                onClick={handleShare}
-                className="h-11 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium shrink-0"
-              >
-                <Share2 className="w-4 h-4 mr-1" />
-                Share
-              </Button>
+              <WhatsAppShareButton
+                share={whatsappShare}
+                variant="compact"
+                className="h-11 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-sm shrink-0"
+              />
               {/* Update */}
               <Button
                 onClick={handleSave}

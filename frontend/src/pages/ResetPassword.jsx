@@ -41,7 +41,7 @@ export default function ResetPassword() {
           <div className="inline-flex items-center justify-center w-12 h-12 bg-black rounded-xl mb-4">
             <span className="text-white text-xl font-bold">Q</span>
           </div>
-          <h1 className="text-black text-xl font-semibold">Quotely</h1>
+          <p className="text-black text-xl font-semibold">Quotely Pro</p>
         </div>
 
         {success ? (

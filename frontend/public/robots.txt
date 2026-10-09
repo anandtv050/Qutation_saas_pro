@@ -1,3 +1,26 @@
 User-agent: *
 Allow: /
+
+# App, account and auth screens (not public content)
+Disallow: /login$
+Disallow: /signup$
+Disallow: /subscribe$
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /dashboard$
+Disallow: /quotations/
+Disallow: /invoices/
+Disallow: /warranty$
+Disallow: /advance-receipts$
+Disallow: /inventory$
+Disallow: /reports$
+Disallow: /profile$
+Disallow: /print-settings$
+Disallow: /users$
+Disallow: /admin$
+Disallow: /plans$
+Disallow: /services$
+Disallow: /modules$
+Disallow: /spa
+
 Sitemap: https://quotelypro.in/sitemap.xml

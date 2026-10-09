@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Source for public/og-image.png (1200x630). Re-render with: node scripts/render-brand.mjs -->
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0a0a"/>
+      <stop offset="100%" stop-color="#171717"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <g transform="translate(80, 76)" font-family="Segoe UI, Inter, system-ui, sans-serif">
+    <rect width="56" height="56" rx="12" fill="#ffffff"/>
+    <text x="28" y="40" font-size="30" font-weight="800" text-anchor="middle" fill="#0a0a0a">Q</text>
+    <text x="74" y="38" font-size="28" font-weight="700" fill="#ffffff">Quotely Pro</text>
+  </g>
+  <g transform="translate(80, 250)" font-family="Segoe UI, Inter, system-ui, sans-serif" font-weight="800" fill="#ffffff" font-size="68">
+    <text x="0" y="0">Professional quotations</text>
+    <text x="0" y="84">on your phone in <tspan fill="#a3a3a3">1 minute</tspan>.</text>
+  </g>
+  <text x="80" y="440" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="28" fill="#d4d4d4">Quotation maker for small businesses in India</text>
+  <g transform="translate(80, 500)" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="18" font-weight="600" fill="#ffffff">
+    <rect width="230" height="44" rx="22" fill="#ffffff" fill-opacity="0.12"/>
+    <text x="115" y="29" text-anchor="middle">Item-wise quotations</text>
+    <rect x="250" width="250" height="44" rx="22" fill="#ffffff" fill-opacity="0.12"/>
+    <text x="375" y="29" text-anchor="middle">PDF ready for WhatsApp</text>
+    <rect x="520" width="170" height="44" rx="22" fill="#ffffff" fill-opacity="0.12"/>
+    <text x="605" y="29" text-anchor="middle">Made in India</text>
+  </g>
+  <text x="1120" y="530" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="24" font-weight="600" fill="#a3a3a3" text-anchor="end">quotelypro.in</text>
+</svg>

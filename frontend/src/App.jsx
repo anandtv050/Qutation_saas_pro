@@ -1,27 +1,49 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import Subscribe from "./pages/Subscribe";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import Dashboard from "./pages/Dashboard";
-import NewQuotation from "./pages/NewQuotation";
-import NewInvoice from "./pages/NewInvoice";
-import Inventory from "./pages/Inventory";
-import Reports from "./pages/Reports";
-import Profile from "./pages/Profile";
-import UserManagement from "./pages/UserManagement";
-import AdminDashboard from "./pages/AdminDashboard";
-import WarrantyCertificate from "./pages/WarrantyCertificate";
-import AdvanceReceipt from "./pages/AdvanceReceipt";
-import PrintModelSettings from "./pages/PrintModelSettings";
-import PlanManagement from "./pages/PlanManagement";
-import ServiceManagement from "./pages/ServiceManagement";
-import ModuleManagement from "./pages/ModuleManagement";
-import MainLayout from "./components/layout/MainLayout";
+import { lazy, Suspense } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
+import { MARKETING_ROUTES, NOT_FOUND_ELEMENT } from "./marketing/publicRoutes";
 import NoPermission from "./components/NoPermission";
 import { usePermissions } from "./contexts/PermissionsContext";
+
+// Marketing pages above are bundled eagerly so prerendered HTML hydrates without a
+// Suspense mismatch. App pages load on demand; each gets its own Suspense boundary.
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <Loader2 className="w-8 h-8 animate-spin text-neutral-400" />
+  </div>
+);
+
+const lazyPage = (importer) => {
+  const Page = lazy(importer);
+  return function LazyPage(props) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Page {...props} />
+      </Suspense>
+    );
+  };
+};
+
+const Login = lazyPage(() => import("./pages/Login"));
+const Signup = lazyPage(() => import("./pages/Signup"));
+const Subscribe = lazyPage(() => import("./pages/Subscribe"));
+const ForgotPassword = lazyPage(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazyPage(() => import("./pages/ResetPassword"));
+const Dashboard = lazyPage(() => import("./pages/Dashboard"));
+const NewQuotation = lazyPage(() => import("./pages/NewQuotation"));
+const NewInvoice = lazyPage(() => import("./pages/NewInvoice"));
+const Inventory = lazyPage(() => import("./pages/Inventory"));
+const Reports = lazyPage(() => import("./pages/Reports"));
+const Profile = lazyPage(() => import("./pages/Profile"));
+const UserManagement = lazyPage(() => import("./pages/UserManagement"));
+const AdminDashboard = lazyPage(() => import("./pages/AdminDashboard"));
+const WarrantyCertificate = lazyPage(() => import("./pages/WarrantyCertificate"));
+const AdvanceReceipt = lazyPage(() => import("./pages/AdvanceReceipt"));
+const PrintModelSettings = lazyPage(() => import("./pages/PrintModelSettings"));
+const PlanManagement = lazyPage(() => import("./pages/PlanManagement"));
+const ServiceManagement = lazyPage(() => import("./pages/ServiceManagement"));
+const ModuleManagement = lazyPage(() => import("./pages/ModuleManagement"));
+const MainLayout = lazyPage(() => import("./components/layout/MainLayout"));
 
 function App() {
   // Check if user is logged in
@@ -64,10 +86,13 @@ function App() {
   };
 
   return (
-    <BrowserRouter>
       <Routes>
+        {/* Public marketing routes (prerendered at build time) */}
+        {MARKETING_ROUTES.map((r) => (
+          <Route key={r.path} path={r.path} element={r.element} />
+        ))}
+
         {/* Public Routes */}
-        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/subscribe" element={<Subscribe />} />
@@ -100,10 +125,9 @@ function App() {
           <Route path="/modules" element={<AdminRoute><ModuleManagement /></AdminRoute>} />
         </Route>
 
-        {/* Redirect unknown routes */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Unknown routes: real 404 page */}
+        <Route path="*" element={NOT_FOUND_ELEMENT} />
       </Routes>
-    </BrowserRouter>
   );
 }
 

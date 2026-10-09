@@ -66,5 +66,7 @@ coverage/
 .cache/
 .eslintcache
 
-# Runtime-generated uploads (regenerated automatically, not source)
-backend/uploads/qrcodes/
+# Uploaded customer files (logos, signatures, QR codes). Images now live in the
+# database (tbl_user_asset); never commit customer files.
+backend/uploads/
+uploads/

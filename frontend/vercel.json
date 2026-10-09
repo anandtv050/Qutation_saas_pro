@@ -1,5 +1,23 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "trailingSlash": false,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
+    {
+      "source": "/:route(login|signup|subscribe|forgot-password|reset-password|dashboard|warranty|advance-receipts|inventory|reports|profile|print-settings|users|admin|plans|services|modules)",
+      "destination": "/spa.html"
+    },
+    { "source": "/:section(quotations|invoices)/:rest*", "destination": "/spa.html" }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/:route(login|signup|subscribe|forgot-password|reset-password|dashboard|warranty|advance-receipts|inventory|reports|profile|print-settings|users|admin|plans|services|modules|spa)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    }
   ]
 }

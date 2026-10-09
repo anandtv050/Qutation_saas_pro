@@ -10,6 +10,8 @@ import quotationService from "@/services/quotationService";
 import invoiceService from "@/services/invoiceService";
 import advanceReceiptService from "@/services/advanceReceiptService";
 import pdfService from "@/services/pdfService";
+import WhatsAppShareButton from "@/components/WhatsAppShareButton";
+import { useWhatsAppShare } from "@/lib/whatsappShare";
 
 const PAYMENT_MODES = [
   { value: "cash", label: "Cash" },
@@ -29,6 +31,18 @@ const emptyForm = {
 };
 
 const fmtMoney = (n) => `₹${(Number(n) || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+
+// One share hook per receipt row; the PDF is generated on tap (no prefetch for lists).
+function ReceiptShareButton({ receipt, quotation }) {
+  const strRef = receipt.strReceiptNumber || receipt.intPkReceiptId;
+  const whatsappShare = useWhatsAppShare({
+    fetchPdf: () => pdfService.generateAdvanceReceiptPDF({ intReceiptId: receipt.intPkReceiptId }),
+    filename: `Receipt_${strRef}.pdf`,
+    message: `Hello ${receipt.strReceivedFrom || ""}, please find receipt ${strRef} for your payment attached.`.replace("Hello ,", "Hello,"),
+    phone: quotation?.strCustomerPhone,
+  });
+  return <WhatsAppShareButton share={whatsappShare} variant="icon" className="p-2 rounded-lg text-emerald-700 hover:bg-emerald-50" />;
+}
 
 export default function AdvanceReceipt() {
   const navigate = useNavigate();
@@ -367,6 +381,7 @@ export default function AdvanceReceipt() {
                     <Printer className="w-4 h-4 text-neutral-500" />
                   )}
                 </button>
+                {r.strStatus !== "void" && <ReceiptShareButton receipt={r} quotation={quotation} />}
                 {r.strStatus !== "void" && (
                   <>
                     <button onClick={() => openEditForm(r)} className="p-2 hover:bg-neutral-100 rounded-lg" title="Edit">

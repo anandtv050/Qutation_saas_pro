@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import quotationService from "@/services/quotationService";
 import invoiceService from "@/services/invoiceService";
 import pdfService from "@/services/pdfService";
+import WhatsAppShareButton from "@/components/WhatsAppShareButton";
+import { useWhatsAppShare } from "@/lib/whatsappShare";
 import {
   calculateExpiryDate,
   formatWarrantyPeriod,
@@ -298,6 +300,15 @@ export default function WarrantyCertificate() {
     }
   };
 
+  // No prefetch: warranty dates change on this page, so the PDF is generated on tap.
+  const strWarrantyRef = quotation?.strQuotationNumber || "quotation";
+  const whatsappShare = useWhatsAppShare({
+    fetchPdf: () => pdfService.generateWarrantyCertificatePDF({ intQuotationId: quotation.intPkQuotationId }),
+    filename: `Warranty_${strWarrantyRef}.pdf`,
+    message: `Hello ${quotation?.strCustomerName || ""}, please find the warranty certificate for ${strWarrantyRef} attached.`.replace("Hello ,", "Hello,"),
+    phone: quotation?.strCustomerPhone,
+  });
+
   if (isLoading) {
     return (
       <div className="p-4 md:p-6 flex items-center justify-center min-h-[360px]">
@@ -537,6 +548,11 @@ export default function WarrantyCertificate() {
           >
             {isPrinting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
           </Button>
+          <WhatsAppShareButton
+            share={whatsappShare}
+            variant="icon"
+            className="h-11 px-3 rounded-md border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+          />
           <Button
             onClick={handleSave}
             disabled={isSaving || hasInvalidItems}
@@ -554,6 +570,10 @@ export default function WarrantyCertificate() {
             {isPrinting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Printer className="w-4 h-4 mr-2" />}
             Print Certificate
           </Button>
+          <WhatsAppShareButton
+            share={whatsappShare}
+            className="h-10 px-4 rounded-md text-sm font-medium border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+          />
           <Button
             onClick={handleSave}
             disabled={isSaving || hasInvalidItems}

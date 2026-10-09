@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Sparkles, Zap, FileText } from "lucide-react";
+import { Loader2, Copy, Package, FileText } from "lucide-react";
+import { demoLink } from "@/marketing/site";
 import authService from "@/services/authServices";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -76,7 +77,7 @@ export default function Login() {
             <div className="flex items-center justify-center w-10 h-10 bg-white rounded-lg shadow-sm">
               <span className="text-black text-xl font-bold">Q</span>
             </div>
-            <span className="text-white text-xl font-semibold">Quotely</span>
+            <span className="text-white text-xl font-semibold">Quotely Pro</span>
           </div>
 
           {/* Main Message - Centered */}
@@ -90,37 +91,18 @@ export default function Login() {
           </div>
 
           {/* Features - Clean list */}
-          <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 mt-1">
-                <Sparkles className="w-4 h-4 text-white/60" strokeWidth={2} />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-white text-sm font-medium mb-0.5">AI-Powered Generation</h3>
-                <p className="text-neutral-500 text-xs leading-relaxed">Generate professional quotes instantly with intelligent automation</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 mt-1">
-                <Zap className="w-4 h-4 text-white/60" strokeWidth={2} />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-white text-sm font-medium mb-0.5">Lightning Fast Workflow</h3>
-                <p className="text-neutral-500 text-xs leading-relaxed">Save hours with automated calculations and smart templates</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 mt-1">
-                <FileText className="w-4 h-4 text-white/60" strokeWidth={2} />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-white text-sm font-medium mb-0.5">Professional Output</h3>
-                <p className="text-neutral-500 text-xs leading-relaxed">Polished, branded quotes that win clients every time</p>
-              </div>
-            </div>
-          </div>
+          <ul className="space-y-3">
+            {[
+              { icon: Copy, label: "Copy any old quotation" },
+              { icon: Package, label: "Your item catalogue with saved rates" },
+              { icon: FileText, label: "Branded PDF with your logo" },
+            ].map((f) => (
+              <li key={f.label} className="flex items-center gap-3">
+                <f.icon className="w-4 h-4 text-white/60 shrink-0" strokeWidth={2} />
+                <span className="text-white text-sm font-medium">{f.label}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 
@@ -132,7 +114,7 @@ export default function Login() {
             <div className="inline-flex items-center justify-center w-12 h-12 bg-black rounded-xl mb-4">
               <span className="text-white text-xl font-bold">Q</span>
             </div>
-            <h1 className="text-black text-xl font-semibold">Quotely</h1>
+            <p className="text-black text-xl font-semibold">Quotely Pro</p>
           </div>
 
           {/* Header */}
@@ -253,18 +235,23 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Security Badge */}
-          <div className="mt-5 flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-50/80 rounded-lg border border-neutral-200">
-            <svg className="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
-            </svg>
-            <span className="text-neutral-600 text-xs font-medium tracking-wide">Bank-level 256-bit encryption</span>
-          </div>
+          {/* New user: trial is set up on WhatsApp */}
+          <p className="mt-5 text-center text-sm text-neutral-600">
+            New here?{" "}
+            <a
+              href={demoLink()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-black underline underline-offset-2 hover:text-neutral-700"
+            >
+              Start free trial on WhatsApp
+            </a>
+          </p>
 
           {/* Footer */}
           <div className="mt-4 text-center">
             <p className="text-neutral-400 text-xs">
-              &copy; {new Date().getFullYear()} Quotely. All rights reserved.
+              &copy; {new Date().getFullYear()} Quotely Pro. All rights reserved.
             </p>
           </div>
         </div>
