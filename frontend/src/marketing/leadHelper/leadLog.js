@@ -8,6 +8,7 @@
 //   waText    pre-filled WhatsApp text of a WhatsApp click: no auto teaser ever again, the
 //             launcher opens WhatsApp directly
 //   answers   { industrySlug, method, quotes, visitorType } for "Welcome back"
+//   numberAt  they left their WhatsApp number in the chat: no auto teaser or toast again
 // Per browser tab session (sessionStorage): at most one auto teaser and one download toast.
 
 const SHEET_URL = (import.meta.env.VITE_LEAD_SHEET_URL || "").trim();
@@ -52,7 +53,7 @@ export const getConvertedText = () => (typeof loadState().waText === "string" ? 
 
 export function canAutoTeaser() {
   const obj = loadState();
-  if (obj.waText || isSnoozed(obj) || storageGet("sessionStorage", TEASER_SESSION_KEY)) return false;
+  if (obj.waText || obj.numberAt || isSnoozed(obj) || storageGet("sessionStorage", TEASER_SESSION_KEY)) return false;
   const lstRecent = (Array.isArray(obj.teasers) ? obj.teasers : []).filter((t) => Date.now() - Number(t) < WEEK_MS);
   return lstRecent.length < MAX_TEASERS_PER_WEEK;
 }
@@ -64,10 +65,18 @@ export function noteTeaserShown() {
 }
 export const snooze = () => saveState({ snoozeAt: Date.now() });
 export const markConverted = (strText) => saveState({ waText: strText });
+export const markNumberGiven = () => saveState({ numberAt: Date.now() });
 
 export function canToast() {
   const obj = loadState();
-  return !obj.waText && !isSnoozed(obj) && !storageGet("sessionStorage", TOAST_SESSION_KEY);
+  return !obj.waText && !obj.numberAt && !isSnoozed(obj) && !storageGet("sessionStorage", TOAST_SESSION_KEY);
+}
+
+// Indian mobile number from free text: optional +91 / 91 / 0, then 10 digits starting 6-9.
+// Returns "+91XXXXXXXXXX", or null if it is not a valid mobile number.
+export function normaliseMobile(strInput) {
+  const strDigits = String(strInput || "").replace(/[\s\-().]/g, "").replace(/^\+?91(?=\d{10}$)/, "").replace(/^0(?=\d{10}$)/, "");
+  return /^[6-9]\d{9}$/.test(strDigits) ? `+91${strDigits}` : null;
 }
 export const noteToastShown = () => storageSet("sessionStorage", TOAST_SESSION_KEY, "1");
 
@@ -149,7 +158,8 @@ function getSource() {
 const industryKey = (slug) => (slug ? slug.replace(/-quotation-format$/, "") : "");
 
 // page: entry from pages.js, or null on the homepage. answers: whatever is known so far.
-export function logEvent(page, strEvent, { question = "", answer = "", answers = {} } = {}) {
+// phone: only on "number_submitted" rows (the visitor typed it in the chat).
+export function logEvent(page, strEvent, { question = "", answer = "", answers = {}, phone = "" } = {}) {
   if (!SHEET_URL) return;
   const strIndustry = answers.industrySlug || (page?.kind === "industry" ? page.slug : "");
   const objRow = {
@@ -166,6 +176,7 @@ export function logEvent(page, strEvent, { question = "", answer = "", answers =
     source: getSource(),
     device: getDevice(),
     referrer: getReferrer(),
+    phone,
   };
   try {
     fetch(SHEET_URL, {

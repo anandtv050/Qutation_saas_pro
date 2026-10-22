@@ -8,7 +8,7 @@ import { INDUSTRY_PAGES } from "../pages";
 import { templatePath } from "../samples";
 import {
   canAutoTeaser, noteTeaserShown, snooze, markConverted, getConvertedText, canToast, noteToastShown,
-  getSavedAnswers, saveAnswers, logEvent, clarityEvent,
+  getSavedAnswers, saveAnswers, markNumberGiven, normaliseMobile, logEvent, clarityEvent,
 } from "./leadLog";
 import { whatsappText, whatsappUrl, withArticle, pageTitle, industryName, industryOfSlug } from "./whatsapp";
 
@@ -36,6 +36,11 @@ const CLOSING = {
 };
 const CLOSING_DEFAULT = "Make item-wise quotations with your logo, ready in a minute.";
 const CLOSING_BUSY = "That's a lot of quotations. This will save you real time every week.";
+// After a download: point them to Quotely Pro; the WhatsApp trial button always ends the chat.
+const AFTER_DOWNLOAD = [
+  "Good luck with your quotation!",
+  `Next time, make quotations like this with your own logo in 1 minute on Quotely Pro. Start free for ${SITE.trialDays} days 👇`,
+];
 const TRIGGER_DELAY_MS = 7000;
 const SCROLL_SHARE = 0.4;
 const TYPING_MS = 600;
@@ -140,6 +145,9 @@ export default function LeadHelper({ page }) {
   const [blnTyping, setBlnTyping] = useState(false);
   const [blnPulse, setBlnPulse] = useState(false); // one launcher pulse when the teaser appears
   const [blnMore, setBlnMore] = useState(false);
+  const [strNumber, setStrNumber] = useState(""); // "leave your number" box at the end of the chat
+  const [blnNumberError, setBlnNumberError] = useState(false);
+  const [blnNumberSent, setBlnNumberSent] = useState(false);
   const [answers, setAnswers] = useState(() =>
     objSaved
       ? { method: "", quotes: "", ...objSaved, visitorType: objSaved.visitorType || "owner" }
@@ -147,6 +155,7 @@ export default function LeadHelper({ page }) {
   );
 
   const strTitleId = useId();
+  const strNumberId = useId();
   const refLauncher = useRef(null);
   const refScroll = useRef(null);
   const refLastBot = useRef(null);
@@ -439,8 +448,24 @@ export default function LeadHelper({ page }) {
     later(() => setStrConverted(strText), 0);
   };
   const onWhatsApp = () => {
-    log("whatsapp_click", "result");
+    log("whatsapp_click", QUESTION[step]);
     convert(strChatText);
+  };
+  // "Leave your number": a valid Indian mobile is logged to the sheet (phone column).
+  const onSubmitNumber = (e) => {
+    e.preventDefault();
+    const strMobile = normaliseMobile(strNumber);
+    if (!strMobile) {
+      setBlnNumberError(true);
+      return;
+    }
+    setBlnNumberError(false);
+    setBlnNumberSent(true);
+    markNumberGiven();
+    logEvent(page, "number_submitted", { question: QUESTION[step], answers, phone: strMobile });
+    clarityEvent("helper_number");
+    userSays(strMobile.replace(/^\+91(\d{5})(\d{5})$/, "+91 $1 $2"));
+    say([`Thanks! Our team will message you on WhatsApp within a few hours (9 AM – 9 PM).`], step);
   };
   const onToastWhatsApp = () => {
     log("toast_whatsapp_click", "toast");
@@ -453,7 +478,7 @@ export default function LeadHelper({ page }) {
     clarityEvent("helper_download");
     later(() => {
       userSays("PDF format");
-      say(["Good luck with your quotation!"], "end");
+      say(AFTER_DOWNLOAD, "end");
     }, 0);
   };
 
@@ -601,6 +626,57 @@ export default function LeadHelper({ page }) {
                 >
                   📄 Download PDF format
                 </a>
+              </div>
+            )}
+
+            {/* End of the chat: leave a number, or (always last) start the free trial on WhatsApp */}
+            {step === "end" && (
+              <div className="mt-3 grid gap-2">
+                {!blnNumberSent && (
+                  <form onSubmit={onSubmitNumber} noValidate className="rounded-xl border border-neutral-200 p-3">
+                    <label htmlFor={strNumberId} className="block text-sm font-medium text-neutral-900">
+                      Or leave your WhatsApp number and our team will message you
+                    </label>
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        id={strNumberId}
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        placeholder="10-digit mobile number"
+                        value={strNumber}
+                        onChange={(e) => {
+                          setStrNumber(e.target.value);
+                          setBlnNumberError(false);
+                        }}
+                        aria-invalid={blnNumberError}
+                        aria-describedby={blnNumberError ? `${strNumberId}-err` : undefined}
+                        className={`min-w-0 flex-1 min-h-[44px] px-3 text-base text-neutral-900 bg-white border rounded-lg outline-none focus:border-black ${
+                          blnNumberError ? "border-red-500" : "border-neutral-300"
+                        }`}
+                      />
+                      <button type="submit" className="shrink-0 min-h-[44px] px-4 text-sm font-semibold text-white bg-black rounded-lg hover:bg-neutral-800">
+                        Send
+                      </button>
+                    </div>
+                    {blnNumberError && (
+                      <p id={`${strNumberId}-err`} role="alert" className="mt-1.5 text-xs text-red-600">
+                        Please enter a valid 10-digit mobile number.
+                      </p>
+                    )}
+                    <p className="mt-1.5 text-xs text-neutral-500">We'll only use it to contact you about Quotely Pro.</p>
+                  </form>
+                )}
+                <a
+                  href={whatsappUrl(strChatText)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 min-h-[48px] px-4 text-[15px] font-semibold text-white bg-[#15803d] rounded-xl shadow-sm hover:bg-[#166534] transition-colors"
+                  onClick={onWhatsApp}
+                >
+                  💬 Start free {SITE.trialDays}-day trial on WhatsApp
+                </a>
+                <p className="-mt-0.5 text-xs text-neutral-600 text-center">Our team usually replies within a few hours (9 AM – 9 PM).</p>
               </div>
             )}
           </div>

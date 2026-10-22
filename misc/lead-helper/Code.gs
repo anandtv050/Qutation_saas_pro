@@ -13,19 +13,26 @@ var TIME_ZONE = 'Asia/Kolkata';
 // Columns, in order. "timestamp" is set here, not by the browser.
 var COLUMNS = [
   'timestamp', 'session_id', 'page_slug', 'page_type', 'industry', 'event', 'question', 'answer',
-  'quotes_per_day', 'current_method', 'visitor_type', 'source', 'device', 'referrer'
+  'quotes_per_day', 'current_method', 'visitor_type', 'source', 'device', 'referrer', 'phone'
 ];
 
 var ALLOWED_EVENTS = [
   'shown', 'opened', 'closed', 'hook_yes', 'hook_no', 'answered', 'skipped', 'whatsapp_click', 'download_click',
-  'toast_whatsapp_click', 'inline_whatsapp_click'
+  'toast_whatsapp_click', 'inline_whatsapp_click', 'number_submitted'
 ];
 
 // Max length per field. Unlisted fields are dropped.
 var MAX_LENGTH = {
   session_id: 64, page_slug: 100, page_type: 20, industry: 60, event: 20, question: 40, answer: 60,
-  quotes_per_day: 20, current_method: 40, visitor_type: 30, source: 60, device: 10, referrer: 200
+  quotes_per_day: 20, current_method: 40, visitor_type: 30, source: 60, device: 10, referrer: 200, phone: 13
 };
+
+// The number a visitor typed in the chat ("+91" + 10-digit Indian mobile). Kept only on
+// "number_submitted" rows and only in that exact shape; anything else is left blank.
+function phone_(data) {
+  var p = typeof data.phone === 'string' ? data.phone : '';
+  return data.event === 'number_submitted' && /^\+91[6-9]\d{9}$/.test(p) ? p : '';
+}
 
 function doPost(e) {
   try {
@@ -37,6 +44,7 @@ function doPost(e) {
 
     var row = COLUMNS.map(function (col) {
       if (col === 'timestamp') return Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
+      if (col === 'phone') return clean_(phone_(data), MAX_LENGTH.phone);
       return clean_(data[col], MAX_LENGTH[col]);
     });
 
@@ -68,8 +76,11 @@ function sheet_() {
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(COLUMNS);
     sheet.setFrozenRows(1);
-    sheet.getRange(1, 1, 1, COLUMNS.length).setFontWeight('bold');
   }
+  // Keep the header in step with COLUMNS (e.g. the "phone" column added later).
+  var header = sheet.getRange(1, 1, 1, COLUMNS.length);
+  if (header.getValues()[0].join('|') !== COLUMNS.join('|')) header.setValues([COLUMNS]);
+  header.setFontWeight('bold');
   return sheet;
 }
 

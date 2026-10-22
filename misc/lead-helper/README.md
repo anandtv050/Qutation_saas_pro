@@ -5,12 +5,13 @@ step to a Google Apps Script web app, which appends a row to the **Website Leads
 Growth Tracker sheet. Free, no backend.
 
 ## Columns
-`timestamp, session_id, page_slug, page_type, industry, event, question, answer, quotes_per_day, current_method, visitor_type, source, device, referrer`
+`timestamp, session_id, page_slug, page_type, industry, event, question, answer, quotes_per_day, current_method, visitor_type, source, device, referrer, phone`
 
-- `event`: `shown` (auto teaser appeared), `opened` (chat opened), `closed`, `hook_yes`, `hook_no`, `answered`, `whatsapp_click`, `download_click`, `toast_whatsapp_click` (download toast), `inline_whatsapp_click` (the line under each sample)
+- `event`: `shown` (auto teaser appeared), `opened` (chat opened), `closed`, `hook_yes`, `hook_no`, `answered`, `whatsapp_click`, `download_click`, `toast_whatsapp_click` (download toast), `inline_whatsapp_click` (the line under each sample), `number_submitted` (visitor left their WhatsApp number at the end of the chat)
 - `session_id`: random per page visit. One helper run = one session_id.
-- `question`: `hook`, `quotes_per_day`, `current_method`, `result`, `download`, `end`, `teaser` / `toast` (closed), `page` (a download link on the page itself), `launcher` (launcher opened WhatsApp directly), `inline`. On `opened` rows, `answer` is `teaser` or `launcher`
-- `visitor_type`: `owner`, `learning` ("No, just looking"), `unknown`
+- `question`: `hook`, `industry`, `current_method`, `quotes_per_day`, `result`, `download`, `end`, `teaser` / `toast` (closed), `page` (a download link on the page itself), `launcher` (launcher opened WhatsApp directly), `inline`. On `opened` rows, `answer` is `teaser` or `launcher`
+- `visitor_type`: `owner`, `other_business` (another trade, after "No"), `needs_quote` ("I'm a customer"), `learning` ("Just learning"), `unknown`
+- `phone`: only on `number_submitted` rows, as `+91XXXXXXXXXX`. This is personal data: share the sheet only with people who follow up leads.
 - `source`: `utm_source`, else referrer (`google`, `bing`, `chatgpt.com`, other host, `internal`), else `direct`
 - `referrer`: origin only (e.g. `https://www.google.com`), never the full URL
 - `timestamp`: set by the script, IST
@@ -20,6 +21,7 @@ Growth Tracker sheet. Free, no backend.
 - Auto teaser: 7 s on the page AND the sample in view (or 40% scrolled). At most once per browser session, at most 2 per 7 days. None for 7 days after the teaser ×. Never again after a WhatsApp click (the launcher then opens WhatsApp directly).
 - Download toast: after a template download on the page, once per session, not during the 7-day snooze.
 - Answers are remembered in the browser; a returning visitor gets "Welcome back" and skips what they already answered.
+- After a PDF download the chat ends with a "leave your number" box and the "Start free 7-day trial on WhatsApp" button (always last). A visitor who leaves a number gets no more auto teasers or toasts.
 
 ## Deploy the script (one time)
 1. Open the **Growth Tracker** Google Sheet.
