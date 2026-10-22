@@ -20,9 +20,10 @@ Growth Tracker sheet. Free, no backend.
 One row per visit (`session_id`), updated on every event:
 `first_seen, last_seen, session_id, page_slug, industry, source, device, visitor_type, current_method, quotes_per_day, furthest_step, downloaded, whatsapp, phone, result`
 
-- `furthest_step`: shown < opened < hook < current_method < quotes_per_day < result < end. It only moves forward.
+- `furthest_step`: shown < opened < hook < current_method < quotes_per_day < result < end. It only moves forward, from the event type and from the `question` of any event (e.g. `closed` at `result` = reached result).
 - `downloaded`: pdf / excel / word (each listed once). `whatsapp`: Yes / No.
-- `result`: 🟢 WhatsApp lead > 📞 Number given > 📥 Downloaded only > 🟡 Answered, left at {step} > ⚪ Opened, no answer > Seen teaser only.
+- `result`: 🟢 WhatsApp lead > 📞 Number given > 📥 Downloaded only > 🔁 Returning, saw offer, left > 🟡 Answered, left at {step} > ⚪ Opened, no answer > Seen teaser only.
+- 🔁 Returning: the visit's method / quotes came from memory (on opened, shown, closed… events) and no answer was given in this session. Marked with a note on the session_id cell.
 - Events can reach the script out of order (each is a separate run), so the row is merged without depending on order: known answers are never blanked, and `unknown` never replaces a real visitor type.
 
 ## When the widget shows itself

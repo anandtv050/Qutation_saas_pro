@@ -43,6 +43,9 @@ var STEP_RANK = { shown: 1, opened: 2, hook: 3, current_method: 4, quotes_per_da
 var WHATSAPP_EVENTS = ['whatsapp_click', 'toast_whatsapp_click', 'inline_whatsapp_click'];
 var DOWNLOAD_NAMES = { pdf: 'pdf', xlsx: 'excel', docx: 'word' };
 var VISITOR_CACHE_SECONDS = 6 * 60 * 60;
+var RETURNING_NOTE = 'Returning visitor: answers remembered from an earlier visit';
+// Events that mean the visitor answered in this session.
+var ANSWER_EVENTS = ['hook_yes', 'hook_no', 'answered'];
 
 function doPost(e) {
   try {
@@ -103,8 +106,22 @@ function sheet_(strName, lstColumns) {
 
 // ---- Visitors tab ------------------------------------------------------------------------
 
-// Which chat step an event proves the visitor reached ('' = does not move the step).
+// The chat step a "question" value names. Every event carries the step the chat was on (closed,
+// opened, answered, clicks…), so any of them proves the visitor got that far. Page-level
+// questions (teaser, toast, page, inline, launcher) are not chat steps.
+var QUESTION_STEP = {
+  hook: 'hook', industry: 'hook', download: 'hook',
+  current_method: 'current_method', quotes_per_day: 'quotes_per_day', result: 'result', end: 'end'
+};
+
+// Furthest step an event proves: the higher of its event type and its question.
 function stepOf_(data) {
+  var strFromEvent = stepOfEvent_(data);
+  var strFromQuestion = QUESTION_STEP[typeof data.question === 'string' ? data.question : ''] || '';
+  return (STEP_RANK[strFromQuestion] || 0) > (STEP_RANK[strFromEvent] || 0) ? strFromQuestion : strFromEvent;
+}
+
+function stepOfEvent_(data) {
   var q = typeof data.question === 'string' ? data.question : '';
   switch (data.event) {
     case 'shown': return 'shown';
@@ -123,10 +140,12 @@ function stepOf_(data) {
 }
 
 // Outcome label from the merged row, so it does not depend on the order events arrived in.
-function resultOf_(objRow) {
+// blnReturning: the answers came from an earlier visit (see upsertVisitor_).
+function resultOf_(objRow, blnReturning) {
   if (objRow.whatsapp === 'Yes') return '🟢 WhatsApp lead';
   if (objRow.phone) return '📞 Number given';
   if (objRow.downloaded) return '📥 Downloaded only';
+  if (blnReturning) return '🔁 Returning, saw offer, left';
   var intRank = STEP_RANK[objRow.furthest_step] || 0;
   if (intRank >= STEP_RANK.hook) return '🟡 Answered, left at ' + objRow.furthest_step;
   if (objRow.furthest_step === 'opened') return '⚪ Opened, no answer';
@@ -172,6 +191,21 @@ function upsertVisitor_(data, strNow) {
   }
   objRow.last_seen = strNow;
 
+  // Returning visitor: method / quotes arrive on events that are not answers (opened, shown,
+  // closed, clicks), so they came from an earlier visit, and no answer was given in this
+  // session. Any answer event (even one that arrives late) means they answered here, which
+  // clears the flag. Kept as a note on the session_id cell (no extra column); "answered here"
+  // is kept in the script cache, which outlives any single visit.
+  var intSidCol = VISITOR_COLUMNS.indexOf('session_id') + 1;
+  var cache = CacheService.getScriptCache();
+  var blnAnswerEvent = ANSWER_EVENTS.indexOf(data.event) !== -1;
+  if (blnAnswerEvent) cache.put('a:' + strSid, '1', VISITOR_CACHE_SECONDS);
+  var blnAnsweredHere = blnAnswerEvent || cache.get('a:' + strSid) === '1';
+  var blnReturning = !blnAnsweredHere && (
+    (intRow && sheet.getRange(intRow, intSidCol).getNote() === RETURNING_NOTE) ||
+    !!(clean_(data.current_method, MAX_LENGTH.current_method) || clean_(data.quotes_per_day, MAX_LENGTH.quotes_per_day))
+  );
+
   // Answers: fill only when the new value is known; never blank a known one. "unknown" is not an answer.
   ['page_slug', 'industry', 'source', 'device', 'visitor_type', 'current_method', 'quotes_per_day'].forEach(function (col) {
     var v = clean_(data[col], MAX_LENGTH[col]);
@@ -196,7 +230,7 @@ function upsertVisitor_(data, strNow) {
   var strPhone = phone_(data);
   if (strPhone) objRow.phone = strPhone;
 
-  objRow.result = resultOf_(objRow);
+  objRow.result = resultOf_(objRow, blnReturning);
 
   // Everything is written through clean_ (formula protection), with no extra length cut.
   var lstValues = VISITOR_COLUMNS.map(function (col) { return clean_(objRow[col], 200); });
@@ -204,8 +238,12 @@ function upsertVisitor_(data, strNow) {
     sheet.getRange(intRow, 1, 1, lstValues.length).setValues([lstValues]);
   } else {
     sheet.appendRow(lstValues);
-    CacheService.getScriptCache().put('v:' + strSid, String(sheet.getLastRow()), VISITOR_CACHE_SECONDS);
+    intRow = sheet.getLastRow();
+    cache.put('v:' + strSid, String(intRow), VISITOR_CACHE_SECONDS);
   }
+  var cellSid = sheet.getRange(intRow, intSidCol);
+  var strNote = blnReturning ? RETURNING_NOTE : '';
+  if (cellSid.getNote() !== strNote) cellSid.setNote(strNote);
 }
 
 function done_() {
