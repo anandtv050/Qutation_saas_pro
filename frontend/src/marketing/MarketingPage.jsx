@@ -7,9 +7,38 @@ import { useSeo } from "./seo";
 import { QRCodeSVG } from "qrcode.react";
 import { sampleMeta, computeSample, TEMPLATE_FORMATS, templatePath } from "./samples";
 import { signaturePathD, SIG_W, SIG_H } from "./sampleArt";
+import LeadHelperMount from "./leadHelper/LeadHelperMount";
+import { whatsappText, whatsappUrl, pageTitle, industryName } from "./leadHelper/whatsapp";
+import { logEvent, clarityEvent, markConverted } from "./leadHelper/leadLog";
+import { MessageCircle } from "lucide-react";
 
 const fmt = (n) => new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 const fmtQty = (n) => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(n);
+
+// "Make this quotation with your logo" line under the sample's download links (prerendered).
+function InlineWhatsApp({ page }) {
+  const strText = whatsappText({ industry: page.kind === "industry" ? industryName(page) : "", pageTitle: pageTitle(page) });
+  const onClick = () => {
+    logEvent(page, "inline_whatsapp_click", { question: "inline" });
+    clarityEvent("helper_whatsapp");
+    markConverted(strText);
+  };
+  return (
+    <div className="mt-4 flex flex-col gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm font-semibold text-neutral-900">Make this quotation with your logo in 1 minute →</p>
+      <a
+        href={whatsappUrl(strText)}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onClick}
+        className="inline-flex shrink-0 items-center justify-center gap-2 min-h-[44px] px-4 text-sm font-semibold text-white bg-[#15803d] rounded-lg hover:bg-[#166534]"
+      >
+        <MessageCircle className="w-4 h-4" aria-hidden="true" />
+        Chat on WhatsApp
+      </a>
+    </div>
+  );
+}
 
 // Mirrors the Quotely Pro quotation PDF (backend/app/api/pdf/service.py) with the default
 // print-settings colours: primary #1f2a67 (navy), accent #0ea5a4 (teal), Helvetica-style type.
@@ -179,6 +208,7 @@ function SampleQuotation({ page }) {
           </span>
         ))}
       </p>
+      <InlineWhatsApp page={page} />
       <p className="mt-2 text-xs text-neutral-600">
         Sample for reference only. Rates are typical figures and vary by city and brand. GSTIN, bank and UPI details are
         made up. {gstNote || "GST rates shown are common rates; confirm the current rate for your items with your accountant."}
@@ -347,6 +377,7 @@ export default function MarketingPage({ slug }) {
 
         <RelatedLinks page={page} />
       </article>
+      {page.kind !== "about" && <LeadHelperMount key={page.slug} page={page} />}
     </MarketingLayout>
   );
 }

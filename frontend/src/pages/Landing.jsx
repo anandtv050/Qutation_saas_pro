@@ -9,6 +9,7 @@ import { formatInr } from "@/lib/pricing";
 import { HOME_FAQS } from "@/marketing/home";
 import { GENERAL_PAGES, INDUSTRY_PAGES, COMPARISON_PAGES } from "@/marketing/pages";
 import { useSeo } from "@/marketing/seo";
+import LeadHelperMount from "@/marketing/leadHelper/LeadHelperMount";
 
 const STEPS = [
   { icon: ListPlus, title: "Add your items", desc: "Pick from your saved items or copy an old quotation. Quantity, unit and rate on every line." },
@@ -351,6 +352,7 @@ export default function Landing() {
           <TrialButton context="my business" className="px-8 py-3.5" />
         </div>
       </section>
+      <LeadHelperMount page={null} />
     </MarketingLayout>
   );
 }

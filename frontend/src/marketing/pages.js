@@ -11,6 +11,7 @@
 // Inline links in paragraphs/answers: [link text](/path)
 //
 // sample.items: { name, qty, unit, rate, gst } — totals are calculated by the template.
+// helperRole (industry pages): used by the Lead Helper hook, "Are you a CCTV installer?".
 
 export const GENERAL_PAGES = [
   {
@@ -414,6 +415,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "cctv-quotation-format",
     kind: "industry",
+    helperRole: "CCTV installer",
     navLabel: "CCTV installation",
     title: "CCTV Quotation Format (Free Sample + Excel)",
     description:
@@ -532,6 +534,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "solar-installation-quotation-format",
     kind: "industry",
+    helperRole: "solar installer",
     navLabel: "Solar installation",
     title: "Solar Installation Quotation Format (Free Sample + Excel)",
     description:
@@ -658,6 +661,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "electrical-work-quotation-format",
     kind: "industry",
+    helperRole: "electrician",
     navLabel: "Electrical work",
     title: "Electrical Work Quotation Format (Free Sample + Excel)",
     description:
@@ -768,6 +772,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "interior-design-quotation-format",
     kind: "industry",
+    helperRole: "interior designer",
     navLabel: "Interior design",
     title: "Interior Design Quotation Format (Free Sample + Excel)",
     description:
@@ -879,6 +884,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "plumbing-quotation-format",
     kind: "industry",
+    helperRole: "plumber",
     navLabel: "Plumbing",
     title: "Plumbing Quotation Format (Free Sample + Excel)",
     description:
@@ -983,6 +989,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "networking-quotation-format",
     kind: "industry",
+    helperRole: "networking installer",
     navLabel: "Networking",
     title: "Networking Quotation Format (Free Sample + Excel)",
     description:
@@ -1088,6 +1095,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "construction-quotation-format",
     kind: "industry",
+    helperRole: "contractor",
     navLabel: "Construction",
     title: "Construction Quotation Format (Free Sample + Excel)",
     description:
@@ -1198,6 +1206,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "painting-quotation-format",
     kind: "industry",
+    helperRole: "painting contractor",
     navLabel: "Painting",
     title: "Painting Quotation Format (Free Sample + Excel)",
     description:
@@ -1301,6 +1310,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "ac-installation-service-quotation-format",
     kind: "industry",
+    helperRole: "AC technician",
     navLabel: "AC installation & service",
     title: "AC Installation and Service Quotation Format + Free Excel",
     description:
@@ -1403,6 +1413,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "carpentry-quotation-format",
     kind: "industry",
+    helperRole: "carpenter",
     navLabel: "Carpentry",
     title: "Carpentry Quotation Format (Free Sample + Excel)",
     description:
@@ -1504,6 +1515,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "catering-quotation-format",
     kind: "industry",
+    helperRole: "caterer",
     navLabel: "Catering",
     title: "Catering Quotation Format (Free Sample + Excel)",
     description:
@@ -1605,6 +1617,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "event-management-quotation-format",
     kind: "industry",
+    helperRole: "event planner",
     navLabel: "Event management",
     title: "Event Management Quotation Format (Free Sample + Excel)",
     description:
@@ -1710,6 +1723,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "printing-quotation-format",
     kind: "industry",
+    helperRole: "printer",
     navLabel: "Printing",
     title: "Printing Quotation Format (Free Sample + Excel)",
     description:
@@ -1813,6 +1827,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "web-design-quotation-format",
     kind: "industry",
+    helperRole: "web designer",
     navLabel: "Web design",
     title: "Web Design Quotation Format (Free Sample + Excel)",
     description:
@@ -1916,6 +1931,7 @@ export const INDUSTRY_PAGES = [
   {
     slug: "photography-quotation-format",
     kind: "industry",
+    helperRole: "photographer",
     navLabel: "Photography",
     title: "Photography Quotation Format (Free Sample + Excel)",
     description:
