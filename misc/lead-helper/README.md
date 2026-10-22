@@ -16,6 +16,15 @@ Growth Tracker sheet. Free, no backend.
 - `referrer`: origin only (e.g. `https://www.google.com`), never the full URL
 - `timestamp`: set by the script, IST
 
+## Visitors tab (readable summary)
+One row per visit (`session_id`), updated on every event:
+`first_seen, last_seen, session_id, page_slug, industry, source, device, visitor_type, current_method, quotes_per_day, furthest_step, downloaded, whatsapp, phone, result`
+
+- `furthest_step`: shown < opened < hook < current_method < quotes_per_day < result < end. It only moves forward.
+- `downloaded`: pdf / excel / word (each listed once). `whatsapp`: Yes / No.
+- `result`: 🟢 WhatsApp lead > 📞 Number given > 📥 Downloaded only > 🟡 Answered, left at {step} > ⚪ Opened, no answer > Seen teaser only.
+- Events can reach the script out of order (each is a separate run), so the row is merged without depending on order: known answers are never blanked, and `unknown` never replaces a real visitor type.
+
 ## When the widget shows itself
 - The launcher (round Q button, bottom-right) is on every public marketing page after load.
 - Auto teaser: 7 s on the page AND the sample in view (or 40% scrolled). At most once per browser session, at most 2 per 7 days. None for 7 days after the teaser ×. Never again after a WhatsApp click (the launcher then opens WhatsApp directly).
