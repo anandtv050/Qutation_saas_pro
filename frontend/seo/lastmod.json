@@ -1,102 +1,102 @@
 {
   "/": {
-    "hash": "942b4d110edd71dde97bb05ed5f319e17381976e",
-    "lastmod": "2026-10-09"
+    "hash": "3e5630fe2e918c9413e01e362cb54ed7a4335403",
+    "lastmod": "2026-10-25"
   },
   "/quotation-format": {
-    "hash": "b39c7bb27f0a5174f6ef3cfed357f681d985b8fa",
-    "lastmod": "2026-10-21"
+    "hash": "0b17db1cb5fba0ceb4e8fd2c3be0e6a2236f5448",
+    "lastmod": "2026-10-25"
   },
   "/quotation-maker-app": {
-    "hash": "96feeb8dad1cbeaa890ed3dd9fa7a399c9fb1c91",
-    "lastmod": "2026-10-09"
+    "hash": "38db6223869d623cd5c0cf855bc7f6c09e94cfc1",
+    "lastmod": "2026-10-25"
   },
   "/quotation-vs-invoice": {
-    "hash": "a59920ae1d70f7119f1aa377ebe68149034a2173",
-    "lastmod": "2026-10-09"
+    "hash": "44ff9514f127b6b2fd88a219bd93fefe0bc49c02",
+    "lastmod": "2026-10-25"
   },
   "/free-quotation-maker": {
-    "hash": "5babac96c5a8d76e7a22ebaa4f18fddf6a259bee",
-    "lastmod": "2026-10-21"
+    "hash": "8a5f16fdf06244c649fca2ceda06dad758fe498c",
+    "lastmod": "2026-10-25"
   },
   "/cctv-quotation-format": {
-    "hash": "d65d39ecde8ce007929d3d2e8c4d54287b2acd93",
-    "lastmod": "2026-10-21"
+    "hash": "74c2d8362380dc4d1fda378ca3388cfc898ebbb4",
+    "lastmod": "2026-10-25"
   },
   "/solar-installation-quotation-format": {
-    "hash": "b78b4b566d6af96db86ff76f77bfd81b6829f646",
-    "lastmod": "2026-10-21"
+    "hash": "b88a0ba9c3fb2cfff48dc45389ba2a026fb99ce0",
+    "lastmod": "2026-10-25"
   },
   "/electrical-work-quotation-format": {
-    "hash": "8aeb3019bab481671e9f428e9e3fa25477e7f992",
-    "lastmod": "2026-10-21"
+    "hash": "8ab1b8c1443ce9ff9744fceaf118aac5f3784036",
+    "lastmod": "2026-10-25"
   },
   "/interior-design-quotation-format": {
-    "hash": "8dfcf73a4cf6afed3d033ab67c5670efb4813af1",
-    "lastmod": "2026-10-21"
+    "hash": "fe072823a39f0fdaeaa23e43c349a8e0354e9485",
+    "lastmod": "2026-10-25"
   },
   "/plumbing-quotation-format": {
-    "hash": "cdd17a26972758ae008684c97d35657d712efa22",
-    "lastmod": "2026-10-21"
+    "hash": "f22605bd3cf30754225f86e30e0f28f2fdedf37c",
+    "lastmod": "2026-10-25"
   },
   "/networking-quotation-format": {
-    "hash": "a4bbeb01e51866e21b8527a3bb0064e5484d7c7d",
-    "lastmod": "2026-10-21"
+    "hash": "170ad94ea0903abc67f7a5c312270b11ce5e6d49",
+    "lastmod": "2026-10-25"
   },
   "/construction-quotation-format": {
-    "hash": "1406814ee32b89e0b6c7035cc8969cc7bf3f3253",
-    "lastmod": "2026-10-21"
+    "hash": "ec13741d8cb3ed93bada125bd21f2ac1dd06a3c5",
+    "lastmod": "2026-10-25"
   },
   "/painting-quotation-format": {
-    "hash": "0698abc46057bea9842a85b94d46d28ce67d9870",
-    "lastmod": "2026-10-21"
+    "hash": "8583bb0edde2af760acf8e214098de4e9e142901",
+    "lastmod": "2026-10-25"
   },
   "/ac-installation-service-quotation-format": {
-    "hash": "325075d9eac432aa50ea5d6a6743ff96989883a3",
-    "lastmod": "2026-10-21"
+    "hash": "4509c089369d021028a3d5e12a8f678c08177e1b",
+    "lastmod": "2026-10-25"
   },
   "/carpentry-quotation-format": {
-    "hash": "c98f8c54429dafb135495926f7cd3f7e604eb9fd",
-    "lastmod": "2026-10-21"
+    "hash": "635b29bb19c018f0c9020eca30cda14b04309ad9",
+    "lastmod": "2026-10-25"
   },
   "/catering-quotation-format": {
-    "hash": "17f613b2b422745c31afdbcce40f08b110f6e556",
-    "lastmod": "2026-10-21"
+    "hash": "32e9676bc6c3c1c422245518f492967967461425",
+    "lastmod": "2026-10-25"
   },
   "/event-management-quotation-format": {
-    "hash": "7714a20d043c621fca4feedec5938c0cb2482d34",
-    "lastmod": "2026-10-21"
+    "hash": "a31a00f54355fe5d95fbbd9d3e74449deaceb798",
+    "lastmod": "2026-10-25"
   },
   "/printing-quotation-format": {
-    "hash": "b960a69d588017f2235c2a5d4da9d46fa6eb68fe",
-    "lastmod": "2026-10-21"
+    "hash": "c9c3a1858d587be5f26cac2e8722c08c53a462f7",
+    "lastmod": "2026-10-25"
   },
   "/web-design-quotation-format": {
-    "hash": "a821e47f5aab921ff6ebfafa972785f2de640510",
-    "lastmod": "2026-10-21"
+    "hash": "dc1703bd3d74620a5a958a62c05f111cba8d58b5",
+    "lastmod": "2026-10-25"
   },
   "/photography-quotation-format": {
-    "hash": "2b3eba9ea98f6daa788b66a8a7885f479df7d26b",
-    "lastmod": "2026-10-21"
+    "hash": "70f5aba76b8969bb9620746c3f7bbe1680dca1ae",
+    "lastmod": "2026-10-25"
   },
   "/vyapar-alternative-for-quotations": {
-    "hash": "aec8240a2a17bbe54943f3edda5440a6b19e45e2",
-    "lastmod": "2026-10-09"
+    "hash": "05e9c0a6fafda9a9472dc0c26e1f667e1949c233",
+    "lastmod": "2026-10-25"
   },
   "/zoho-invoice-alternative-for-quotations": {
-    "hash": "e3d5fa0c477b1e2fb50921f11fe5ce2eb0bcd8d6",
-    "lastmod": "2026-10-09"
+    "hash": "f715efe3c24f4bdf015d50e50f1cfb3b6633c6bd",
+    "lastmod": "2026-10-25"
   },
   "/mybillbook-alternative-for-quotations": {
-    "hash": "e97d2b6e9d0c1ea4082f1b676a802fcdb798b8e9",
-    "lastmod": "2026-10-09"
+    "hash": "93b02794b04af27cf1b29c303f30495b829ec53d",
+    "lastmod": "2026-10-25"
   },
   "/quotely-pro-vs-excel-quotations": {
-    "hash": "18b968be099d246b66979c0b492b186e0e19ff88",
-    "lastmod": "2026-10-09"
+    "hash": "c016e8497d2a30f7186a4b7b2ad31f1105fbdc88",
+    "lastmod": "2026-10-25"
   },
   "/about": {
-    "hash": "e473164ee5b77a768da859666e834c7fa14e56f3",
-    "lastmod": "2026-10-09"
+    "hash": "53867291bd0085934905a4d411700ee88e551a12",
+    "lastmod": "2026-10-25"
   }
 }

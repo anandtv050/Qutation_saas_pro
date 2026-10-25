@@ -2440,6 +2440,7 @@ export const ABOUT_PAGE = {
   intro: [
     "Quotely Pro (quotelypro.in) is a web app for quotations and invoices for small businesses and installers in India.",
     "Quotely Pro (quotelypro.in) is an Indian product and is not related to quotelypro.com, the QuotelyPro mobile app, or other apps named Quotely or Quotly.",
+    "Quotely Pro is built and maintained by [Co-Mate](https://co-mate.tech/products/quotely/), a software engineering studio in Kerala, India.",
   ],
   sections: [
     {

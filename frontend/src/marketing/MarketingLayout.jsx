@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { MessageCircle, Mail, Phone, ArrowRight } from "lucide-react";
+import { MessageCircle, Mail, Phone, ArrowRight, Linkedin } from "lucide-react";
 import { SITE, demoLink } from "./site";
 import { GENERAL_PAGES, INDUSTRY_PAGES, COMPARISON_PAGES } from "./pages";
 import { APP_FEATURES } from "./features";
@@ -38,18 +38,21 @@ export function Logo({ size = "md" }) {
   );
 }
 
-// Renders "[text](/path)" markup inside copy as internal links.
+// Renders "[text](/path)" markup inside copy as internal links, and "[text](https://...)" as external links.
 export function RichText({ text }) {
   const lstParts = [];
-  const re = /\[([^\]]+)\]\((\/[^)]*)\)/g;
+  const re = /\[([^\]]+)\]\((\/[^)]*|https:\/\/[^)]*)\)/g;
+  const strLinkClass = "font-medium text-black underline underline-offset-2 hover:text-neutral-600";
   let intLast = 0;
   let m;
   while ((m = re.exec(text)) !== null) {
     if (m.index > intLast) lstParts.push(text.slice(intLast, m.index));
     lstParts.push(
-      <Link key={m.index} to={m[2]} className="font-medium text-black underline underline-offset-2 hover:text-neutral-600">
-        {m[1]}
-      </Link>
+      m[2].startsWith("/") ? (
+        <Link key={m.index} to={m[2]} className={strLinkClass}>{m[1]}</Link>
+      ) : (
+        <a key={m.index} href={m[2]} className={strLinkClass}>{m[1]}</a>
+      )
     );
     intLast = m.index + m[0].length;
   }
@@ -158,6 +161,12 @@ function Footer() {
       <div className="max-w-6xl mx-auto mt-10 pt-6 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-2">
         <p className="text-xs text-neutral-600">
           &copy; <span suppressHydrationWarning>{new Date().getFullYear()}</span> Quotely Pro (quotelypro.in). Made in India.
+        </p>
+        <p className="inline-flex items-center gap-2 text-xs text-neutral-600">
+          A product by <a href="https://co-mate.tech" className="font-medium text-neutral-700 hover:text-black">Co-Mate</a>
+          <a href={SITE.comateLinkedin} target="_blank" rel="noopener" aria-label="Co-Mate on LinkedIn" className="text-neutral-500 hover:text-black">
+            <Linkedin className="w-3.5 h-3.5" aria-hidden="true" />
+          </a>
         </p>
         <div className="flex items-center gap-4">
           <Link to="/about" className="text-xs text-neutral-600 hover:text-black">About Quotely Pro</Link>

@@ -18,6 +18,7 @@ export const SITE = {
   priceNote: PRICE_NOTE,
   logo: "https://quotelypro.in/logo-512.png",
   ogImage: "https://quotelypro.in/og-image.png",
+  comateLinkedin: "https://www.linkedin.com/company/comate-tech",
 };
 
 // Every "start" CTA goes to WhatsApp until self-serve signup exists.
@@ -134,7 +135,12 @@ export const SOFTWARE_JSONLD = {
   operatingSystem: "Web",
   description:
     "Quotation maker web app for small businesses in India. Create item-wise quotations with quantity, unit and rate, turn them into invoices, and download branded PDFs to send on WhatsApp.",
-  publisher: { "@id": `${SITE.url}/#organization` },
+  publisher: {
+    "@type": "Organization",
+    name: "Co-Mate",
+    url: "https://co-mate.tech",
+    sameAs: [SITE.comateLinkedin, "https://www.instagram.com/comate.tech/"],
+  },
   offers: PLANS.map((p) => ({
     "@type": "Offer",
     name: `${p.name} plan`,
