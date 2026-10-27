@@ -1,4 +1,5 @@
 import asyncio
+import os
 import secrets
 from datetime import date, datetime, timedelta, timezone
 from fastapi import HTTPException, status
@@ -7,6 +8,9 @@ from app.api.login.schema import MdlLoginResponse, MdlSignupRequest
 from app.core.security import fnCreateAccesToken, fnVerifyPassword, fnHashPassword
 from app.core.logger import getUserLogger
 from app.core.presence import ClsPresenceTracker
+from app.core.notify import fnNotifyOwner
+from app.core.ratelimit import objSignupLimiter
+from app.api.onboarding.seed import fnGetTrade
 
 
 class ClsLoginService:
@@ -53,6 +57,12 @@ class ClsLoginService:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Your account has been deactivated. Please contact support."
+            )
+
+        if not rstUser['vchr_password_hash']:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="This account uses Google sign-in. Please click 'Continue with Google'."
             )
 
         if not fnVerifyPassword(mdlLoginRequest.password, rstUser['vchr_password_hash']):
@@ -164,6 +174,141 @@ class ClsLoginService:
                 "strBusinessName": rstNewUser['vchr_business_name'],
                 "blnIsNewUser": True
             }
+        )
+
+    # ── Google sign-in ────────────────────────────────────────────────────
+    def _fnVerifyGoogleToken(self, strIdToken: str) -> dict:
+        """Blocking: validate a Google ID token and return its claims."""
+        from google.oauth2 import id_token
+        from google.auth.transport import requests as google_requests
+
+        strClientId = (os.getenv("GOOGLE_CLIENT_ID") or "").strip()
+        if not strClientId:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Google sign-in is not available right now."
+            )
+        try:
+            return id_token.verify_oauth2_token(strIdToken, google_requests.Request(), strClientId)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Google sign-in failed. Please try again."
+            )
+
+    async def fnGoogleLoginService(self, mdlRequest, strClientIp: str = "unknown"):
+        """Sign in with Google. Creates a free-trial account on first use."""
+        logger = getUserLogger(0)
+
+        dctClaims = await asyncio.to_thread(self._fnVerifyGoogleToken, mdlRequest.strIdToken)
+        strSub = dctClaims.get("sub")
+        strEmail = (dctClaims.get("email") or "").lower()
+        if not strSub or not strEmail or not dctClaims.get("email_verified"):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Your Google email is not verified."
+            )
+        strName = (dctClaims.get("name") or strEmail.split("@")[0]).strip()[:100]
+
+        blnIsNewUser = False
+        async with self.insPool.acquire() as conn:
+            rstUser = await conn.fetchrow(
+                """SELECT pk_bint_user_id, bln_is_active FROM tbl_user
+                   WHERE vchr_google_sub = $1 OR LOWER(vchr_email) = $2
+                   ORDER BY (vchr_google_sub = $1) DESC NULLS LAST
+                   LIMIT 1""",
+                strSub, strEmail
+            )
+
+            if rstUser:
+                if not rstUser['bln_is_active']:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Your account has been deactivated. Please contact support."
+                    )
+                intUserId = rstUser['pk_bint_user_id']
+                # Link Google to an existing email account (Google verified the email)
+                await conn.execute(
+                    """UPDATE tbl_user
+                       SET vchr_google_sub = COALESCE(vchr_google_sub, $1), bln_email_verified = TRUE
+                       WHERE pk_bint_user_id = $2""",
+                    strSub, intUserId
+                )
+            else:
+                objSignupLimiter.fnCheck(
+                    strClientIp, "Too many sign-ups from your network. Please try again in an hour."
+                )
+                blnIsNewUser = True
+                strSource = (mdlRequest.strSource or "").strip().lower()[:60] or None
+                dctTrade = fnGetTrade(mdlRequest.strIndustry)
+                strTradeHint = dctTrade["key"] if dctTrade else None
+                rstTrialPlan = await conn.fetchrow(
+                    "SELECT pk_bint_plan_id, int_trial_days FROM tbl_subscription_plan WHERE vchr_plan_name = 'free_trial' LIMIT 1"
+                )
+                intTrialPlanId = rstTrialPlan['pk_bint_plan_id'] if rstTrialPlan else None
+                intTrialDays = (rstTrialPlan['int_trial_days'] if rstTrialPlan else 7) or 7
+
+                rstNew = await conn.fetchrow(
+                    """INSERT INTO tbl_user (
+                        vchr_email, vchr_password_hash, vchr_username, vchr_google_sub, bln_email_verified,
+                        fk_bint_plan_id, vchr_plan_status, dat_plan_start_date, dat_plan_end_date,
+                        bln_needs_onboarding, vchr_signup_source, vchr_signup_trade
+                    ) VALUES ($1, NULL, $2, $3, TRUE, $4, 'trial', CURRENT_DATE, CURRENT_DATE + ($5::integer),
+                              TRUE, $6, $7)
+                    RETURNING pk_bint_user_id""",
+                    strEmail, strName, strSub, intTrialPlanId, intTrialDays, strSource, strTradeHint
+                )
+                intUserId = rstNew['pk_bint_user_id']
+                logger.info(f"New Google user registered: ID={intUserId} | Email={strEmail} | plan_id={intTrialPlanId}")
+
+            rstFull = await conn.fetchrow(
+                """SELECT u.pk_bint_user_id, u.vchr_email, u.vchr_username, u.vchr_business_name,
+                          u.vchr_plan_status, u.dat_plan_end_date, u.bln_needs_onboarding,
+                          p.vchr_display_name AS vchr_plan_display_name
+                   FROM tbl_user u
+                   LEFT JOIN tbl_subscription_plan p ON u.fk_bint_plan_id = p.pk_bint_plan_id
+                   WHERE u.pk_bint_user_id = $1""",
+                intUserId
+            )
+
+        dctUserInfo = {
+            "intUserId": rstFull['pk_bint_user_id'],
+            "strEmail": rstFull['vchr_email'],
+            "strUserName": rstFull['vchr_username'],
+            "strBusinessName": rstFull['vchr_business_name'],
+            "blnIsNewUser": blnIsNewUser,
+            "blnNeedsOnboarding": bool(rstFull['bln_needs_onboarding']),
+        }
+
+        if rstFull['dat_plan_end_date']:
+            intDaysRemaining = (rstFull['dat_plan_end_date'] - date.today()).days
+            strStatus = rstFull['vchr_plan_status']
+            if intDaysRemaining < 0 and strStatus in ('trial', 'active'):
+                strStatus = 'expired'
+            dctUserInfo["dctSubscription"] = {
+                "strStatus": strStatus,
+                "strPlanName": rstFull['vchr_plan_display_name'],
+                "intDaysRemaining": max(intDaysRemaining, 0),
+                "datEndDate": str(rstFull['dat_plan_end_date']),
+            }
+
+        strAccessToken = fnCreateAccesToken(
+            data={"user_id": intUserId, "email": rstFull['vchr_email']}
+        )
+
+        insPresence = ClsPresenceTracker()
+        await insPresence.fnSetLogin(self.insPool, intUserId)
+
+        if blnIsNewUser:
+            await fnNotifyOwner(
+                f"New Quotely Pro signup (Google)\n{strName}\n{strEmail}\n"
+                f"Source: {strSource or 'direct'}" + (f"\nTrade: {strTradeHint}" if strTradeHint else "")
+            )
+
+        return MdlLoginResponse(
+            strAccessToken=strAccessToken,
+            strTokentype="bearer",
+            dctUserInfo=dctUserInfo
         )
 
     async def fnForgotPassword(self, strEmail: str):

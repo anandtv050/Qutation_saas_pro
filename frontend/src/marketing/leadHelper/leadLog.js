@@ -89,6 +89,25 @@ export const saveAnswers = (objAnswers) =>
     answers: { industrySlug: objAnswers.industrySlug, method: objAnswers.method, quotes: objAnswers.quotes, visitorType: objAnswers.visitorType },
   });
 
+// ---- visitor id -------------------------------------------------------------------
+// One random id per browser (localStorage), sent with every event the website, the editor and the signup
+// send, so a visit can be followed through to the account. Falls back to memory when storage is blocked.
+const VISITOR_KEY = "qp_vid";
+let strVisitorMemory = "";
+export function getVisitorId() {
+  let strId = storageGet("localStorage", VISITOR_KEY) || strVisitorMemory;
+  if (!strId) {
+    try {
+      strId = crypto.randomUUID();
+    } catch {
+      strId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+    }
+    strVisitorMemory = strId;
+    storageSet("localStorage", VISITOR_KEY, strId);
+  }
+  return strId;
+}
+
 // ---- row fields -----------------------------------------------------------------
 // session_id: one random id per page visit (a new one when the path changes).
 let objVisit = { path: null, id: null };
@@ -163,6 +182,7 @@ export function logEvent(page, strEvent, { question = "", answer = "", answers =
   if (!SHEET_URL) return;
   const strIndustry = answers.industrySlug || (page?.kind === "industry" ? page.slug : "");
   const objRow = {
+    visitor_id: getVisitorId(),
     session_id: visitId(),
     page_slug: page ? page.slug : "home",
     page_type: page ? page.kind : "home",
@@ -178,6 +198,10 @@ export function logEvent(page, strEvent, { question = "", answer = "", answers =
     referrer: getReferrer(),
     phone,
   };
+  sendRow(objRow);
+}
+
+function sendRow(objRow) {
   try {
     fetch(SHEET_URL, {
       method: "POST",
@@ -190,6 +214,84 @@ export function logEvent(page, strEvent, { question = "", answer = "", answers =
     // ignore
   }
 }
+
+// ---- self-serve signup funnel ----------------------------------------------------
+// Same sheet and fire-and-forget rules as the Lead Helper. Funnel rows have page_type "app"
+// (the Apps Script keeps them in the raw tab only, not in the Visitors summary).
+//   signup_started, signup_completed, onboarding_step (question = step 1/2/3, answer = done/skipped),
+//   first_quote_created, first_pdf_downloaded
+const CTX_KEY = "qp_signup_ctx";
+const FUNNEL_SID_KEY = "qp_funnel_sid";
+
+export function getSignupContext() {
+  try {
+    const obj = JSON.parse(storageGet("localStorage", CTX_KEY) || "{}");
+    return { industry: String(obj.industry || ""), src: String(obj.src || "") };
+  } catch {
+    return { industry: "", src: "" };
+  }
+}
+
+// The editor sets this just before Google sign-in so the new account records the trade and "editor" as its source.
+export function setSignupContext({ industry = "", src = "" } = {}) {
+  storageSet("localStorage", CTX_KEY, JSON.stringify({ industry: String(industry).slice(0, 60), src: String(src).slice(0, 60) }));
+}
+
+// /signup?industry=cctv&src=lead_helper: remember where the visitor came from until signup is done.
+export function captureSignupContext() {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const strIndustry = (q.get("industry") || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 60);
+    const strSrc = (q.get("src") || "").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 60);
+    if (strIndustry || strSrc) storageSet("localStorage", CTX_KEY, JSON.stringify({ industry: strIndustry, src: strSrc }));
+  } catch {
+    // ignore
+  }
+  return getSignupContext();
+}
+
+// Same id for the whole signup, even though it spans several pages.
+function funnelSessionId() {
+  let strId = storageGet("localStorage", FUNNEL_SID_KEY);
+  if (!strId) {
+    try {
+      strId = crypto.randomUUID();
+    } catch {
+      strId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+    storageSet("localStorage", FUNNEL_SID_KEY, strId);
+  }
+  return strId;
+}
+
+// pageType "site" = the website editor; "app" = the signed-in app. industry overrides the remembered one.
+export function funnelEvent(strEvent, { question = "", answer = "", industry, pageType = "app" } = {}) {
+  if (!SHEET_URL) return;
+  const objCtx = getSignupContext();
+  sendRow({
+    visitor_id: getVisitorId(),
+    session_id: funnelSessionId(),
+    page_slug: window.location.pathname.slice(0, 100),
+    page_type: pageType,
+    industry: industry ?? objCtx.industry,
+    event: strEvent,
+    question,
+    answer,
+    source: objCtx.src || getSource(),
+    device: getDevice(),
+    referrer: getReferrer(),
+  });
+}
+
+// Run a funnel event once per browser (first quotation saved, first PDF downloaded).
+export function funnelEventOnce(strEvent) {
+  const strKey = `qp_funnel_done_${strEvent}`;
+  if (storageGet("localStorage", strKey)) return;
+  storageSet("localStorage", strKey, "1");
+  funnelEvent(strEvent);
+}
+
+export const trafficSource = () => getSource();
 
 export function clarityEvent(strName) {
   try {

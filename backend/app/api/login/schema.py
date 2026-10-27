@@ -50,3 +50,9 @@ class MdlResetPasswordRequest(BaseModel):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters')
         return v
+
+
+class MdlGoogleLoginRequest(BaseModel):
+    strIdToken: str
+    strIndustry: Optional[str] = None   # ?industry= from the website (trade chip preselect)
+    strSource: Optional[str] = None     # ?src= (header, hero, lead_helper, ...)

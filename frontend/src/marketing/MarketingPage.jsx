@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import MarketingLayout, { RichText, TrialButton, FeatureGrid } from "./MarketingLayout";
+import MarketingLayout, { RichText, StartTrialButton, FeatureGrid } from "./MarketingLayout";
+import QuoteEditorMount from "@/components/quote-editor/QuoteEditorMount";
 import { SITE } from "./site";
 import { GENERAL_PAGES, getPage } from "./pages";
 import { useSeo } from "./seo";
@@ -8,37 +9,9 @@ import { QRCodeSVG } from "qrcode.react";
 import { sampleMeta, computeSample, TEMPLATE_FORMATS, templatePath } from "./samples";
 import { signaturePathD, SIG_W, SIG_H } from "./sampleArt";
 import LeadHelperMount from "./leadHelper/LeadHelperMount";
-import { whatsappText, whatsappUrl, pageTitle, industryName } from "./leadHelper/whatsapp";
-import { logEvent, clarityEvent, markConverted } from "./leadHelper/leadLog";
-import { MessageCircle } from "lucide-react";
 
 const fmt = (n) => new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 const fmtQty = (n) => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(n);
-
-// "Make this quotation with your logo" line under the sample's download links (prerendered).
-function InlineWhatsApp({ page }) {
-  const strText = whatsappText({ industry: page.kind === "industry" ? industryName(page) : "", pageTitle: pageTitle(page) });
-  const onClick = () => {
-    logEvent(page, "inline_whatsapp_click", { question: "inline" });
-    clarityEvent("helper_whatsapp");
-    markConverted(strText);
-  };
-  return (
-    <div className="mt-4 flex flex-col gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm font-semibold text-neutral-900">Make this quotation with your logo in 1 minute →</p>
-      <a
-        href={whatsappUrl(strText)}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={onClick}
-        className="inline-flex shrink-0 items-center justify-center gap-2 min-h-[44px] px-4 text-sm font-semibold text-white bg-[#15803d] rounded-lg hover:bg-[#166534]"
-      >
-        <MessageCircle className="w-4 h-4" aria-hidden="true" />
-        Chat on WhatsApp
-      </a>
-    </div>
-  );
-}
 
 // Mirrors the Quotely Pro quotation PDF (backend/app/api/pdf/service.py) with the default
 // print-settings colours: primary #1f2a67 (navy), accent #0ea5a4 (teal), Helvetica-style type.
@@ -193,22 +166,6 @@ function SampleQuotation({ page }) {
         </div>
       </div>
 
-      <p className="mt-3 text-sm text-neutral-800">
-        <span className="font-semibold">Download this format:</span>{" "}
-        {TEMPLATE_FORMATS.map((f, i) => (
-          <span key={f.ext}>
-            {i > 0 && <span className="text-neutral-400" aria-hidden="true"> | </span>}
-            <a
-              href={templatePath(page.slug, f.ext)}
-              download
-              className="font-medium text-black underline underline-offset-2 hover:text-neutral-600"
-            >
-              {f.label}
-            </a>
-          </span>
-        ))}
-      </p>
-      <InlineWhatsApp page={page} />
       <p className="mt-2 text-xs text-neutral-600">
         Sample for reference only. Rates are typical figures and vary by city and brand. GSTIN, bank and UPI details are
         made up. {gstNote || "GST rates shown are common rates; confirm the current rate for your items with your accountant."}
@@ -325,7 +282,11 @@ export default function MarketingPage({ slug }) {
   // Braces matter: newer Chrome returns a Promise from scrollTo, and React would treat
   // a returned value as the effect's clean-up function and crash.
   useEffect(() => {
-    window.scrollTo(0, 0);
+    // A link like /quotation-format#template-downloads should land on that block, not the top.
+    const strHash = window.location.hash.slice(1);
+    const el = strHash ? document.getElementById(strHash) : null;
+    if (el) el.scrollIntoView();
+    else window.scrollTo(0, 0);
   }, [slug]);
   const blnIndustry = page.kind === "industry";
 
@@ -339,27 +300,31 @@ export default function MarketingPage({ slug }) {
           </ol>
         </nav>
 
-        <h1 className="text-3xl sm:text-4xl font-bold text-black leading-tight tracking-tight mb-6">{page.h1}</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold text-black leading-tight tracking-tight mb-3">{page.h1}</h1>
+        {blnIndustry && (
+          <>
+            <p className="text-lg text-neutral-700 mb-5">Edit the sample below and download your own PDF quotation. Free.</p>
+            {/* key: moving between two industry pages must give the editor fresh state (its items come from this page) */}
+            <QuoteEditorMount key={page.slug} page={page} />
+          </>
+        )}
         {page.intro.map((p, i) => (
           <p key={i} className="text-lg text-neutral-700 leading-relaxed mb-4"><RichText text={p} /></p>
         ))}
 
         {page.sections.map((s, i) => <Section key={i} section={s} page={page} />)}
 
-        <aside className="mt-12 rounded-2xl bg-neutral-900 text-white p-6 sm:p-8">
-          <h2 className="text-2xl font-bold mb-3">
-            {blnIndustry ? "Create this quotation in 1 minute" : "Make your next quotation in 1 minute"}
-          </h2>
-          <p className="text-neutral-300 leading-relaxed mb-6">
-            {blnIndustry
-              ? "Save these items once in Quotely Pro. For every new customer, copy the quotation, change the quantities, download the PDF and send it on WhatsApp."
-              : "Add your items once in Quotely Pro, reuse them on every quotation, download a branded PDF and send it on WhatsApp."}
-          </p>
-          <TrialButton context={page.ctaContext} className="bg-white !text-black hover:bg-neutral-200 w-full sm:w-auto" />
-          <p className="mt-3 text-sm text-neutral-400">
-            {SITE.trialLine} Plans from ₹999/month. {SITE.priceNote}
-          </p>
-        </aside>
+        {/* Pages without the editor keep one call to action. Industry pages have the editor at the top instead. */}
+        {!blnIndustry && (
+          <aside className="mt-12 rounded-2xl bg-neutral-900 text-white p-6 sm:p-8">
+            <h2 className="text-2xl font-bold mb-3">Make your next quotation in 1 minute</h2>
+            <p className="text-neutral-300 leading-relaxed mb-6">
+              Add your items once in Quotely Pro, reuse them on every quotation, download a branded PDF and send it on WhatsApp.
+            </p>
+            <StartTrialButton src="page_cta" className="bg-white !text-black hover:bg-neutral-200 w-full sm:w-auto" />
+            <p className="mt-3 text-sm text-neutral-400">{SITE.trialLine}</p>
+          </aside>
+        )}
 
         <section className="mt-14" aria-labelledby="faq-heading">
           <h2 id="faq-heading" className="text-2xl font-bold text-black mb-6">Frequently asked questions</h2>
@@ -374,6 +339,18 @@ export default function MarketingPage({ slug }) {
         </section>
 
         {page.disclaimer && <p className="mt-10 text-xs text-neutral-600 border-t border-neutral-200 pt-4">{page.disclaimer}</p>}
+
+        {page.sample && (
+          <p className="mt-10 text-sm text-neutral-700" data-qe="blank-format">
+            Prefer a blank format? Download{" "}
+            {TEMPLATE_FORMATS.map((f, i) => (
+              <span key={f.ext}>
+                {i > 0 && <span aria-hidden="true"> · </span>}
+                <a href={templatePath(page.slug, f.ext)} download className="font-medium text-black underline underline-offset-2 hover:no-underline">{f.label}</a>
+              </span>
+            ))}
+          </p>
+        )}
 
         <RelatedLinks page={page} />
       </article>

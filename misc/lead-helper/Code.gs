@@ -18,7 +18,7 @@ var TIME_ZONE = 'Asia/Kolkata';
 // Raw tab columns, in order. "timestamp" is set here, not by the browser.
 var COLUMNS = [
   'timestamp', 'session_id', 'page_slug', 'page_type', 'industry', 'event', 'question', 'answer',
-  'quotes_per_day', 'current_method', 'visitor_type', 'source', 'device', 'referrer', 'phone'
+  'quotes_per_day', 'current_method', 'visitor_type', 'source', 'device', 'referrer', 'phone', 'visitor_id'
 ];
 
 // Visitors tab columns, in order: one row per session_id.
@@ -29,13 +29,23 @@ var VISITOR_COLUMNS = [
 
 var ALLOWED_EVENTS = [
   'shown', 'opened', 'closed', 'hook_yes', 'hook_no', 'answered', 'skipped', 'whatsapp_click', 'download_click',
-  'toast_whatsapp_click', 'inline_whatsapp_click', 'number_submitted'
+  'toast_whatsapp_click', 'inline_whatsapp_click', 'number_submitted',
+  // self-serve signup funnel (raw tab only, not the Visitors summary)
+  'signup_started', 'signup_completed', 'onboarding_step', 'first_quote_created', 'first_pdf_downloaded',
+  // website editor + save-as-signup funnel, and the Lead Helper's signup button
+  'editor_opened', 'editor_edited', 'save_click', 'google_prompt_opened', 'google_prompt_closed', 'draft_imported', 'signup_click',
+  'item_added', 'custom_pdf_whatsapp_click'
+];
+var FUNNEL_EVENTS = [
+  'signup_started', 'signup_completed', 'onboarding_step', 'first_quote_created', 'first_pdf_downloaded',
+  'editor_opened', 'editor_edited', 'save_click', 'google_prompt_opened', 'google_prompt_closed', 'draft_imported', 'signup_click',
+  'item_added', 'custom_pdf_whatsapp_click'
 ];
 
 // Max length per field. Unlisted fields are dropped.
 var MAX_LENGTH = {
-  session_id: 64, page_slug: 100, page_type: 20, industry: 60, event: 20, question: 40, answer: 60,
-  quotes_per_day: 20, current_method: 40, visitor_type: 30, source: 60, device: 10, referrer: 200, phone: 13
+  session_id: 64, page_slug: 100, page_type: 20, industry: 60, event: 24, question: 40, answer: 60,
+  quotes_per_day: 20, current_method: 40, visitor_type: 30, source: 60, device: 10, referrer: 200, phone: 13, visitor_id: 64
 };
 
 // How far into the chat the visit got. Higher wins.
@@ -66,7 +76,7 @@ function doPost(e) {
     lock.waitLock(10000);
     try {
       sheet_(SHEET_NAME, COLUMNS).appendRow(row);
-      upsertVisitor_(data, strNow);
+      if (FUNNEL_EVENTS.indexOf(data.event) === -1) upsertVisitor_(data, strNow);
     } finally {
       lock.releaseLock();
     }

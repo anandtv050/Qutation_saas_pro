@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { MessageCircle, Mail, Phone, ArrowRight, Linkedin } from "lucide-react";
-import { SITE, demoLink } from "./site";
+import { SITE, signupLink } from "./site";
 import { GENERAL_PAGES, INDUSTRY_PAGES, COMPARISON_PAGES } from "./pages";
 import { APP_FEATURES } from "./features";
 
@@ -60,22 +60,28 @@ export function RichText({ text }) {
   return <>{lstParts}</>;
 }
 
-export function TrialButton({ context, children = "Start free trial on WhatsApp", className = "" }) {
+// Primary "Start free trial" button: self-serve signup. src says which button the visitor used.
+export function StartTrialButton({ src, industry, children = "Start free trial", className = "" }) {
   return (
-    <a
-      href={demoLink(context)}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      to={signupLink({ industry, src })}
       className={`inline-flex items-center justify-center gap-2 px-6 py-3 text-base font-semibold bg-black text-white rounded-xl hover:bg-neutral-800 transition-colors ${className}`}
     >
-      <MessageCircle className="w-4 h-4" aria-hidden="true" />
       {children}
       <ArrowRight className="w-4 h-4" aria-hidden="true" />
-    </a>
+    </Link>
   );
 }
 
 function Nav() {
+  // On pages with the editor "Try free" scrolls to it; on the others it goes to /signup.
+  const onTry = (e) => {
+    const el = document.getElementById("quote-editor");
+    if (!el) return;
+    e.preventDefault();
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => document.getElementById("qe-business")?.focus({ preventScroll: true }), 500);
+  };
   return (
     <header className="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-md border-b border-neutral-100 z-50">
       <nav className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16" aria-label="Main">
@@ -87,14 +93,13 @@ function Nav() {
           <a href="/#industries" className="hidden md:inline text-sm text-neutral-600 hover:text-black">Industries</a>
           <a href="/#pricing" className="hidden md:inline text-sm text-neutral-600 hover:text-black">Pricing</a>
           <a href="/login" className="text-sm font-medium text-neutral-700 hover:text-black">Sign in</a>
-          <a
-            href={demoLink()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 md:px-4 py-1.5 md:py-2 text-sm font-semibold bg-black text-white rounded-lg hover:bg-neutral-800"
+          <Link
+            to={signupLink({ src: "header" })}
+            onClick={onTry}
+            className="px-3 md:px-4 py-1.5 md:py-2 text-sm font-semibold text-black bg-white border border-black rounded-lg hover:bg-neutral-100"
           >
-            Start free trial
-          </a>
+            Try free
+          </Link>
         </div>
       </nav>
     </header>
@@ -146,7 +151,7 @@ function Footer() {
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-600 mb-1">Contact</p>
           <a href={`https://wa.me/${SITE.whatsappNumber}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-neutral-700 hover:text-black">
             <MessageCircle className="w-4 h-4 text-[#128C7E]" aria-hidden="true" />
-            WhatsApp {SITE.phoneDisplay}
+            Need help? Chat on WhatsApp
           </a>
           <a href={`tel:${SITE.phoneE164}`} className="inline-flex items-center gap-2 text-sm text-neutral-700 hover:text-black">
             <Phone className="w-4 h-4 text-neutral-500" aria-hidden="true" />

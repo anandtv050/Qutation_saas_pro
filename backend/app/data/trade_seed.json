@@ -1,0 +1,1234 @@
+{
+  "trades": [
+    {
+      "key": "cctv",
+      "label": "CCTV",
+      "service": "cctv",
+      "items": [
+        {
+          "code": "SMP-CCTV-01",
+          "name": "4MP IP dome camera, PoE, 30 m IR night vision, indoor",
+          "category": "CCTV",
+          "unit": "Nos",
+          "price": 2450,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CCTV-02",
+          "name": "4MP IP bullet camera, PoE, 40 m IR, IP67 outdoor",
+          "category": "CCTV",
+          "unit": "Nos",
+          "price": 2750,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CCTV-03",
+          "name": "8-channel NVR with 8 PoE ports, H.265",
+          "category": "CCTV",
+          "unit": "Nos",
+          "price": 7800,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CCTV-04",
+          "name": "2TB surveillance hard disk",
+          "category": "CCTV",
+          "unit": "Nos",
+          "price": 5600,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CCTV-05",
+          "name": "Cat6 cable, copper (estimated, billed as per actual)",
+          "category": "CCTV",
+          "unit": "Mtr",
+          "price": 24,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CCTV-06",
+          "name": "PVC conduit, bends, clamps and junction boxes",
+          "category": "CCTV",
+          "unit": "Lot",
+          "price": 1800,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CCTV-07",
+          "name": "RJ45 connectors and boots",
+          "category": "CCTV",
+          "unit": "Pcs",
+          "price": 25,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CCTV-08",
+          "name": "Installation, configuration and mobile app setup",
+          "category": "CCTV",
+          "unit": "Points",
+          "price": 650,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "solar-installation",
+      "label": "Solar Installation",
+      "service": "solar",
+      "items": [
+        {
+          "code": "SMP-SOLARINS-01",
+          "name": "545 Wp mono PERC DCR solar panel",
+          "category": "Solar Installation",
+          "unit": "Nos",
+          "price": 15200,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-SOLARINS-02",
+          "name": "3 kW single-phase on-grid inverter with Wi-Fi monitoring",
+          "category": "Solar Installation",
+          "unit": "Nos",
+          "price": 32000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-SOLARINS-03",
+          "name": "Hot-dip GI elevated mounting structure",
+          "category": "Solar Installation",
+          "unit": "kWp",
+          "price": 8500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-SOLARINS-04",
+          "name": "DC solar cable 4 sq mm (red + black)",
+          "category": "Solar Installation",
+          "unit": "Mtr",
+          "price": 75,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-SOLARINS-05",
+          "name": "AC cable 4 sq mm, inverter to ACDB to meter",
+          "category": "Solar Installation",
+          "unit": "Mtr",
+          "price": 95,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-SOLARINS-06",
+          "name": "ACDB and DCDB with SPD, MCB and isolator",
+          "category": "Solar Installation",
+          "unit": "Set",
+          "price": 6500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-SOLARINS-07",
+          "name": "Chemical earthing kit",
+          "category": "Solar Installation",
+          "unit": "Nos",
+          "price": 2800,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-SOLARINS-08",
+          "name": "Lightning arrester with earthing",
+          "category": "Solar Installation",
+          "unit": "Nos",
+          "price": 3200,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-SOLARINS-09",
+          "name": "Net metering application and DISCOM liaison",
+          "category": "Solar Installation",
+          "unit": "Job",
+          "price": 3500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-SOLARINS-10",
+          "name": "Installation, testing and commissioning",
+          "category": "Solar Installation",
+          "unit": "Job",
+          "price": 12000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "electrical-work",
+      "label": "Electrical Work",
+      "service": "electrical",
+      "items": [
+        {
+          "code": "SMP-ELECTRIC-01",
+          "name": "FR copper wire 1.5 sq mm, 90 m coil (lights and fans)",
+          "category": "Electrical Work",
+          "unit": "Coil",
+          "price": 1950,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ELECTRIC-02",
+          "name": "FR copper wire 2.5 sq mm, 90 m coil (sockets)",
+          "category": "Electrical Work",
+          "unit": "Coil",
+          "price": 3100,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ELECTRIC-03",
+          "name": "FR copper wire 4 sq mm, 90 m coil (AC and geyser)",
+          "category": "Electrical Work",
+          "unit": "Coil",
+          "price": 4900,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ELECTRIC-04",
+          "name": "PVC conduit 25 mm, 3 m length, with bends",
+          "category": "Electrical Work",
+          "unit": "Pcs",
+          "price": 85,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ELECTRIC-05",
+          "name": "Modular switches and sockets, 6A and 16A",
+          "category": "Electrical Work",
+          "unit": "Nos",
+          "price": 120,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ELECTRIC-06",
+          "name": "Modular boxes with cover plates",
+          "category": "Electrical Work",
+          "unit": "Nos",
+          "price": 210,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ELECTRIC-07",
+          "name": "8-way SPN distribution board",
+          "category": "Electrical Work",
+          "unit": "Nos",
+          "price": 2300,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ELECTRIC-08",
+          "name": "MCB 6A to 32A, single pole",
+          "category": "Electrical Work",
+          "unit": "Nos",
+          "price": 280,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ELECTRIC-09",
+          "name": "RCCB 40A, 30 mA, double pole",
+          "category": "Electrical Work",
+          "unit": "Nos",
+          "price": 2400,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ELECTRIC-10",
+          "name": "Wiring labour per point, including testing",
+          "category": "Electrical Work",
+          "unit": "Points",
+          "price": 450,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "interior-design",
+      "label": "Interior Design",
+      "service": "general",
+      "items": [
+        {
+          "code": "SMP-INTERIOR-01",
+          "name": "Design, 2D layout and 3D views (2 revisions)",
+          "category": "Interior Design",
+          "unit": "Job",
+          "price": 15000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-INTERIOR-02",
+          "name": "Modular kitchen, BWP plywood 18 mm, 1 mm laminate",
+          "category": "Interior Design",
+          "unit": "Sq ft",
+          "price": 1450,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-INTERIOR-03",
+          "name": "Quartz countertop, 20 mm, with backsplash strip",
+          "category": "Interior Design",
+          "unit": "Rft",
+          "price": 850,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-INTERIOR-04",
+          "name": "Sliding wardrobes, MR plywood 18 mm, laminate finish",
+          "category": "Interior Design",
+          "unit": "Sq ft",
+          "price": 1350,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-INTERIOR-05",
+          "name": "TV unit with open shelves and back panel",
+          "category": "Interior Design",
+          "unit": "Sq ft",
+          "price": 1200,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-INTERIOR-06",
+          "name": "Hardware: soft-close hinges, channels, tandem baskets",
+          "category": "Interior Design",
+          "unit": "Set",
+          "price": 18500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-INTERIOR-07",
+          "name": "Gypsum false ceiling with cove, living and bedroom",
+          "category": "Interior Design",
+          "unit": "Sq ft",
+          "price": 95,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-INTERIOR-08",
+          "name": "Site supervision and installation",
+          "category": "Interior Design",
+          "unit": "Job",
+          "price": 12000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "plumbing",
+      "label": "Plumbing",
+      "service": "general",
+      "items": [
+        {
+          "code": "SMP-PLUMBING-01",
+          "name": "CPVC pipe 3/4 inch, SDR 11, 3 m length",
+          "category": "Plumbing",
+          "unit": "Lengths",
+          "price": 420,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PLUMBING-02",
+          "name": "CPVC pipe 1/2 inch, SDR 11, 3 m length",
+          "category": "Plumbing",
+          "unit": "Lengths",
+          "price": 260,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PLUMBING-03",
+          "name": "CPVC fittings: elbows, tees, couplers, adaptors",
+          "category": "Plumbing",
+          "unit": "Lot",
+          "price": 3800,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PLUMBING-04",
+          "name": "Concealed diverter body (trim and shower by customer)",
+          "category": "Plumbing",
+          "unit": "Nos",
+          "price": 2400,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PLUMBING-05",
+          "name": "Ball valve 3/4 inch, brass",
+          "category": "Plumbing",
+          "unit": "Nos",
+          "price": 380,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PLUMBING-06",
+          "name": "SWR pipes 75 mm and 110 mm with fittings",
+          "category": "Plumbing",
+          "unit": "Lot",
+          "price": 4600,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PLUMBING-07",
+          "name": "Floor trap with stainless steel grating",
+          "category": "Plumbing",
+          "unit": "Nos",
+          "price": 450,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PLUMBING-08",
+          "name": "Plumbing labour per bathroom (up to 6 points)",
+          "category": "Plumbing",
+          "unit": "Bathroom",
+          "price": 9500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PLUMBING-09",
+          "name": "Fixing of WC, wash basin and accessories",
+          "category": "Plumbing",
+          "unit": "Set",
+          "price": 2200,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PLUMBING-10",
+          "name": "Pressure testing before tiling, with photo record",
+          "category": "Plumbing",
+          "unit": "Job",
+          "price": 1500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "networking",
+      "label": "Networking",
+      "service": "networking",
+      "items": [
+        {
+          "code": "SMP-NETWORKI-01",
+          "name": "24-port gigabit smart switch with 4 SFP uplinks",
+          "category": "Networking",
+          "unit": "Nos",
+          "price": 14500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-NETWORKI-02",
+          "name": "Cat6 UTP cable, 305 m box",
+          "category": "Networking",
+          "unit": "Box",
+          "price": 9800,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-NETWORKI-03",
+          "name": "24-port Cat6 patch panel, loaded",
+          "category": "Networking",
+          "unit": "Nos",
+          "price": 4200,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-NETWORKI-04",
+          "name": "Cat6 I/O module with face plate and box",
+          "category": "Networking",
+          "unit": "Nos",
+          "price": 280,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-NETWORKI-05",
+          "name": "Cat6 patch cords, 1 m and 2 m",
+          "category": "Networking",
+          "unit": "Nos",
+          "price": 120,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-NETWORKI-06",
+          "name": "9U wall-mount rack with shelf, fan and PDU",
+          "category": "Networking",
+          "unit": "Nos",
+          "price": 8500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-NETWORKI-07",
+          "name": "Wi-Fi 6 ceiling access point, PoE",
+          "category": "Networking",
+          "unit": "Nos",
+          "price": 7800,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-NETWORKI-08",
+          "name": "PVC casing and capping, 25 mm",
+          "category": "Networking",
+          "unit": "Mtr",
+          "price": 45,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-NETWORKI-09",
+          "name": "Cable laying and termination per node (up to 40 m)",
+          "category": "Networking",
+          "unit": "Nodes",
+          "price": 350,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-NETWORKI-10",
+          "name": "Testing, labelling and port map documentation",
+          "category": "Networking",
+          "unit": "Job",
+          "price": 3000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "construction",
+      "label": "Construction",
+      "service": "general",
+      "items": [
+        {
+          "code": "SMP-CONSTRUC-01",
+          "name": "Excavation for foundation in ordinary soil, including disposal within plot",
+          "category": "Construction",
+          "unit": "Cu m",
+          "price": 450,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CONSTRUC-02",
+          "name": "PCC 1:4:8 below footings, 100 mm",
+          "category": "Construction",
+          "unit": "Cu m",
+          "price": 5800,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CONSTRUC-03",
+          "name": "RCC M20 footings, columns and plinth beam, incl. shuttering (excl. steel)",
+          "category": "Construction",
+          "unit": "Cu m",
+          "price": 7800,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CONSTRUC-04",
+          "name": "Reinforcement steel Fe 500D, cutting, bending and placing",
+          "category": "Construction",
+          "unit": "Kg",
+          "price": 82,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CONSTRUC-05",
+          "name": "Brick masonry 230 mm in CM 1:6",
+          "category": "Construction",
+          "unit": "Cu m",
+          "price": 6900,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CONSTRUC-06",
+          "name": "RCC M20 roof slab 125 mm with beams, incl. shuttering (excl. steel)",
+          "category": "Construction",
+          "unit": "Cu m",
+          "price": 8200,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CONSTRUC-07",
+          "name": "Internal plaster 12 mm in CM 1:4, walls and ceiling",
+          "category": "Construction",
+          "unit": "Sq m",
+          "price": 320,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CONSTRUC-08",
+          "name": "External plaster 20 mm in CM 1:4",
+          "category": "Construction",
+          "unit": "Sq m",
+          "price": 420,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CONSTRUC-09",
+          "name": "Vitrified tile flooring 600x600 mm, tile up to Rs. 45/sq ft",
+          "category": "Construction",
+          "unit": "Sq ft",
+          "price": 95,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "painting",
+      "label": "Painting",
+      "service": "general",
+      "items": [
+        {
+          "code": "SMP-PAINTING-01",
+          "name": "Surface preparation: scraping, sanding and crack filling",
+          "category": "Painting",
+          "unit": "Sq ft",
+          "price": 4,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PAINTING-02",
+          "name": "Wall putty, 2 coats, on patchy areas only",
+          "category": "Painting",
+          "unit": "Sq ft",
+          "price": 14,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PAINTING-03",
+          "name": "Interior primer, 1 coat",
+          "category": "Painting",
+          "unit": "Sq ft",
+          "price": 6,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PAINTING-04",
+          "name": "Premium interior emulsion, 2 coats (brand and shade as approved)",
+          "category": "Painting",
+          "unit": "Sq ft",
+          "price": 18,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PAINTING-05",
+          "name": "Ceiling: 1 coat primer and 2 coats ceiling white",
+          "category": "Painting",
+          "unit": "Sq ft",
+          "price": 12,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PAINTING-06",
+          "name": "Enamel paint on doors and grills, 2 coats",
+          "category": "Painting",
+          "unit": "Sq ft",
+          "price": 28,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PAINTING-07",
+          "name": "Texture finish on living room feature wall",
+          "category": "Painting",
+          "unit": "Sq ft",
+          "price": 85,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PAINTING-08",
+          "name": "Furniture covering, masking and final cleaning",
+          "category": "Painting",
+          "unit": "Job",
+          "price": 3500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "ac-installation-service",
+      "label": "AC Installation and Service",
+      "service": "general",
+      "items": [
+        {
+          "code": "SMP-ACINSTAL-01",
+          "name": "Installation of 1.5 ton split AC with standard kit",
+          "category": "AC Installation and Service",
+          "unit": "Nos",
+          "price": 1500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ACINSTAL-02",
+          "name": "Additional copper pipe 1/4 + 1/2 inch with insulation",
+          "category": "AC Installation and Service",
+          "unit": "Mtr",
+          "price": 750,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ACINSTAL-03",
+          "name": "Drain pipe extension",
+          "category": "AC Installation and Service",
+          "unit": "Mtr",
+          "price": 40,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ACINSTAL-04",
+          "name": "Outdoor unit wall stand, MS powder-coated",
+          "category": "AC Installation and Service",
+          "unit": "Nos",
+          "price": 900,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ACINSTAL-05",
+          "name": "Core cutting 65 mm for pipe routing",
+          "category": "AC Installation and Service",
+          "unit": "Nos",
+          "price": 600,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ACINSTAL-06",
+          "name": "Uninstallation of old window AC",
+          "category": "AC Installation and Service",
+          "unit": "Nos",
+          "price": 600,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-ACINSTAL-07",
+          "name": "Non-comprehensive AMC, 3 wet services per year",
+          "category": "AC Installation and Service",
+          "unit": "Units",
+          "price": 1800,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "carpentry",
+      "label": "Carpentry",
+      "service": "general",
+      "items": [
+        {
+          "code": "SMP-CARPENTR-01",
+          "name": "Bed 6 x 6.5 ft with hydraulic storage, 18 mm MR ply, 1 mm laminate",
+          "category": "Carpentry",
+          "unit": "Nos",
+          "price": 32000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CARPENTR-02",
+          "name": "Study table 4 ft with one drawer and keyboard tray",
+          "category": "Carpentry",
+          "unit": "Nos",
+          "price": 9500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CARPENTR-03",
+          "name": "Shoe rack 3 x 3.5 ft with shutters, laminate finish",
+          "category": "Carpentry",
+          "unit": "Nos",
+          "price": 6800,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CARPENTR-04",
+          "name": "Kitchen shutter replacement, 18 mm BWP ply, laminate, soft-close hinges",
+          "category": "Carpentry",
+          "unit": "Nos",
+          "price": 1450,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CARPENTR-05",
+          "name": "Floating wall shelf 3 ft, concealed brackets",
+          "category": "Carpentry",
+          "unit": "Nos",
+          "price": 1100,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CARPENTR-06",
+          "name": "Door repair: hinge replacement and alignment",
+          "category": "Carpentry",
+          "unit": "Doors",
+          "price": 450,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CARPENTR-07",
+          "name": "Melamine polish on teak main door, both sides",
+          "category": "Carpentry",
+          "unit": "Nos",
+          "price": 4500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CARPENTR-08",
+          "name": "Transport and installation",
+          "category": "Carpentry",
+          "unit": "Job",
+          "price": 2500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "catering",
+      "label": "Catering",
+      "service": "general",
+      "items": [
+        {
+          "code": "SMP-CATERING-01",
+          "name": "Veg buffet per plate: 1 welcome drink, 2 starters, 4 main dishes, 2 breads, rice, 2 desserts",
+          "category": "Catering",
+          "unit": "Plates",
+          "price": 420,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CATERING-02",
+          "name": "Live chaat counter (per plate add-on)",
+          "category": "Catering",
+          "unit": "Plates",
+          "price": 55,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CATERING-03",
+          "name": "Packaged drinking water, 500 ml",
+          "category": "Catering",
+          "unit": "Bottles",
+          "price": 12,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CATERING-04",
+          "name": "Uniformed service staff, 4 hours",
+          "category": "Catering",
+          "unit": "Persons",
+          "price": 700,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CATERING-05",
+          "name": "Buffet setup with chafing dishes, counters and table linen",
+          "category": "Catering",
+          "unit": "Job",
+          "price": 8000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-CATERING-06",
+          "name": "Transport of food and equipment",
+          "category": "Catering",
+          "unit": "Job",
+          "price": 3500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "event-management",
+      "label": "Event Management",
+      "service": "general",
+      "items": [
+        {
+          "code": "SMP-EVENTMAN-01",
+          "name": "Event concept, planning, vendor management and on-site coordination",
+          "category": "Event Management",
+          "unit": "Job",
+          "price": 25000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-EVENTMAN-02",
+          "name": "Stage 24 x 16 ft, 2 ft high, with printed backdrop",
+          "category": "Event Management",
+          "unit": "Set",
+          "price": 38000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-EVENTMAN-03",
+          "name": "Sound system 2 kW with 2 cordless mics and operator",
+          "category": "Event Management",
+          "unit": "Day",
+          "price": 18000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-EVENTMAN-04",
+          "name": "LED wall, P3.9 indoor, 12 x 8 ft",
+          "category": "Event Management",
+          "unit": "Sq ft",
+          "price": 140,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-EVENTMAN-05",
+          "name": "Stage lighting: par cans and 4 moving heads with operator",
+          "category": "Event Management",
+          "unit": "Set",
+          "price": 15000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-EVENTMAN-06",
+          "name": "Anchor for 3 hours (English and Hindi)",
+          "category": "Event Management",
+          "unit": "Nos",
+          "price": 20000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-EVENTMAN-07",
+          "name": "Registration desk with 2 hostesses",
+          "category": "Event Management",
+          "unit": "Day",
+          "price": 6000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-EVENTMAN-08",
+          "name": "Photography and videography with edited highlights",
+          "category": "Event Management",
+          "unit": "Day",
+          "price": 22000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-EVENTMAN-09",
+          "name": "Decor: entrance arch, stage flowers and table centrepieces",
+          "category": "Event Management",
+          "unit": "Lot",
+          "price": 18000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "printing",
+      "label": "Printing",
+      "service": "general",
+      "items": [
+        {
+          "code": "SMP-PRINTING-01",
+          "name": "Visiting cards, 350 GSM, 4/4, matt lamination",
+          "category": "Printing",
+          "unit": "Nos",
+          "price": 1.2,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PRINTING-02",
+          "name": "Tri-fold brochure, A4 open, 170 GSM art paper, 4/4, folded",
+          "category": "Printing",
+          "unit": "Nos",
+          "price": 6.5,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PRINTING-03",
+          "name": "Letterhead A4, 100 GSM, 4/0",
+          "category": "Printing",
+          "unit": "Nos",
+          "price": 3.2,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PRINTING-04",
+          "name": "Flex banner, star flex with eyelets (4 banners of 6 x 3 ft)",
+          "category": "Printing",
+          "unit": "Sq ft",
+          "price": 18,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PRINTING-05",
+          "name": "Roll-up standee 6 x 3 ft with print and carry bag",
+          "category": "Printing",
+          "unit": "Nos",
+          "price": 1650,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PRINTING-06",
+          "name": "Brochure design, 2 revisions",
+          "category": "Printing",
+          "unit": "Job",
+          "price": 2500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PRINTING-07",
+          "name": "Delivery within city",
+          "category": "Printing",
+          "unit": "Job",
+          "price": 300,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "web-design",
+      "label": "Web Design",
+      "service": "general",
+      "items": [
+        {
+          "code": "SMP-WEBDESIG-01",
+          "name": "UI design: Home, About, Services, Gallery, Blog, Contact",
+          "category": "Web Design",
+          "unit": "Pages",
+          "price": 3500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-WEBDESIG-02",
+          "name": "Responsive WordPress development",
+          "category": "Web Design",
+          "unit": "Pages",
+          "price": 3000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-WEBDESIG-03",
+          "name": "Contact form, Google Map and WhatsApp chat button",
+          "category": "Web Design",
+          "unit": "Job",
+          "price": 2000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-WEBDESIG-04",
+          "name": "Basic on-page SEO: titles, meta descriptions, sitemap, Search Console",
+          "category": "Web Design",
+          "unit": "Job",
+          "price": 3500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-WEBDESIG-05",
+          "name": "Domain registration, .in (in client's name)",
+          "category": "Web Design",
+          "unit": "Year",
+          "price": 800,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-WEBDESIG-06",
+          "name": "Shared hosting with SSL (in client's name)",
+          "category": "Web Design",
+          "unit": "Year",
+          "price": 4500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-WEBDESIG-07",
+          "name": "Content upload (text and images supplied by client)",
+          "category": "Web Design",
+          "unit": "Job",
+          "price": 2000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-WEBDESIG-08",
+          "name": "Training session and handover (1 hour)",
+          "category": "Web Design",
+          "unit": "Job",
+          "price": 1500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    },
+    {
+      "key": "photography",
+      "label": "Photography",
+      "service": "general",
+      "items": [
+        {
+          "code": "SMP-PHOTOGRA-01",
+          "name": "Candid photography, 2 photographers, per day",
+          "category": "Photography",
+          "unit": "Days",
+          "price": 25000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PHOTOGRA-02",
+          "name": "Traditional photography and videography, per day",
+          "category": "Photography",
+          "unit": "Days",
+          "price": 18000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PHOTOGRA-03",
+          "name": "Cinematic highlight film, 4 to 5 minutes",
+          "category": "Photography",
+          "unit": "Nos",
+          "price": 20000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PHOTOGRA-04",
+          "name": "Drone coverage (subject to venue permission)",
+          "category": "Photography",
+          "unit": "Day",
+          "price": 8000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PHOTOGRA-05",
+          "name": "Pre-wedding shoot, 1 location, half day",
+          "category": "Photography",
+          "unit": "Nos",
+          "price": 22000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PHOTOGRA-06",
+          "name": "Premium album 12 x 36 inch, 40 sheets",
+          "category": "Photography",
+          "unit": "Nos",
+          "price": 9500,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        },
+        {
+          "code": "SMP-PHOTOGRA-07",
+          "name": "Travel and stay for team outside city",
+          "category": "Photography",
+          "unit": "Lot",
+          "price": 6000,
+          "warrantyYears": 0,
+          "warrantyMonths": 0
+        }
+      ]
+    }
+  ]
+}

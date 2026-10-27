@@ -6,6 +6,7 @@ import { X, MessageCircle } from "lucide-react";
 import { SITE } from "../site";
 import { INDUSTRY_PAGES } from "../pages";
 import { templatePath } from "../samples";
+import { signupLink, industryKeyOfSlug } from "../site";
 import {
   canAutoTeaser, noteTeaserShown, snooze, markConverted, getConvertedText, canToast, noteToastShown,
   getSavedAnswers, saveAnswers, markNumberGiven, normaliseMobile, logEvent, clarityEvent,
@@ -467,6 +468,13 @@ export default function LeadHelper({ page }) {
     userSays(strMobile.replace(/^\+91(\d{5})(\d{5})$/, "+91 $1 $2"));
     say([`Thanks! Our team will message you on WhatsApp within a few hours (9 AM – 9 PM).`], step);
   };
+  const onSignupClick = () => {
+    log("signup_click", QUESTION[step]);
+    clarityEvent("helper_signup");
+  };
+  const strSignupHref = signupLink({ industry: industryKeyOfSlug(answers.industrySlug), src: "lead_helper" });
+  const SIGNUP_CLASS = "flex items-center justify-center gap-2 min-h-[48px] px-4 text-[15px] font-semibold text-white bg-black rounded-xl shadow-sm hover:bg-neutral-800 transition-colors";
+  const HELP_CLASS = "text-center text-sm font-medium text-neutral-700 underline underline-offset-2 hover:no-underline";
   const onToastWhatsApp = () => {
     log("toast_whatsapp_click", "toast");
     convert(strToastText);
@@ -608,16 +616,9 @@ export default function LeadHelper({ page }) {
 
             {step === "result" && (
               <div className="mt-3 grid gap-2">
-                <a
-                  href={whatsappUrl(strChatText)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 min-h-[48px] px-4 text-[15px] font-semibold text-white bg-[#15803d] rounded-xl shadow-sm hover:bg-[#166534] transition-colors"
-                  onClick={onWhatsApp}
-                >
-                  💬 Chat with our engineer on WhatsApp
+                <a href={strSignupHref} className={SIGNUP_CLASS} onClick={onSignupClick}>
+                  Make this with your business name. Start free
                 </a>
-                <p className="-mt-0.5 text-xs text-neutral-600 text-center">Our team usually replies within a few hours (9 AM – 9 PM).</p>
                 <a
                   href={templatePath(strTemplateSlug, "pdf")}
                   download
@@ -626,10 +627,13 @@ export default function LeadHelper({ page }) {
                 >
                   📄 Download PDF format
                 </a>
+                <a href={whatsappUrl(strChatText)} target="_blank" rel="noopener noreferrer" className={HELP_CLASS} onClick={onWhatsApp}>
+                  Questions? Chat on WhatsApp
+                </a>
               </div>
             )}
 
-            {/* End of the chat: leave a number, or (always last) start the free trial on WhatsApp */}
+            {/* End of the chat: leave a number, or (always last) start the free trial */}
             {step === "end" && (
               <div className="mt-3 grid gap-2">
                 {!blnNumberSent && (
@@ -667,16 +671,12 @@ export default function LeadHelper({ page }) {
                     <p className="mt-1.5 text-xs text-neutral-500">We'll only use it to contact you about Quotely Pro.</p>
                   </form>
                 )}
-                <a
-                  href={whatsappUrl(strChatText)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 min-h-[48px] px-4 text-[15px] font-semibold text-white bg-[#15803d] rounded-xl shadow-sm hover:bg-[#166534] transition-colors"
-                  onClick={onWhatsApp}
-                >
-                  💬 Start free {SITE.trialDays}-day trial on WhatsApp
+                <a href={strSignupHref} className={SIGNUP_CLASS} onClick={onSignupClick}>
+                  Start free {SITE.trialDays}-day trial
                 </a>
-                <p className="-mt-0.5 text-xs text-neutral-600 text-center">Our team usually replies within a few hours (9 AM – 9 PM).</p>
+                <a href={whatsappUrl(strChatText)} target="_blank" rel="noopener noreferrer" className={HELP_CLASS} onClick={onWhatsApp}>
+                  Questions? Chat on WhatsApp
+                </a>
               </div>
             )}
           </div>

@@ -128,7 +128,7 @@ What it does:
 - Warranty certificates and warranty expiry tracking
 - PDF branding: logo, colours, header, terms, footer note, signature, payment QR code
 
-Getting started: accounts are set up personally via WhatsApp (${SITE.phoneDisplay}). ${SITE.trialLine} There is no permanent free plan.
+Getting started: sign in with Google at ${SITE.url}/signup, add items and download a first quotation in a few minutes. ${SITE.trialLine} There is no permanent free plan. Questions: WhatsApp ${SITE.phoneDisplay}.
 
 Pricing (${SITE.priceNote} Yearly billing = 2 months free):
 ${PLANS.map((p) => `- ${p.name}: ₹${p.priceMonthly.toLocaleString("en-IN")}/month or ₹${p.priceYearly.toLocaleString("en-IN")}/year. ${p.features.join("; ")}.`).join("\n")}

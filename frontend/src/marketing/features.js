@@ -47,8 +47,8 @@ export const APP_FEATURES = [
   },
   {
     icon: SlidersHorizontal,
-    title: "Print layout set up for you",
-    desc: "When we set up your account, we configure each document type for you: table columns and their order, company details, totals, header title, logo, signature and payment QR.",
+    title: "Print layout you control",
+    desc: "Set the table columns and their order, company details, totals, header title, signature and payment QR for each document type. Send us your logo on WhatsApp and we add it.",
   },
   {
     icon: ChartBar,

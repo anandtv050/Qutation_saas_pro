@@ -12,6 +12,8 @@ import pdfService from "@/services/pdfService";
 import aiService from "@/services/aiService";
 import { usePermission } from "@/contexts/PermissionsContext";
 import NoPermission from "@/components/NoPermission";
+import { funnelEventOnce } from "@/marketing/leadHelper/leadLog";
+import { customPdfLink, trackCustomPdfClick } from "@/lib/customPdfHelp";
 
 // Session storage key
 const STORAGE_KEY = "quotation_draft";
@@ -40,6 +42,15 @@ const clearDraft = () => {
   sessionStorage.removeItem(STORAGE_KEY);
 };
 
+// Users who signed up through the self-serve wizard (flag set when it finishes)
+const isSelfServeUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem("userInfo") || "{}").blnSelfServe === true;
+  } catch {
+    return false;
+  }
+};
+
 export default function NewQuotation() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -53,6 +64,25 @@ export default function NewQuotation() {
   const { id: editId } = useParams(); // Get ID from URL for edit mode
   const mode = searchParams.get("mode") || "ai";
   const isEditMode = !!editId;
+  // Arrived from the website editor (?saved=new|1): big Download PDF button + a toast. The PDF is not
+  // downloaded automatically (iOS blocks downloads that were not started by a tap).
+  const [strJustSaved] = useState(() => {
+    const v = new URLSearchParams(window.location.search).get("saved");
+    return v === "new" || v === "1" ? v : "";
+  });
+  const [blnSavedToast, setBlnSavedToast] = useState(!!strJustSaved);
+  useEffect(() => {
+    if (!strJustSaved) return undefined;
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.delete("saved");
+      window.history.replaceState(window.history.state, "", u.pathname + u.search);
+    } catch {
+      // ignore
+    }
+    const t = setTimeout(() => setBlnSavedToast(false), 7000);
+    return () => clearTimeout(t);
+  }, [strJustSaved]);
 
   // Load saved draft on mount (only for new quotations)
   const draft = isEditMode ? null : loadDraft();
@@ -575,6 +605,7 @@ export default function NewQuotation() {
         setSavedQuotation(savedData);
         setIsUpdated(wasAlreadySaved);
         clearDraft(); // Clear draft after successful save
+        if (!isEditMode && !wasAlreadySaved && isSelfServeUser()) funnelEventOnce("first_quote_created");
       } else {
         alert(response.strMessage || "Failed to save quotation");
       }
@@ -605,6 +636,7 @@ export default function NewQuotation() {
       // Download PDF file
       const filename = `Quotation_${savedQuotation.quotation_number || 'draft'}.pdf`;
       pdfService.downloadPDF(pdfBlob, filename);
+      if (isSelfServeUser()) funnelEventOnce("first_pdf_downloaded");
     } catch (error) {
       console.error("Print error:", error);
       alert(error.message || "Failed to generate PDF");
@@ -843,6 +875,45 @@ Example:
               <Calendar className="w-4 h-4" />
               {today}
             </div>
+          </div>
+        )}
+        {isEditMode && searchParams.get("welcome") === "1" && (
+          <p className="mt-3 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-900">
+            Change the customer name and quantities, then download the PDF.
+          </p>
+        )}
+        {isEditMode && strJustSaved && (
+          <div className="mt-3 rounded-2xl border border-green-200 bg-green-50 p-4" data-qe="saved-banner">
+            <p className="text-sm font-semibold text-green-900">Your quotation is saved.</p>
+            <p className="mt-0.5 text-sm text-green-800">Tap the button to download the PDF. You can still change the customer or quantities first.</p>
+            <button
+              type="button"
+              data-qe="download-pdf"
+              onClick={handlePrint}
+              disabled={isPrinting || !savedQuotation}
+              className="mt-3 w-full h-12 rounded-xl bg-black text-white text-base font-semibold hover:bg-neutral-800 disabled:bg-neutral-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isPrinting || !savedQuotation ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+              {isPrinting ? "Preparing your PDF..." : "Download PDF"}
+            </button>
+            <p className="mt-2 text-center text-sm text-green-800">
+              Want your logo on it?{" "}
+              <a
+                href={customPdfLink()}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-qe="custom-pdf-saved"
+                onClick={() => trackCustomPdfClick("saved_quotation")}
+                className="font-semibold underline underline-offset-2"
+              >
+                Chat with our team
+              </a>
+            </p>
+          </div>
+        )}
+        {blnSavedToast && (
+          <div role="status" data-qe="saved-toast" className="fixed left-1/2 top-4 z-50 w-[92vw] max-w-sm -translate-x-1/2 rounded-xl bg-neutral-900 px-4 py-3 text-sm text-white shadow-lg">
+            {strJustSaved === "new" ? "Saved to your account. Free trial started." : "Saved to your account."}
           </div>
         )}
       </div>

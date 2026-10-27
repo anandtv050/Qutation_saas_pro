@@ -1,12 +1,13 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, Request, status, Depends
 import asyncpg
 
-from app.api.login.schema import MdlLoginRequest, MdlLoginResponse, MdlSignupRequest, MdlForgotPasswordRequest, MdlResetPasswordRequest
+from app.api.login.schema import MdlLoginRequest, MdlLoginResponse, MdlSignupRequest, MdlForgotPasswordRequest, MdlResetPasswordRequest, MdlGoogleLoginRequest
 from app.api.login.service import ClsLoginService
 from app.core.database import ClsDatabasepool
 from app.core.logger import getLogger
 from app.core.security import fnGetCurrentUser
 from app.core.presence import ClsPresenceTracker
+from app.core.ratelimit import fnClientIp
 
 logger = getLogger()
 
@@ -74,6 +75,25 @@ async def fnSignup(mdlSignupRequest: MdlSignupRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.post("/google", response_model=MdlLoginResponse)
+async def fnGoogleLogin(mdlRequest: MdlGoogleLoginRequest, request: Request):
+    """Sign in / sign up with a Google ID token (no password, no OTP)."""
+    try:
+        objDatabase = ClsDatabasepool()
+        objPool = await objDatabase.fnGetPool()
+        insLoginService = ClsLoginService(objPool)
+        return await insLoginService.fnGoogleLoginService(mdlRequest, fnClientIp(request))
+    except HTTPException as e:
+        logger.warning(f"Google login failed: {e.detail}")
+        raise
+    except Exception as e:
+        logger.error(f"Google login error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Something went wrong. Please try again."
         )
 
 

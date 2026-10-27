@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { MessageSquareText, ListPlus, ArrowRight, Loader2, LayoutDashboard, Clock, AlertTriangle } from "lucide-react";
 import dashboardService from "@/services/dashboardService";
 import subscriptionService from "@/services/subscriptionService";
 import { usePermission } from "@/contexts/PermissionsContext";
+import GettingStartedCard from "@/components/GettingStartedCard";
 
 export default function Dashboard() {
   const [userName, setUserName] = useState("");
@@ -67,6 +68,15 @@ export default function Dashboard() {
     }).format(amount);
   };
 
+  // New Google signup that has not finished the setup wizard yet
+  let blnNeedsWizard = false;
+  try {
+    blnNeedsWizard = JSON.parse(localStorage.getItem("userInfo") || "{}").blnNeedsOnboarding === true;
+  } catch {
+    // ignore
+  }
+  if (blnNeedsWizard) return <Navigate to="/welcome" replace />;
+
   return (
     <div className="min-h-screen flex items-start justify-center">
       <div className="w-full max-w-md px-5 py-8 md:py-10">
@@ -76,6 +86,8 @@ export default function Dashboard() {
           <p className="text-neutral-400 text-sm">Welcome back,</p>
           <h1 className="text-xl font-semibold text-neutral-900">{userName || "User"}</h1>
         </div>
+
+        {!isAdmin && <GettingStartedCard />}
 
         {/* Subscription Banner */}
         {subscription && !isAdmin && (
@@ -102,7 +114,7 @@ export default function Dashboard() {
                     }`}>
                       {subscription.intDaysRemaining <= 2
                         ? `Only ${subscription.intDaysRemaining} days left!`
-                        : `${subscription.intDaysRemaining} days left in free trial`
+                        : `Free trial: ${subscription.intDaysRemaining} days left`
                       }
                     </p>
                     <p className={`text-xs mt-0.5 ${
@@ -122,7 +134,7 @@ export default function Dashboard() {
                         : "bg-orange-500 text-white hover:bg-orange-600"
                     }`}
                   >
-                    Upgrade
+                    See plans
                   </Link>
                 </div>
               </div>

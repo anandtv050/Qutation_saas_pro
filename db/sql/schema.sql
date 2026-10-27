@@ -34,7 +34,8 @@ CREATE TABLE tbl_user (
     pk_bint_user_id             BIGSERIAL PRIMARY KEY,
     vchr_email                  VARCHAR(255) UNIQUE NOT NULL,
     vchr_username               VARCHAR(100) NOT NULL,
-    vchr_password_hash          VARCHAR(255) NOT NULL,
+    vchr_password_hash          VARCHAR(255),                               -- NULL for Google-only accounts
+    vchr_google_sub             VARCHAR(64) UNIQUE,                         -- Google account id (Google sign-in)
     vchr_business_name          VARCHAR(200),
     vchr_phone                  VARCHAR(20),
     txt_address                 TEXT,
@@ -58,7 +59,13 @@ CREATE TABLE tbl_user (
     bln_cancel_at_period_end    BOOLEAN      DEFAULT FALSE,                 -- Customer requested cancel but still has access
     dat_canceled_at             DATE,                                       -- When cancel was requested
     vchr_cancel_reason          TEXT,                                       -- Retention analytics
-    vchr_razorpay_customer_id   VARCHAR(100)                                -- Future: Razorpay customer reference
+    vchr_razorpay_customer_id   VARCHAR(100),                               -- Future: Razorpay customer reference
+    -- Self-serve onboarding (see migration_self_serve_signup_2026_10_27.sql)
+    bln_needs_onboarding        BOOLEAN      DEFAULT FALSE,                 -- TRUE for new Google signups until the wizard is finished/skipped
+    tim_onboarded_at            TIMESTAMP    DEFAULT NULL,
+    vchr_signup_trade           VARCHAR(60)  DEFAULT NULL,
+    vchr_signup_source          VARCHAR(60)  DEFAULT NULL,
+    tim_first_pdf_at            TIMESTAMP    DEFAULT NULL
 );
 
 CREATE INDEX idx_email ON tbl_user(vchr_email);
@@ -105,6 +112,8 @@ CREATE TABLE tbl_inventory (
 CREATE INDEX idx_inventory_user_id ON tbl_inventory(fk_bint_user_id);
 CREATE INDEX idx_item_code ON tbl_inventory(vchr_item_code);
 CREATE INDEX idx_item_name ON tbl_inventory(vchr_item_name);
+-- One seeded (onboarding) item per user and code; user-created items are unconstrained
+CREATE UNIQUE INDEX uq_inventory_user_seed_code ON tbl_inventory(fk_bint_user_id, vchr_item_code) WHERE vchr_item_code LIKE 'SMP-%';
 
 CREATE TRIGGER trg_inventory_updated_at
 BEFORE UPDATE ON tbl_inventory

@@ -21,13 +21,36 @@ export const SITE = {
   comateLinkedin: "https://www.linkedin.com/company/comate-tech",
 };
 
-// Every "start" CTA goes to WhatsApp until self-serve signup exists.
+// Feature flags. The Lead Helper chat widget code is kept but switched off: while false its chunk is never loaded.
+export const FEATURES = { leadHelper: false };
+
+// Small "Questions? Chat on WhatsApp" link. The start-trial buttons go to /signup (see signupLink below).
+export function helpLink(context) {
+  const strText = context
+    ? `Hi, I have a question about Quotely Pro for ${context}.`
+    : "Hi, I have a question about Quotely Pro.";
+  return `https://wa.me/${SITE.whatsappNumber}?text=${encodeURIComponent(strText)}`;
+}
+
+// WhatsApp link that asks the team to set up a trial (used by the Lead Helper's WhatsApp path and the login help line).
 export function demoLink(context) {
   const strText = context
     ? `Hi, I want to try Quotely Pro for ${context}. Please set up my 7-day free trial.`
     : "Hi, I want to try Quotely Pro. Please set up my 7-day free trial.";
   return `https://wa.me/${SITE.whatsappNumber}?text=${encodeURIComponent(strText)}`;
 }
+
+// Self-serve signup: /signup?industry=cctv&src=hero. src says which button the visitor used.
+export function signupLink({ industry, src } = {}) {
+  const objParams = new URLSearchParams();
+  if (industry) objParams.set("industry", industry);
+  if (src) objParams.set("src", src);
+  const strQuery = objParams.toString();
+  return strQuery ? `/signup?${strQuery}` : "/signup";
+}
+
+// "cctv-quotation-format" -> "cctv" (the trade key the signup wizard uses)
+export const industryKeyOfSlug = (strSlug) => (strSlug ? strSlug.replace(/-quotation-format$/, "") : "");
 
 // Shown on the website and the in-app Subscribe page (UI-only; DB update parked in misc/pricing-2026-10).
 export const PLANS = [

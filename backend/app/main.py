@@ -36,6 +36,7 @@ logger = getLogger()
 # Router registry - Easy to see all APIs
 LST_ROUTERS = [
     "app.api.login.router",
+    "app.api.onboarding.router",      # Self-serve onboarding wizard (post Google signup)
     "app.api.inventory.router",
     "app.api.quotation.router",
     "app.api.invoice.router",

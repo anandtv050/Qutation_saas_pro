@@ -40,7 +40,7 @@ export const HOME_FAQS = [
   },
   {
     q: "Is there a free trial?",
-    a: `Yes. ${SITE.trialLine} Message us on WhatsApp and we set up your account.`,
+    a: `Yes. ${SITE.trialLine} Sign in with Google at quotelypro.in/signup and you can make your first quotation in a few minutes.`,
   },
   {
     q: "How much does Quotely Pro cost?",

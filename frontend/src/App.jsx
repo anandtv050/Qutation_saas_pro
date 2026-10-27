@@ -26,6 +26,7 @@ const lazyPage = (importer) => {
 
 const Login = lazyPage(() => import("./pages/Login"));
 const Signup = lazyPage(() => import("./pages/Signup"));
+const Welcome = lazyPage(() => import("./pages/Welcome"));
 const Subscribe = lazyPage(() => import("./pages/Subscribe"));
 const ForgotPassword = lazyPage(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazyPage(() => import("./pages/ResetPassword"));
@@ -96,6 +97,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/subscribe" element={<Subscribe />} />
+        <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 

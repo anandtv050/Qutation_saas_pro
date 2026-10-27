@@ -36,7 +36,7 @@ api.interceptors.response.use(
     (error) => {
         // if 401 (UnAuthorized) clear token and redirect to login
         // BUT skip redirect for login endpoint (let it show error message)
-        const isLoginEndpoint = error.config?.url?.includes('/auth/login');
+        const isLoginEndpoint = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/google');
 
         if (error.response?.status === 401 && !isLoginEndpoint) {
             localStorage.removeItem('access_token');

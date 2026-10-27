@@ -3,19 +3,14 @@ import {
   Zap, FileText, Sparkles, ChevronRight, Smartphone, Send, ListPlus, Check, X, Star,
   Camera, Hammer, Briefcase, Store, PenTool, Wallet,
 } from "lucide-react";
-import MarketingLayout, { RichText, TrialButton, FeatureGrid } from "@/marketing/MarketingLayout";
+import MarketingLayout, { RichText, FeatureGrid } from "@/marketing/MarketingLayout";
+import QuoteEditorMount from "@/components/quote-editor/QuoteEditorMount";
 import { SITE, PLANS, FOUNDING_OFFER } from "@/marketing/site";
 import { formatInr } from "@/lib/pricing";
 import { HOME_FAQS } from "@/marketing/home";
 import { GENERAL_PAGES, INDUSTRY_PAGES, COMPARISON_PAGES } from "@/marketing/pages";
 import { useSeo } from "@/marketing/seo";
 import LeadHelperMount from "@/marketing/leadHelper/LeadHelperMount";
-
-const STEPS = [
-  { icon: ListPlus, title: "Add your items", desc: "Pick from your saved items or copy an old quotation. Quantity, unit and rate on every line." },
-  { icon: FileText, title: "Download the PDF", desc: "A clean quotation with your logo, terms, signature and payment QR code. Totals are worked out for you." },
-  { icon: Send, title: "Send it on WhatsApp", desc: "Attach the PDF in your customer's WhatsApp chat while you are still at the site." },
-];
 
 const AUDIENCES = [
   { icon: Camera, title: "Installers", desc: "CCTV, solar, electrical, AC and networking jobs with many line items.", href: "/cctv-quotation-format", linkLabel: "CCTV quotation format" },
@@ -25,14 +20,6 @@ const AUDIENCES = [
   { icon: PenTool, title: "Freelancers", desc: "Web design, photography and creative projects quoted by deliverable.", href: "/web-design-quotation-format", linkLabel: "Web design quotation format" },
 ];
 
-const HOME_FEATURES = [
-  "Copy quotation",
-  "Item catalogue",
-  "AI Quick Create",
-  "Branded PDFs",
-  "Warranty certificates",
-  "Advance and payment receipts",
-];
 
 // Industry grid order: these first, then the rest in their usual order.
 const INDUSTRY_PRIORITY = [
@@ -48,79 +35,65 @@ const ORDERED_INDUSTRIES = [
   ...INDUSTRY_PAGES.filter((p) => !INDUSTRY_PRIORITY.includes(p.slug)),
 ];
 
-// Hero images. Until the real files exist (ready: false) the hero is text-only and centred.
-// To enable: add both files under frontend/public/screenshots/ and set ready: true.
-// width/height must be the files' real pixel size (they reserve space, so there is no layout shift).
-const HERO_MEDIA = {
-  ready: false,
-  app: {
-    src: "/screenshots/app-quotation.png",
-    width: 1080,
-    height: 2340,
-    alt: "Quotely Pro on a phone: a quotation with items, quantities, rates and the total",
-  },
-  pdf: {
-    src: "/screenshots/sample-quotation.png",
-    width: 1240,
-    height: 1754,
-    alt: "Sample quotation PDF made with Quotely Pro: logo, item table, totals and terms",
-  },
-};
 
-function HeroVisual() {
-  const { app, pdf } = HERO_MEDIA;
-  return (
-    <div className="relative mx-auto w-full max-w-[420px]" style={{ aspectRatio: "420 / 500" }}>
-      <div
-        className="absolute right-0 top-0 w-[64%] rotate-3 rounded-lg border border-neutral-200 bg-white shadow-xl overflow-hidden"
-        style={{ aspectRatio: `${pdf.width} / ${pdf.height}` }}
-      >
-        <img src={pdf.src} width={pdf.width} height={pdf.height} alt={pdf.alt} loading="lazy" decoding="async" className="block w-full h-full object-cover" />
-      </div>
-      <div
-        className="absolute left-0 bottom-0 w-[50%] rounded-[1.75rem] p-[7px] bg-neutral-900 shadow-2xl ring-1 ring-black/20 overflow-hidden"
-        style={{ aspectRatio: `${app.width} / ${app.height}` }}
-      >
-        <img src={app.src} width={app.width} height={app.height} alt={app.alt} loading="lazy" decoding="async" className="block w-full h-full object-cover rounded-[1.25rem]" />
-      </div>
-    </div>
-  );
+const STEPS = [
+  { icon: ListPlus, title: "Add your items", desc: "Pick from your saved items or copy an old quotation. Quantity, unit and rate on every line." },
+  { icon: FileText, title: "Download the PDF", desc: "A clean quotation with your logo, terms, signature and payment QR code. Totals are worked out for you." },
+  { icon: Send, title: "Send it on WhatsApp", desc: "Attach the PDF in your customer's WhatsApp chat while you are still at the site." },
+];
+
+const HOME_FEATURES = [
+  "Copy quotation",
+  "Item catalogue",
+  "AI Quick Create",
+  "Branded PDFs",
+  "Warranty certificates",
+  "Advance and payment receipts",
+];
+
+// The hero button: smooth-scroll to the editor and focus the first box.
+function scrollToEditor(e) {
+  const el = document.getElementById("quote-editor");
+  if (!el) return;
+  e.preventDefault();
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  setTimeout(() => document.getElementById("qe-business")?.focus({ preventScroll: true }), 500);
 }
-
 
 export default function Landing() {
   useSeo("/");
 
   return (
     <MarketingLayout>
-      {/* Hero */}
-      <section className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-neutral-100 via-neutral-50 to-white">
-        <div className={HERO_MEDIA.ready ? "max-w-6xl mx-auto grid gap-12 lg:grid-cols-2 lg:gap-10 items-center" : "max-w-4xl mx-auto"}>
-        <div className={HERO_MEDIA.ready ? "text-center lg:text-left" : "text-center"}>
+      {/* Hero: headline, one line, one button that scrolls to the editor */}
+      <section className="pt-28 pb-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-neutral-100 via-neutral-50 to-white">
+        <div className="max-w-3xl mx-auto text-center">
           <p className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-neutral-200 rounded-full mb-8 text-xs font-medium text-neutral-700">
             <Smartphone className="w-3.5 h-3.5" aria-hidden="true" />
             Quotation maker for small businesses in India
           </p>
-          <h1 className={`text-4xl sm:text-5xl font-bold text-black leading-tight tracking-tight mb-6 ${HERO_MEDIA.ready ? "lg:text-[3.4rem]" : "lg:text-6xl"}`}>
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-black leading-tight tracking-tight mb-6">
             Make a professional quotation on your phone in 1 minute
           </h1>
-          <p className={`text-lg sm:text-xl text-neutral-700 max-w-2xl mx-auto mb-10 leading-relaxed ${HERO_MEDIA.ready ? "lg:mx-0" : ""}`}>
+          <p className="text-lg sm:text-xl text-neutral-700 max-w-2xl mx-auto mb-8 leading-relaxed">
             Quotely Pro turns your items, quantities and rates into a clean, branded PDF quotation. Download it and send
             it to your customer on WhatsApp before a competitor does.
           </p>
-          <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 ${HERO_MEDIA.ready ? "lg:justify-start" : ""}`}>
-            <TrialButton context="my business" className="w-full sm:w-auto px-8 py-3.5" />
-            <a
-              href="#how-it-works"
-              className="w-full sm:w-auto px-8 py-3.5 text-base font-semibold text-neutral-800 bg-white border border-neutral-200 rounded-xl hover:bg-neutral-50 text-center"
-            >
-              See how it works
-            </a>
-          </div>
+          <a
+            href="#quote-editor"
+            onClick={scrollToEditor}
+            className="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold bg-black text-white rounded-xl hover:bg-neutral-800 transition-colors w-full sm:w-auto"
+          >
+            Make your quotation — free ↓
+          </a>
           <p className="mt-5 text-base font-semibold text-black">{SITE.trialLine}</p>
-          <p className="mt-1 text-sm text-neutral-600">Plans from ₹{formatInr(PLANS[0].priceMonthly)}/month. {SITE.priceNote}</p>
         </div>
-        {HERO_MEDIA.ready && <HeroVisual />}
+      </section>
+
+      {/* The editor (client-only and lazy; the prerendered page has a placeholder) */}
+      <section className="px-4 sm:px-6 lg:px-8 pb-10">
+        <div className="max-w-5xl mx-auto">
+          <QuoteEditorMount mode="home" />
         </div>
       </section>
 
@@ -315,7 +288,9 @@ export default function Landing() {
             ))}
           </div>
           <div className="mt-12 flex flex-col items-center gap-3">
-            <TrialButton context="my business" className="px-8 py-3.5" />
+            <a href="#quote-editor" onClick={scrollToEditor} className="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold bg-black text-white rounded-xl hover:bg-neutral-800 transition-colors">
+              Make your quotation — free ↑
+            </a>
             <p className="text-sm text-neutral-600">Pay by UPI or bank transfer. We activate your plan once payment is received.</p>
           </div>
         </div>
@@ -347,9 +322,11 @@ export default function Landing() {
           <Zap className="w-8 h-8 mx-auto mb-4 text-neutral-800" aria-hidden="true" />
           <h2 className="text-3xl font-bold text-black mb-4">Send your next quotation in 1 minute</h2>
           <p className="text-neutral-700 mb-8">
-            Message us on WhatsApp. We set up your account with your logo and terms. {SITE.trialLine}
+            Sign in with Google, add your items and download your first quotation in a few minutes. {SITE.trialLine}
           </p>
-          <TrialButton context="my business" className="px-8 py-3.5" />
+          <a href="#quote-editor" onClick={scrollToEditor} className="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold bg-black text-white rounded-xl hover:bg-neutral-800 transition-colors">
+            Make your quotation — free ↑
+          </a>
         </div>
       </section>
       <LeadHelperMount page={null} />

@@ -5,9 +5,13 @@ step to a Google Apps Script web app, which appends a row to the **Website Leads
 Growth Tracker sheet. Free, no backend.
 
 ## Columns
-`timestamp, session_id, page_slug, page_type, industry, event, question, answer, quotes_per_day, current_method, visitor_type, source, device, referrer, phone`
+`timestamp, session_id, page_slug, page_type, industry, event, question, answer, quotes_per_day, current_method, visitor_type, source, device, referrer, phone, visitor_id`
+
+- `visitor_id`: one random id per browser (localStorage `qp_vid`), on **every** row from the website, the editor and the signup, so a visit can be followed to the account. `session_id` is still per page visit (Lead Helper) or per signup (funnel).
 
 - `event`: `shown` (auto teaser appeared), `opened` (chat opened), `closed`, `hook_yes`, `hook_no`, `answered`, `whatsapp_click`, `download_click`, `toast_whatsapp_click` (download toast), `inline_whatsapp_click` (the line under each sample), `number_submitted` (visitor left their WhatsApp number at the end of the chat)
+- Self-serve signup funnel events (same endpoint, raw tab only, `page_type` = `app`): `signup_started` (opened /signup; `answer` = traffic source), `signup_completed` (new account created with Google), `onboarding_step` (`question` = wizard step 1/2/3, `answer` = `done` or `skipped`), `first_quote_created`, `first_pdf_downloaded` (the last two once per browser, only for accounts made through the wizard). `source` is the `?src=` of the button used (`header`, `hero`, `pricing`, `final_cta`, `inline`, `page_cta`, `lead_helper`), else the traffic source; `industry` is the `?industry=` trade. `session_id` stays the same across the whole signup. **After changing `Code.gs`, redeploy the web app** (Deploy → Manage deployments → Edit → New version).
+- Website editor funnel (raw tab only, `page_type` = `site`): `editor_opened` (editor shown), `editor_edited` (first change per page view), `save_click` (Download my PDF), `google_prompt_opened` (save dialog; `answer` = `anonymous` or `signed_in`), `google_prompt_closed` (`answer` = `dismissed`), `draft_imported` (`answer` = number of warnings), `item_added` (`answer` = `custom` or `suggested`), plus the Lead Helper's `signup_click`. In the signed-in app: `custom_pdf_whatsapp_click` (`answer` = where: `checklist`, `locked_page` or `saved_quotation`). `signup_completed` and `first_pdf_downloaded` (existing) close the loop. `industry` is the trade of the page.
 - `session_id`: random per page visit. One helper run = one session_id.
 - `question`: `hook`, `industry`, `current_method`, `quotes_per_day`, `result`, `download`, `end`, `teaser` / `toast` (closed), `page` (a download link on the page itself), `launcher` (launcher opened WhatsApp directly), `inline`. On `opened` rows, `answer` is `teaser` or `launcher`
 - `visitor_type`: `owner`, `other_business` (another trade, after "No"), `needs_quote` ("I'm a customer"), `learning` ("Just learning"), `unknown`

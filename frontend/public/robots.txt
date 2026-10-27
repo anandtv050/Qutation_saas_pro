@@ -4,6 +4,7 @@ Allow: /
 # App, account and auth screens (not public content)
 Disallow: /login$
 Disallow: /signup$
+Disallow: /welcome$
 Disallow: /subscribe$
 Disallow: /forgot-password
 Disallow: /reset-password

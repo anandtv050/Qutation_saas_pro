@@ -22,7 +22,17 @@ async def fnGenerateQuotationPDF(
     # await fnCheckModuleOperation(objContext.objPool, objContext.intUserId, "print_settings", "print")
     try:
         insPdfService = ClsPdfGenerator(objContext.objPool, objContext.intUserId)
-        return await insPdfService.fnGetQuotationPdf(mdlRequest)
+        objResponse = await insPdfService.fnGetQuotationPdf(mdlRequest)
+        try:
+            async with objContext.objPool.acquire() as conn:
+                await conn.execute(
+                    "UPDATE tbl_user SET tim_first_pdf_at = CURRENT_TIMESTAMP "
+                    "WHERE pk_bint_user_id = $1 AND tim_first_pdf_at IS NULL",
+                    objContext.intUserId,
+                )
+        except Exception:
+            pass  # bookkeeping only: never fail a PDF download for it
+        return objResponse
     except HTTPException:
         raise
     except Exception as e:

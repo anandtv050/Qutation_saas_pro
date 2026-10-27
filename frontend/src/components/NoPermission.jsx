@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Lock, ArrowLeft, Mail, Hourglass, Clock, AlertCircle } from "lucide-react";
+import { Lock, ArrowLeft, Mail, Hourglass, Clock, AlertCircle, MessageCircle } from "lucide-react";
+import { customPdfLink, trackCustomPdfClick } from "@/lib/customPdfHelp";
 
 /**
  * Reusable "restricted access" page/banner. One component, multiple scenarios.
@@ -82,6 +83,30 @@ export default function NoPermission({
   const navigate = useNavigate();
   const cfg = VARIANTS[variant] || VARIANTS.permission;
   const Icon = cfg.icon;
+
+  // Trial accounts have no Print Settings page: our team sets up the logo, colours and layout on WhatsApp.
+  if (variant === "permission" && moduleKey === "print_settings" && !compact) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
+        <div data-qe="custom-pdf-card" className="text-center max-w-md w-full rounded-2xl border border-neutral-200 bg-white p-6">
+          <p className="text-lg font-semibold text-neutral-900">Want your logo, colours or a custom layout on your PDF?</p>
+          <p className="mt-2 text-neutral-500 leading-relaxed">Our team will set it up for you.</p>
+          <a
+            href={customPdfLink()}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-qe="custom-pdf-whatsapp"
+            onClick={() => trackCustomPdfClick("locked_page")}
+            className="mt-5 inline-flex w-full items-center justify-center gap-2 h-12 rounded-xl bg-black text-white text-base font-semibold hover:bg-neutral-800 transition-colors"
+          >
+            <MessageCircle className="w-5 h-5" aria-hidden="true" />
+            Chat with our team on WhatsApp
+          </a>
+          <Link to="/dashboard" className="mt-3 inline-block text-sm text-neutral-500 hover:text-black">Back to dashboard</Link>
+        </div>
+      </div>
+    );
+  }
   const featureLabel = moduleName || (moduleKey ? moduleKey.replace(/_/g, " ") : "this feature");
   const finalTitle = title || cfg.defaultTitle(featureLabel);
   const finalMessage = message || cfg.defaultMessage(featureLabel);

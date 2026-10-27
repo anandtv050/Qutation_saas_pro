@@ -402,6 +402,17 @@ class ClsPdfGenerator:
         else:
             self._print_settings = {"__module": strModule}
             self._column_config = []
+            # Google-only account that never saved print settings: its sign-in email (often a personal
+            # Gmail) must not appear on customer documents. Accounts with a password, or with saved
+            # settings, are untouched.
+            async with self.objPool.acquire() as conn:
+                blnGoogleOnly = await conn.fetchval(
+                    "SELECT vchr_google_sub IS NOT NULL AND vchr_password_hash IS NULL "
+                    "FROM tbl_user WHERE pk_bint_user_id = $1",
+                    self.intUserId,
+                )
+            if blnGoogleOnly:
+                self._print_settings["bln_show_email"] = False
 
     # ── dynamic column helpers ──────────────────────────────────
     def _build_dynamic_columns(self, strModule):

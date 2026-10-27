@@ -187,7 +187,7 @@ export const GENERAL_PAGES = [
       {
         heading: "Getting started",
         paragraphs: [
-          "Accounts are set up personally right now. Message us on WhatsApp and we set up your account with your logo and terms. 7-day free trial. No payment needed. After the trial, plans start at ₹999 per month. Final price. No hidden charges. To see what goes into a good quotation first, read our [quotation format guide](/quotation-format).",
+          "Start free at [quotelypro.in/signup](/signup): sign in with Google, add your items and download your first quotation in a few minutes. Send your logo on WhatsApp and we add it. 7-day free trial. No payment needed. After the trial, plans start at ₹999 per month. Final price. No hidden charges. To see what goes into a good quotation first, read our [quotation format guide](/quotation-format).",
         ],
       },
     ],
@@ -215,7 +215,7 @@ export const GENERAL_PAGES = [
       },
       {
         q: "Is there a free trial?",
-        a: "Yes. 7-day free trial. No payment needed. Message us on WhatsApp and we set up your account.",
+        a: "Yes. 7-day free trial. No payment needed. Sign in with Google to start.",
       },
     ],
   },
@@ -342,7 +342,7 @@ export const GENERAL_PAGES = [
       {
         heading: "How to make your first quotation",
         orderedList: [
-          "Message us on WhatsApp. We create your account and add your logo and terms.",
+          "Sign in with Google at quotelypro.in/signup. Your account is ready in seconds and no payment details are asked for.",
           "Open Quotely Pro in your phone browser and add the items you sell most, with your rates. This is a one-time step.",
           "Start a new quotation, pick the items, and enter quantities. Totals are calculated for you.",
           "Download the PDF and send it to your customer on WhatsApp.",
@@ -393,7 +393,7 @@ export const GENERAL_PAGES = [
       },
       {
         q: "Do I need to pay anything for the free trial?",
-        a: "No. You start by messaging us on WhatsApp. We set up your account without any payment details, and you decide at the end of the 7 days whether to choose a paid plan.",
+        a: "No. You start by signing in with Google. No payment details are asked for, and you decide at the end of the 7 days whether to choose a paid plan.",
       },
       {
         q: "Are quotations limited during the free trial?",
@@ -2130,7 +2130,7 @@ export const COMPARISON_PAGES = [
       },
       {
         q: "Is there a free trial of Quotely Pro?",
-        a: "Yes. 7-day free trial. No payment needed. Message us on WhatsApp to set up your account.",
+        a: "Yes. 7-day free trial. No payment needed. Sign in with Google to start.",
       },
     ],
     disclaimer: TRADEMARK_NOTE,
@@ -2354,7 +2354,7 @@ export const COMPARISON_PAGES = [
           columns: ["", "Excel template", "Quotely Pro"],
           rows: [
             ["Cost", "Often already available; free alternatives like Google Sheets exist", "Free for 7 days, then from ₹999/month (final price, no hidden charges)"],
-            ["Setup", "Build or download a template, set up formulas", "We set up your account, logo and terms with you"],
+            ["Setup", "Build or download a template, set up formulas", "Sign in with Google and add your items. Send your logo on WhatsApp and we add it"],
             ["On a phone", "Possible, but editing cells on a small screen is slow", "Built for phone use in the browser"],
             ["Totals", "Correct if formulas are right; easy to break by mistake", "Calculated automatically"],
             ["Reusing items", "Copy and paste from old files", "Saved items, Copy quotation, AI Quick Create"],
@@ -2417,7 +2417,7 @@ export const COMPARISON_PAGES = [
       },
       {
         q: "Can I move from Excel to Quotely Pro easily?",
-        a: "Yes. Add the items and rates you use most into Quotely Pro once, and when we set up your account we add your logo and terms. After that, new quotations reuse those saved items.",
+        a: "Yes. Add the items and rates you use most into Quotely Pro once, and send your logo on WhatsApp so we can add it. After that, new quotations reuse those saved items.",
       },
       {
         q: "Can I use Quotely Pro for free, like Google Sheets?",

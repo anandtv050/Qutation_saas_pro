@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Copy, Package, FileText } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { demoLink } from "@/marketing/site";
 import authService from "@/services/authServices";
+import GoogleSignInButton, { isGoogleEnabled } from "@/components/GoogleSignInButton";
+import AuthLeftPanel from "@/components/AuthLeftPanel";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -54,57 +56,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-neutral-50 via-white to-neutral-100">
-      {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-black relative overflow-hidden shadow-2xl">
-        {/* Gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black via-neutral-950 to-black" />
-
-        {/* Subtle grid pattern */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{
-          backgroundImage: `
-            linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px)
-          `,
-          backgroundSize: '80px 80px'
-        }} />
-
-        {/* Minimal glow effect */}
-        <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-white/[0.02] rounded-full blur-3xl" />
-
-        <div className="flex flex-col justify-between w-full px-16 py-14 relative z-10">
-          {/* Logo & Brand Name */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-white rounded-lg shadow-sm">
-              <span className="text-black text-xl font-bold">Q</span>
-            </div>
-            <span className="text-white text-xl font-semibold">Quotely Pro</span>
-          </div>
-
-          {/* Main Message - Centered */}
-          <div className="space-y-7">
-            <h1 className="text-white text-5xl font-bold leading-tight tracking-tight max-w-xl">
-              Create professional quotes in seconds
-            </h1>
-            <p className="text-neutral-400 text-base max-w-md leading-relaxed">
-              AI-powered quotation platform built for busy professionals who value speed and precision.
-            </p>
-          </div>
-
-          {/* Features - Clean list */}
-          <ul className="space-y-3">
-            {[
-              { icon: Copy, label: "Copy any old quotation" },
-              { icon: Package, label: "Your item catalogue with saved rates" },
-              { icon: FileText, label: "Branded PDF with your logo" },
-            ].map((f) => (
-              <li key={f.label} className="flex items-center gap-3">
-                <f.icon className="w-4 h-4 text-white/60 shrink-0" strokeWidth={2} />
-                <span className="text-white text-sm font-medium">{f.label}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
+      <AuthLeftPanel />
 
       {/* Right Panel - Login Form */}
       <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">
@@ -128,6 +80,18 @@ export default function Login() {
             <div className="mb-6 p-3.5 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-600 text-sm">{error}</p>
             </div>
+          )}
+
+          {/* Google sign-in (also creates a free-trial account for new users) */}
+          {isGoogleEnabled && (
+            <>
+              <GoogleSignInButton onError={setError} />
+              <div className="flex items-center gap-3 my-6">
+                <div className="flex-1 h-px bg-neutral-200" />
+                <span className="text-xs text-neutral-400">or use email</span>
+                <div className="flex-1 h-px bg-neutral-200" />
+              </div>
+            </>
           )}
 
           {/* Form */}
@@ -235,17 +199,23 @@ export default function Login() {
             </button>
           </form>
 
-          {/* New user: trial is set up on WhatsApp */}
+          {/* New user: self-serve trial (WhatsApp only when Google sign-in is not configured) */}
           <p className="mt-5 text-center text-sm text-neutral-600">
             New here?{" "}
-            <a
-              href={demoLink()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-black underline underline-offset-2 hover:text-neutral-700"
-            >
-              Start free trial on WhatsApp
-            </a>
+            {isGoogleEnabled ? (
+              <Link to="/signup" className="font-semibold text-black underline underline-offset-2 hover:text-neutral-700">
+                Start free trial
+              </Link>
+            ) : (
+              <a
+                href={demoLink()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-black underline underline-offset-2 hover:text-neutral-700"
+              >
+                Start free trial on WhatsApp
+              </a>
+            )}
           </p>
 
           {/* Footer */}

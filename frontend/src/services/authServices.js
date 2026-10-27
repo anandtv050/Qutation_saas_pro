@@ -41,6 +41,21 @@ const authService = {
         }
     },
 
+    // Google sign-in / sign-up (strIdToken = Google credential)
+    googleLogin: async (strIdToken, { industry, source } = {}) => {
+        try {
+            const response = await api.post('/auth/google', {
+                strIdToken,
+                strIndustry: industry || null,
+                strSource: source || null,
+            });
+            return response.data;
+        } catch (error) {
+            const strMessage = error.response?.data?.detail || 'Google sign-in failed';
+            throw new Error(strMessage);
+        }
+    },
+
     // Logout function
     logout: () => {
         localStorage.removeItem('access_token');
